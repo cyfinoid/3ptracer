@@ -6,6 +6,7 @@ class UIRenderer {
         this.progressText = document.getElementById('progressText');
         this.resultsDiv = document.getElementById('results');
         this.statsDiv = document.getElementById('stats');
+        this.sectionCounter = 0; // For unique section IDs
     }
 
     // Update progress bar
@@ -27,11 +28,82 @@ class UIRenderer {
         }
     }
 
+    // Create a collapsible section
+    createCollapsibleSection(title, content, isExpanded = true, itemCount = null) {
+        const sectionId = `section-${++this.sectionCounter}`;
+        const itemCountText = itemCount ? ` (${itemCount})` : '';
+        const expandedClass = isExpanded ? 'expanded' : '';
+        const displayStyle = isExpanded ? 'block' : 'none';
+        
+        return `
+            <div class="collapsible-section ${expandedClass}">
+                <div class="section-header" onclick="toggleSection('${sectionId}')">
+                    <div class="section-title">
+                        <span class="toggle-icon">${isExpanded ? '▼' : '▶'}</span>
+                        <h2>${title}${itemCountText}</h2>
+                    </div>
+                </div>
+                <div id="${sectionId}" class="section-content" style="display: ${displayStyle};">
+                    ${content}
+                </div>
+            </div>
+        `;
+    }
+
+    // Display a major section wrapped in collapsible container
+    displayCollapsibleSection(title, renderFunction, isExpanded = true, itemCount = null) {
+        // Create a temporary container to capture the output
+        const tempDiv = document.createElement('div');
+        
+        // Temporarily redirect the display method's output to our temp container
+        const originalDiv = this.resultsDiv;
+        this.resultsDiv = tempDiv;
+        
+        // Call the render function to generate content
+        renderFunction();
+        
+        // Restore original results div
+        this.resultsDiv = originalDiv;
+        
+        // Get the generated content
+        const content = tempDiv.innerHTML;
+        
+        // Only create the section if there's actual content
+        if (content.trim()) {
+            const collapsibleHTML = this.createCollapsibleSection(title, content, isExpanded, itemCount);
+            this.resultsDiv.innerHTML += collapsibleHTML;
+        }
+    }
+
+    // Global toggle function (needs to be accessible from onclick)
+    static initializeToggleFunction() {
+        if (!window.toggleSection) {
+            window.toggleSection = function(sectionId) {
+                const content = document.getElementById(sectionId);
+                const section = content.closest('.collapsible-section');
+                const icon = section.querySelector('.toggle-icon');
+                
+                if (content.style.display === 'none') {
+                    content.style.display = 'block';
+                    icon.textContent = '▼';
+                    section.classList.add('expanded');
+                } else {
+                    content.style.display = 'none';
+                    icon.textContent = '▶';
+                    section.classList.remove('expanded');
+                }
+            };
+        }
+    }
+
     // Display all results
     displayResults(processedData, securityResults, interestingFindings, apiNotifications, isProgressive = false) {
         if (this.resultsDiv) {
             this.resultsDiv.style.display = 'block';
         }
+
+        // Initialize toggle function
+        UIRenderer.initializeToggleFunction();
 
         // Add progressive status message if this is a progressive update
         if (isProgressive) {
@@ -40,20 +112,46 @@ class UIRenderer {
 
         this.displayStats(processedData.stats, securityResults);
         this.displayAPINotifications(apiNotifications);
-        this.displayServicesByVendor(processedData.services);
+        
+        // Wrap major sections in collapsible containers
+        this.displayCollapsibleSection('Third-Party Services', () => {
+            this.displayServicesByVendor(processedData.services);
+        }, true, processedData.stats.totalServices || 0);
         
         // NEW: Display Data Sovereignty Analysis (only for complete analysis)
         if (!isProgressive && processedData.sovereigntyAnalysis) {
-            this.displayDataSovereignty(processedData.sovereigntyAnalysis);
+            this.displayCollapsibleSection('Data Sovereignty Analysis', () => {
+                this.displayDataSovereignty(processedData.sovereigntyAnalysis);
+            }, false); 
         }
         
-        this.displaySecurity(securityResults);
-        this.displayInterestingFindings(interestingFindings);
-        this.displayRedirectsToMain(processedData.redirectsToMain);
-        this.displayCNAMEMappings(processedData);
-        this.displayDNSRecords(processedData.dnsRecords);
-        this.displaySubdomains(processedData);
-        this.displayHistoricalRecords(processedData.historicalRecords);
+        this.displayCollapsibleSection('Security Issues', () => {
+            this.displaySecurity(securityResults);
+        }, true, this.calculateTotalSecurityIssues(securityResults));
+        
+        this.displayCollapsibleSection('Infrastructure Analysis', () => {
+            this.displayInterestingFindings(interestingFindings);
+        }, false, interestingFindings?.length || 0);
+        
+        this.displayCollapsibleSection('Domain Redirects', () => {
+            this.displayRedirectsToMain(processedData.redirectsToMain);
+        }, false, processedData.redirectsToMain?.length || 0);
+        
+        this.displayCollapsibleSection('CNAME Mappings', () => {
+            this.displayCNAMEMappings(processedData);
+        }, false, processedData.cnameCount || 0);
+        
+        this.displayCollapsibleSection('DNS Records', () => {
+            this.displayDNSRecords(processedData.dnsRecords);
+        }, false, processedData.dnsRecords?.length || 0);
+        
+        this.displayCollapsibleSection('Subdomains', () => {
+            this.displaySubdomains(processedData);
+        }, true, processedData.stats.totalSubdomains || 0);
+        
+        this.displayCollapsibleSection('Historical Records', () => {
+            this.displayHistoricalRecords(processedData.historicalRecords);
+        }, false, processedData.historicalRecords?.length || 0);
     }
 
     // Display statistics
@@ -389,7 +487,7 @@ class UIRenderer {
             1: 'A', 5: 'CNAME', 6: 'SOA', 15: 'MX', 16: 'TXT', 28: 'AAAA',
             2: 'NS', 12: 'PTR', 33: 'SRV', 46: 'RRSIG', 47: 'NSEC',
             48: 'DNSKEY', 43: 'DS', 44: 'SSHFP', 45: 'IPSECKEY',
-            99: 'SPF', 250: 'CAA'
+            99: 'SPF', 250: 'CAA', 257: 'CAA'
         };
         return recordTypes[typeNumber] || `Type ${typeNumber}`;
     }
@@ -401,17 +499,18 @@ class UIRenderer {
         
         if (!container) return;
         
-        // Collect all security issues
+        // Collect all security issues including wildcard certificates
         const allIssues = [
             ...(securityResults.takeovers || []).map(issue => ({ ...issue, category: 'takeover' })),
             ...(securityResults.dnsIssues || []).map(issue => ({ ...issue, category: 'dns' })),
             ...(securityResults.emailIssues || []).map(issue => ({ ...issue, category: 'email' })),
-            ...(securityResults.cloudIssues || []).map(issue => ({ ...issue, category: 'cloud' }))
+            ...(securityResults.cloudIssues || []).map(issue => ({ ...issue, category: 'cloud' })),
+            ...(securityResults.wildcardCertificates || []).map(issue => ({ ...issue, category: 'certificate' }))
         ];
         
         if (allIssues.length === 0) {
             if (section) section.style.display = 'none';
-            return;
+            return;   
         }
         
         if (section) section.style.display = 'block';
@@ -461,7 +560,7 @@ class UIRenderer {
         
         const categoryIcons = {
             takeover: '🎯', dns: '🌐', email: '📧',
-            infrastructure: '🏗️', cloud: '☁️'
+            infrastructure: '🏗️', cloud: '☁️', certificate: '🔐'
         };
         
         const icon = categoryIcons[issue.category] || '🔍';
@@ -809,6 +908,29 @@ class UIRenderer {
                         <strong>Service:</strong> <span style="color: ${confidenceColor};">${record.parsed.service}</span> |
                         <strong>Key:</strong> ${record.parsed.keyType} |
                         <strong>Confidence:</strong> <span style="color: ${confidenceColor};">${confidence}</span>
+                    </div>`;
+                }
+
+                // Show parsed CAA info if available
+                if (record.parsed && record.type === 'CAA') {
+                    const trustColor = record.parsed.isKnownCA ? '#28a745' : '#ffc107';
+                    
+                    html += `<div class="caa-parsed">
+                        <strong>Tag:</strong> ${record.parsed.tag} | 
+                        <strong>Authority:</strong> <span style="color: ${trustColor};">${record.parsed.authority}</span> |
+                        <strong>Flags:</strong> ${record.parsed.flags} |
+                        <strong>Trust Level:</strong> <span style="color: ${trustColor};">${record.parsed.isKnownCA ? 'Known CA' : 'Unknown CA'}</span>
+                    </div>`;
+                }
+
+                // Show parsed SRV info if available
+                if (record.parsed && record.type === 'SRV') {
+                    html += `<div class="srv-parsed">
+                        <strong>Service:</strong> ${record.parsed.service} | 
+                        <strong>Target:</strong> ${record.parsed.target}:${record.parsed.port} |
+                        <strong>Priority:</strong> ${record.parsed.priority} |
+                        <strong>Weight:</strong> ${record.parsed.weight} |
+                        <strong>Type:</strong> ${record.parsed.serviceType}
                     </div>`;
                 }
 

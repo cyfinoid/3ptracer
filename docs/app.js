@@ -58,18 +58,21 @@ async function analyzeDomain() {
     }
 }
 
-// Handle Enter key in input field
-document.getElementById('domain').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        analyzeDomain();
-    }
-});
-
-// Load saved results on page load
+// Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
+    // Handle Enter key in input field
     const domainInput = document.getElementById('domain');
-    const savedDomain = localStorage.getItem('3ptracer_last_domain');
-    if (savedDomain) {
-        domainInput.value = savedDomain;
+    if (domainInput) {
+        domainInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                analyzeDomain();
+            }
+        });
+        
+        // Load saved domain
+        const savedDomain = localStorage.getItem('3ptracer_last_domain');
+        if (savedDomain) {
+            domainInput.value = savedDomain;
+        }
     }
 }); 

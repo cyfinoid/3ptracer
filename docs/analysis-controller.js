@@ -173,32 +173,65 @@ class AnalysisController {
         
         // Update progress for each source
         this.uiRenderer.updateProgress(22, 'Querying Certificate Transparency logs...');
-        this.addAPINotification('Certificate Transparency', 'Querying crt.sh and other CT logs (may take 10-30 seconds)...', 'info');
+        this.addAPINotification('Certificate Transparency', 'Querying crt.sh and other CT logs (may take 30-90 seconds)...', 'info');
         
         try {
-            // Add timeout to prevent indefinite waiting
-            const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Subdomain discovery timeout')), 45000) // 45 second timeout
-            );
+            // Use the new optimized discovery approach
+            const subdomains = await this.dnsAnalyzer.getSubdomainsFromCT(domain);
             
-            const discoveryPromise = this.dnsAnalyzer.getSubdomainsFromCT(domain);
+            // Get final stats from discovery queue
+            const discoveryStats = this.dnsAnalyzer.discoveryQueue.getStats();
             
-            // Race between discovery and timeout
-            const subdomains = await Promise.race([discoveryPromise, timeoutPromise]);
-            
-            this.uiRenderer.updateProgress(35, `Found ${subdomains.length} potential subdomains`);
-            this.addAPINotification('Subdomain Discovery', `Found ${subdomains.length} subdomains from Certificate Transparency logs`, 'success');
+            this.uiRenderer.updateProgress(35, `Found ${discoveryStats.total} subdomains, processed ${discoveryStats.processed}`);
+            this.addAPINotification('Subdomain Discovery', `Found ${discoveryStats.total} subdomains from Certificate Transparency logs`, 'success');
             
             this.debug.logJSON('Subdomains discovered:', subdomains);
-            console.log(`✅ Found ${subdomains.length} subdomains`);
+            console.log(`✅ Found and processed ${subdomains.length} subdomains`);
             
             return subdomains;
             
         } catch (error) {
             console.warn(`⚠️ Subdomain discovery error:`, error.message);
-            this.addAPINotification('Subdomain Discovery', `Warning: ${error.message}. Continuing with available data.`, 'warning');
             
-            // Continue with empty array if discovery fails
+            // Get detailed API status information
+            const apiStatuses = this.dnsAnalyzer.getCTApiStatuses();
+            
+            if (error.message.includes('timeout')) {
+                // Generate detailed timeout message
+                let timeoutMessage = 'Certificate Transparency APIs timeout after 90 seconds: ';
+                const timeoutDetails = [];
+                
+                // Check if we have API status information
+                if (apiStatuses && (apiStatuses.completed.length > 0 || apiStatuses.timeout.length > 0 || apiStatuses.failed.length > 0)) {
+                    if (apiStatuses.completed.length > 0) {
+                        timeoutDetails.push(`✅ ${apiStatuses.completed.join(', ')} succeeded`);
+                    }
+                    if (apiStatuses.timeout.length > 0) {
+                        timeoutDetails.push(`⏰ ${apiStatuses.timeout.join(', ')} timed out`);
+                    }
+                    if (apiStatuses.failed.length > 0) {
+                        timeoutDetails.push(`❌ ${apiStatuses.failed.join(', ')} failed`);
+                    }
+                    timeoutMessage += timeoutDetails.join('; ');
+                } else {
+                    // Fallback message when API status tracking isn't available
+                    timeoutMessage += 'External Certificate Transparency APIs (crt.sh, Cert Spotter, OTX, HackerTarget) are responding slowly';
+                }
+                
+                this.addAPINotification('Certificate Transparency', timeoutMessage + '. Continuing analysis with any available subdomain data.', 'warning');
+            } else {
+                this.addAPINotification('Subdomain Discovery', `Warning: ${error.message}. Continuing with available data.`, 'warning');
+            }
+            
+            // FIXED: Return processed subdomain results even when discovery times out
+            const processedResults = this.dnsAnalyzer.getProcessedSubdomainResults();
+            if (processedResults.length > 0) {
+                console.log(`✅ Returning ${processedResults.length} processed subdomain results despite timeout`);
+                this.addAPINotification('Subdomain Discovery', `Found ${processedResults.length} subdomains that were processed before timeout`, 'success');
+                return processedResults.map(result => result.subdomain);
+            }
+            
+            // Continue with empty array if no processed results available
             return [];
         }
     }
@@ -220,25 +253,31 @@ class AnalysisController {
         
         if (subdomains.length === 0) {
             console.log(`ℹ️ No subdomains to analyze`);
+            
+            // FIXED: Check if we have processed results available
+            const processedResults = this.dnsAnalyzer.getProcessedSubdomainResults();
+            if (processedResults.length > 0) {
+                console.log(`✅ Found ${processedResults.length} processed subdomain results, using those instead`);
+                this.addAPINotification('DNS Analysis', `Using ${processedResults.length} previously processed subdomains`, 'info');
+                return processedResults;
+            }
+            
             return [];
         }
 
-        // Update progress
-        this.uiRenderer.updateProgress(45, `Analyzing ${subdomains.length} subdomains...`);
-        this.addAPINotification('DNS Analysis', `Starting analysis of ${subdomains.length} discovered subdomains...`, 'info');
-        
-        // Analyze subdomains
-        const results = await this.dnsAnalyzer.analyzeSubdomains(subdomains);
+        // With the new discovery queue approach, subdomains are already processed
+        // Just return them directly since they're already analyzed
+        console.log(`✅ Subdomains already processed via discovery queue, returning ${subdomains.length} results`);
         
         // Show progressive results with subdomains
-        this.uiRenderer.updateProgress(60, `Analyzed ${results.length} subdomains, updating display...`);
-        await this.displayProgressiveResults(mainDomainResults, results, [], {});
+        this.uiRenderer.updateProgress(60, `Returning ${subdomains.length} processed subdomains...`);
+        await this.displayProgressiveResults(mainDomainResults, subdomains, [], {});
         
-        this.addAPINotification('DNS Analysis', `Completed analysis of ${results.length} subdomains`, 'success');
-        this.debug.logJSON('Subdomain analysis results:', results);
-        console.log(`✅ Subdomain analysis complete: ${results.length} results`);
+        this.addAPINotification('DNS Analysis', `Completed analysis of ${subdomains.length} subdomains`, 'success');
+        this.debug.logJSON('Subdomain analysis results:', subdomains);
+        console.log(`✅ Subdomain analysis complete: ${subdomains.length} results`);
         
-        return results;
+        return subdomains;
     }
 
     // Enrich subdomain results with ASN information
@@ -283,7 +322,8 @@ class AnalysisController {
             takeovers: [],
             dnsIssues: [],
             emailIssues: [],
-            cloudIssues: []
+            cloudIssues: [],
+            wildcardCertificates: []
         };
 
         if (mainDomainResults?.records) {
@@ -304,6 +344,13 @@ class AnalysisController {
                 securityResults.takeovers = this.serviceDetector.detectTakeoverFromCNAME(mainDomainResults.records.CNAME);
                 this.debug.logJSON('Takeover vulnerabilities:', securityResults.takeovers);
             }
+        }
+
+        // Wildcard certificate security analysis
+        const wildcardCerts = this.dnsAnalyzer.getWildcardCertificates();
+        if (wildcardCerts && wildcardCerts.length > 0) {
+            securityResults.wildcardCertificates = this.serviceDetector.detectWildcardCertificateIssues(wildcardCerts);
+            this.debug.logJSON('Wildcard certificate issues:', securityResults.wildcardCertificates);
         }
 
         // Process DNS records separately from services
@@ -333,6 +380,21 @@ class AnalysisController {
             historicalRecords,
             securityResults?.dnsRecords || []
         );
+        
+        // Add XMPP subdomain service detection
+        if (subdomainResults && subdomainResults.length > 0) {
+            console.log(`🗨️ Detecting XMPP services from subdomains...`);
+            const xmppServices = this.serviceDetector.detectXMPPServices(subdomainResults);
+            if (xmppServices.length > 0) {
+                console.log(`✅ Found ${xmppServices.length} XMPP services`);
+                // Add XMPP services to the processed data services
+                if (!processedData.services) processedData.services = new Map();
+                xmppServices.forEach(service => {
+                    const key = `${service.subdomain}-xmpp`;
+                    processedData.services.set(key, service);
+                });
+            }
+        }
         
         // NEW: Add Data Sovereignty Analysis
         console.log(`🌍 Running data sovereignty analysis...`);

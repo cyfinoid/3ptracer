@@ -10,12 +10,17 @@
     
 </head>
 <body>
+    <!-- Theme Toggle Button -->
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+        <span class="theme-toggle-icon" id="themeIcon">🌙</span>
+        <span id="themeText">Light Mode</span>
+    </button>
     <div class="container">
         <div class="header">
-            <h1><a href="index.html" style="color: white; text-decoration: none;">3rd Party Tracer</a></h1>
+            <h1><a href="index.html" class="header-title-link">3rd Party Tracer</a></h1>
             <p>Identify third-party services associated with any domain via DNS analysis</p>
             <div style="margin-top: 20px;">
-                <a href="about.html" class="header-nav-link" style="color: white; text-decoration: none; padding: 8px 16px; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; font-size: 0.9rem; transition: background 0.3s ease;">About</a>
+                <a href="about.html" class="header-nav-link">About</a>
             </div>
         </div>
 
@@ -187,10 +192,10 @@
             </div>
                                 <div class="footer-bottom">
                         <p>&copy; 2025 Cyfinoid Research. 3rd Party Tracer - Free Cloud Security Research Tool</p>
-                        <p style="margin-top: 10px; font-size: 0.9rem;">
-                            <a href="about.html" style="color: rgba(255, 255, 255, 0.8); text-decoration: none;">About</a> | 
-                            <a href="https://github.com/cyfinoid/3ptracer" target="_blank" style="color: rgba(255, 255, 255, 0.8); text-decoration: none;">GitHub</a> | 
-                            <a href="https://cyfinoid.com/" target="_blank" style="color: rgba(255, 255, 255, 0.8); text-decoration: none;">Cyfinoid Research</a>
+                        <p class="footer-bottom-links">
+                            <a href="about.html" class="footer-bottom-link">About</a> | 
+                            <a href="https://github.com/cyfinoid/3ptracer" target="_blank" class="footer-bottom-link">GitHub</a> | 
+                            <a href="https://cyfinoid.com/" target="_blank" class="footer-bottom-link">Cyfinoid Research</a>
                         </p>
                     </div>
         </footer>
@@ -210,5 +215,42 @@
     <script src="ui-renderer.js"></script>
     <script src="analysis-controller.js"></script>
     <script src="app.js"></script>
+    
+    <!-- Theme Toggle Script -->
+    <script>
+        // Initialize theme from localStorage or default to dark mode
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            updateThemeButton(savedTheme);
+        }
+        
+        // Toggle between light and dark themes
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeButton(newTheme);
+        }
+        
+        // Update theme button icon and text
+        function updateThemeButton(theme) {
+            const themeIcon = document.getElementById('themeIcon');
+            const themeText = document.getElementById('themeText');
+            
+            if (theme === 'dark') {
+                themeIcon.textContent = '🌙';
+                themeText.textContent = 'Light Mode';
+            } else {
+                themeIcon.textContent = '☀️';
+                themeText.textContent = 'Dark Mode';
+            }
+        }
+        
+        // Initialize theme on page load
+        initTheme();
+    </script>
 </body>
 </html> 

@@ -21,7 +21,7 @@ class DataProcessor {
         }
 
         // Process subdomains and separate redirects
-        const { regularSubdomains, redirects } = this.separateRedirects(subdomainResults);
+        const { regularSubdomains, redirects, historicalSubdomains } = this.separateRedirects(subdomainResults);
         
         // Store redirects
         this.processedData.redirectsToMain = redirects;
@@ -31,21 +31,23 @@ class DataProcessor {
             this.processSubdomain(subdomain);
         }
 
-        // Process historical records (these are inactive subdomains from CT logs)
-        this.processedData.historicalRecords = this.deduplicateHistoricalRecords(historicalRecords);
+        // Process historical records (combine CT logs and inactive discovered subdomains)
+        const allHistoricalRecords = [...historicalRecords, ...historicalSubdomains];
+        this.processedData.historicalRecords = this.deduplicateHistoricalRecords(allHistoricalRecords);
         
         // Store DNS records separately from services
         this.processedData.dnsRecords = dnsRecords || [];
 
-        console.log(`📊 Data processing complete: ${regularSubdomains.length} active subdomains, ${historicalRecords.length} historical records`);
+        console.log(`📊 Data processing complete: ${regularSubdomains.length} active subdomains, ${allHistoricalRecords.length} historical records`);
 
         return this.getProcessedData();
     }
 
-    // Separate redirects from regular subdomains
+    // Separate redirects, active subdomains, and historical subdomains
     separateRedirects(subdomainResults) {
         const regularSubdomains = [];
         const redirects = [];
+        const historicalSubdomains = [];
 
         for (const subdomain of subdomainResults) {
             if (subdomain.isRedirectToMain) {
@@ -54,12 +56,20 @@ class DataProcessor {
                     redirectTarget: subdomain.redirectTarget,
                     source: 'batch-analysis'
                 });
+            } else if (this.isHistoricalSubdomain(subdomain)) {
+                // Subdomain with no DNS records - categorize as historical
+                historicalSubdomains.push({
+                    subdomain: subdomain.subdomain,
+                    sources: subdomain.sources || ['discovery'],
+                    discoveredAt: subdomain.discoveredAt || new Date(),
+                    status: 'historical'
+                });
             } else {
                 regularSubdomains.push(subdomain);
             }
         }
 
-        return { regularSubdomains, redirects };
+        return { regularSubdomains, redirects, historicalSubdomains };
     }
 
     // Process services and add to consolidated map
@@ -532,14 +542,12 @@ class DataProcessor {
         subdomains.forEach(subdomain => {
             if (subdomain.asnInfo) {
                 subdomainsWithASN++;
-                console.log(`🔍 DEBUG: Processing subdomain ${subdomain.subdomain} with ASN info:`, subdomain.asnInfo);
                 this.processSovereigntyLocation(subdomain.asnInfo, subdomain.subdomain, 'subdomain', sovereigntyData);
-            } else {
-                console.log(`🔍 DEBUG: Subdomain ${subdomain.subdomain} has no ASN info. Full structure:`, subdomain);
             }
+            // Skip subdomains without ASN info (no IP addresses) - this is normal
         });
 
-        console.log(`🔍 DEBUG: Found ASN info in ${servicesWithASN} services and ${subdomainsWithASN} subdomains`);
+        console.log(`🌍 Sovereignty: ${servicesWithASN} services and ${subdomainsWithASN} subdomains with ASN data`);
 
         // Calculate statistics
         sovereigntyData.statistics.totalIPs = [...services, ...subdomains].reduce((count, item) => {
@@ -566,7 +574,6 @@ class DataProcessor {
         this.identifySovereigntyIssues(sovereigntyData);
 
         console.log(`🌍 Sovereignty analysis complete: ${sovereigntyData.statistics.uniqueCountries} countries, ${sovereigntyData.statistics.totalIPs} IP addresses`);
-        console.log(`🔍 DEBUG: Countries found:`, Array.from(sovereigntyData.countryDistribution.keys()));
 
         return sovereigntyData;
     }
@@ -767,13 +774,18 @@ class DataProcessor {
         }
     }
 
-    // Get active subdomains only (exclude historical records)
+    // Check if a subdomain should be categorized as historical (no active DNS records)
+    isHistoricalSubdomain(subdomain) {
+        // Subdomain is historical if it has no IP addresses and no significant CNAME records
+        const hasNoIPs = !subdomain.ip && (!subdomain.ipAddresses || subdomain.ipAddresses.length === 0);
+        const hasNoSignificantCNAME = !this.hasSignificantCNAME(subdomain);
+        
+        return hasNoIPs && hasNoSignificantCNAME;
+    }
+
+    // Get active subdomains (include all processed subdomains, even inactive ones)
     getActiveSubdomains() {
-        return Array.from(this.processedData.subdomains.values()).filter(subdomain =>
-            (subdomain.ipAddresses && subdomain.ipAddresses.length > 0) ||
-            subdomain.ip ||
-            this.hasSignificantCNAME(subdomain)
-        );
+        return Array.from(this.processedData.subdomains.values());
     }
 
     // Get processed data
