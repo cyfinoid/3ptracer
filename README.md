@@ -98,6 +98,14 @@ Comprehensive security analysis including:
 3. Enter a domain name and click "Analyze Domain"
 
 ### **Production Deployment**
+
+#### Option 1: GitHub Actions (Recommended)
+Automatic deployment via GitHub Actions:
+- **Manual**: Go to Actions tab → Run workflow
+- **Automatic**: Push to main or create a release
+- **Documentation**: See [GitHub Actions Guide](.github/workflows/README.md)
+
+#### Option 2: Local Deployment Script
 Use the included deployment script:
 ```bash
 ./deploy.sh
