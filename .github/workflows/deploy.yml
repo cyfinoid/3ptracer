@@ -60,7 +60,7 @@ jobs:
       
       - name: Create deployment directory
         run: |
-          mkdir -p _site
+          mkdir -p _site/js _site/css
           echo "📦 Copying production files..."
           
           # Core HTML files
@@ -69,19 +69,19 @@ jobs:
           echo "✅ Copied 2 HTML files"
           
           # CSS file
-          cp style.css _site/
+          cp css/style.css _site/css/
           echo "✅ Copied CSS file"
           
           # JavaScript files
-          cp app.js _site/
-          cp dns-analyzer.js _site/
-          cp service-detection-engine.js _site/
-          cp data-processor.js _site/
-          cp ui-renderer.js _site/
-          cp analysis-controller.js _site/
-          cp service-registry.js _site/
-          cp subdomain-registry.js _site/
-          cp export-manager.js _site/
+          cp js/app.js _site/js/
+          cp js/dns-analyzer.js _site/js/
+          cp js/service-detection-engine.js _site/js/
+          cp js/data-processor.js _site/js/
+          cp js/ui-renderer.js _site/js/
+          cp js/analysis-controller.js _site/js/
+          cp js/service-registry.js _site/js/
+          cp js/subdomain-registry.js _site/js/
+          cp js/export-manager.js _site/js/
           echo "✅ Copied 9 JavaScript files"
       
       - name: Generate release status
@@ -109,16 +109,16 @@ jobs:
           required_files=(
             "index.html"
             "about.html"
-            "style.css"
-            "app.js"
-            "dns-analyzer.js"
-            "service-detection-engine.js"
-            "data-processor.js"
-            "ui-renderer.js"
-            "analysis-controller.js"
-            "service-registry.js"
-            "subdomain-registry.js"
-            "export-manager.js"
+            "css/style.css"
+            "js/app.js"
+            "js/dns-analyzer.js"
+            "js/service-detection-engine.js"
+            "js/data-processor.js"
+            "js/ui-renderer.js"
+            "js/analysis-controller.js"
+            "js/service-registry.js"
+            "js/subdomain-registry.js"
+            "js/export-manager.js"
             "release-status.txt"
             ".nojekyll"
           )
@@ -136,11 +136,17 @@ jobs:
             echo ""
             echo "📊 Deployment Summary:"
             echo "   - HTML files: $(ls -1 _site/*.html 2>/dev/null | wc -l)"
-            echo "   - JS files: $(ls -1 _site/*.js 2>/dev/null | wc -l)"
-            echo "   - CSS files: $(ls -1 _site/*.css 2>/dev/null | wc -l)"
+            echo "   - JS files: $(ls -1 _site/js/*.js 2>/dev/null | wc -l)"
+            echo "   - CSS files: $(ls -1 _site/css/*.css 2>/dev/null | wc -l)"
             echo ""
             echo "📁 Contents of _site/:"
             ls -lh _site/
+            echo ""
+            echo "📁 JS files:"
+            ls -lh _site/js/
+            echo ""
+            echo "📁 CSS files:"
+            ls -lh _site/css/
           else
             echo "❌ Error: The following files are missing from _site/:"
             for file in "${missing_files[@]}"; do
