@@ -581,8 +581,10 @@ class UIRenderer {
         if (issue.cname) html += `<strong>CNAME:</strong> ${issue.cname}<br>`;
         if (issue.service) html += `<strong>Service:</strong> ${issue.service}<br>`;
         if (issue.ip) html += `<strong>IP:</strong> ${issue.ip}<br>`;
+        if (issue.ipRange) html += `<strong>IP Range:</strong> ${issue.ipRange}<br>`;
         if (issue.record) html += `<strong>Record:</strong> ${issue.record}<br>`;
         if (issue.pattern) html += `<strong>Pattern:</strong> ${issue.pattern}<br>`;
+        if (issue.details) html += `<strong>Details:</strong> ${issue.details}<br>`;
         
         html += '</div></div>';
         return html;

@@ -73,39 +73,60 @@ class ServiceDetectionEngine {
                 'Amazon AWS': {
                     patterns: ['amazonaws.com', 'aws.amazon.com', 'cloudfront.net', 'awsapprunner.com'],
                     cnamePatterns: ['amazonaws.com', 'cloudfront.net', 'awsapprunner.com'],
-                    txtPatterns: ['amazonses'],
+                    txtPatterns: ['amazonses:', 'amazonses='],
                     description: 'Cloud computing platform'
                 },
                 'Microsoft Azure': {
                     patterns: ['azurewebsites.net', 'azure.com', 'windows.net'],
                     cnamePatterns: ['azurewebsites.net', 'windows.net'],
-                    txtPatterns: ['MS='],
+                    txtPatterns: ['MS=', 'mscid=', 'mtc=', 'ReleaseWLIDNamespace'],
                     description: 'Cloud computing platform'
                 },
                 'Google Cloud Platform': {
                     patterns: ['googleusercontent.com', 'appspot.com', 'firebaseapp.com', 'web.app'],
                     cnamePatterns: ['googleusercontent.com', 'appspot.com', 'firebaseapp.com', 'web.app'],
+                    txtPatterns: ['asuid=', 'firebase=', 'upspin='],
+                    description: 'Cloud computing platform'
+                },
+                'Alibaba Cloud': {
+                    patterns: ['aliyun.com', 'alibabacloud.com'],
+                    txtPatterns: ['aliyun-site-verification'],
                     description: 'Cloud computing platform'
                 },
                 'Cloudflare': {
                     patterns: ['cloudflare.com', 'pages.dev'],
                     cnamePatterns: ['pages.dev'],
                     nsPatterns: ['cloudflare'],
+                    txtPatterns: ['cloudflare-verify', 'cloudpiercer-verification'],
                     description: 'CDN, security services, and DNS management'
+                },
+                'Fastly': {
+                    patterns: ['fastly.com', 'fastly.net'],
+                    cnamePatterns: ['fastly'],
+                    txtPatterns: ['fastly-domain-delegation-', 'fastly-domain-delegation='],
+                    description: 'Edge cloud platform'
+                },
+                'Akamai': {
+                    patterns: ['akamai.com', 'akamaiedge.net'],
+                    txtPatterns: ['cloudpiercer-verification'],
+                    description: 'Content delivery network'
                 },
                 'Heroku': {
                     patterns: ['herokuapp.com'],
                     cnamePatterns: ['herokuapp.com'],
+                    txtPatterns: ['heroku-domain-verification'],
                     description: 'Application hosting platform'
                 },
                 'Vercel': {
                     patterns: ['vercel.app', 'vercel.com'],
                     cnamePatterns: ['vercel.app'],
+                    txtPatterns: ['vercel-domain-verification='],
                     description: 'Deployment platform'
                 },
                 'Netlify': {
                     patterns: ['netlify.app', 'netlify.com'],
                     cnamePatterns: ['netlify.app'],
+                    txtPatterns: ['netlify-verification='],
                     description: 'Site hosting platform'
                 },
                 'DigitalOcean': {
@@ -123,10 +144,11 @@ class ServiceDetectionEngine {
                     cnamePatterns: ['hetzner.cloud'],
                     description: 'Cloud infrastructure platform'
                 },
-                'GitHub Pages': {
-                    patterns: ['github.io'],
+                'GitHub': {
+                    patterns: ['github.io', 'github.com'],
                     cnamePatterns: ['github.io'],
-                    description: 'Static site hosting'
+                    txtPatterns: ['github-verification='],
+                    description: 'Code hosting and collaboration'
                 },
                 'GitLab Pages': {
                     patterns: ['gitlab.io'],
@@ -142,6 +164,16 @@ class ServiceDetectionEngine {
                     patterns: ['fly.dev', 'fly.io'],
                     cnamePatterns: ['fly.dev', 'fly.io'],
                     description: 'Application deployment platform'
+                },
+                'CloudBees': {
+                    patterns: ['cloudbees.com'],
+                    txtPatterns: ['cloudbees-domain-verification:'],
+                    description: 'CI/CD and DevOps platform'
+                },
+                'cloudControl': {
+                    patterns: ['cloudcontrol.com'],
+                    txtPatterns: ['cloudControl-verification:'],
+                    description: 'Platform as a Service'
                 }
             },
             analytics: {
@@ -179,12 +211,42 @@ class ServiceDetectionEngine {
             security: {
                 'Let\'s Encrypt': {
                     patterns: ['letsencrypt.org'],
-                    txtPatterns: ['letsencrypt'],
+                    txtPatterns: ['_acme-challenge', 'letsencrypt'],
                     description: 'SSL certificate provider'
+                },
+                'GlobalSign': {
+                    patterns: ['globalsign.com'],
+                    txtPatterns: ['_globalsign-domain-verification', 'globalsign-domain-verification', 'globalsign-smime-dv'],
+                    description: 'SSL certificate authority'
+                },
+                'DigiCert': {
+                    patterns: ['digicert.com'],
+                    txtPatterns: ['Digicert=', 'QuoVadis='],
+                    description: 'SSL certificate authority'
+                },
+                'Entrust': {
+                    patterns: ['entrust.com'],
+                    txtPatterns: ['Entrust:'],
+                    description: 'SSL certificate authority'
+                },
+                'SwissSign': {
+                    patterns: ['swisssign.com'],
+                    txtPatterns: ['swisssign-check'],
+                    description: 'Swiss SSL certificate authority'
+                },
+                'NetLock': {
+                    patterns: ['netlock.hu'],
+                    txtPatterns: ['_netlock='],
+                    description: 'Certificate authority'
+                },
+                'T-Systems': {
+                    patterns: ['t-systems.com'],
+                    txtPatterns: ['_telesec-domain-validation'],
+                    description: 'Certificate authority'
                 },
                 'Cloudflare': {
                     patterns: ['cloudflare.com'],
-                    txtPatterns: ['cloudflare-verify'],
+                    txtPatterns: ['cloudflare-verify', 'cloudflare-domain-verification'],
                     description: 'Security and performance services'
                 },
                 'HackerOne': {
@@ -192,26 +254,131 @@ class ServiceDetectionEngine {
                     txtPatterns: ['hackerone-verification'],
                     description: 'Bug bounty and vulnerability disclosure platform'
                 },
+                'Bugcrowd': {
+                    patterns: ['bugcrowd.com'],
+                    txtPatterns: ['bugcrowd-verification'],
+                    description: 'Bug bounty and security platform'
+                },
                 'Keybase': {
                     patterns: ['keybase.io'],
                     txtPatterns: ['keybase-site-verification'],
                     description: 'Identity verification and secure messaging'
+                },
+                'Have I Been Pwned': {
+                    patterns: ['haveibeenpwned.com'],
+                    txtPatterns: ['have-i-been-pwned-verification'],
+                    description: 'Data breach notification service'
+                },
+                'Detectify': {
+                    patterns: ['detectify.com'],
+                    txtPatterns: ['detectify-verification'],
+                    description: 'Website security scanner'
+                },
+                'Probely': {
+                    patterns: ['probely.com'],
+                    txtPatterns: ['Probe.ly:'],
+                    description: 'Web application security scanner'
+                },
+                'Tinfoil Security': {
+                    patterns: ['tinfoilsecurity.com'],
+                    txtPatterns: ['tinfoil-site-verification'],
+                    description: 'Application security testing'
+                },
+                'Sophos': {
+                    patterns: ['sophos.com'],
+                    txtPatterns: ['sophos-domain-verification'],
+                    description: 'Cybersecurity and endpoint protection'
+                },
+                'Barracuda': {
+                    patterns: ['barracuda.com'],
+                    txtPatterns: ['bvm-site-verification'],
+                    description: 'Email security and data protection'
+                },
+                'OneTrust': {
+                    patterns: ['onetrust.com'],
+                    txtPatterns: ['onetrust-domain-verification'],
+                    description: 'Privacy and data governance platform'
+                },
+                'Wiz': {
+                    patterns: ['wiz.io'],
+                    txtPatterns: ['wiz-domain-verification'],
+                    description: 'Cloud security platform'
+                },
+                'SpyCloud': {
+                    patterns: ['spycloud.com'],
+                    txtPatterns: ['spycloud-domain-verification'],
+                    description: 'Account takeover prevention'
+                },
+                'KnowBe4': {
+                    patterns: ['knowbe4.com'],
+                    txtPatterns: ['knowbe4-site-verification'],
+                    description: 'Security awareness training'
+                },
+                'LastPass': {
+                    patterns: ['lastpass.com'],
+                    txtPatterns: ['lastpass-verification-code'],
+                    description: 'Password management'
+                },
+                'Brave Browser': {
+                    patterns: ['brave.com'],
+                    txtPatterns: ['brave-ledger-verification'],
+                    description: 'Privacy-focused web browser'
+                },
+                'Proton': {
+                    patterns: ['proton.me', 'protonmail.com'],
+                    txtPatterns: ['protonmail-verification'],
+                    description: 'Encrypted email and VPN services'
                 }
             },
             marketing: {
                 'HubSpot': {
                     patterns: ['hubspot.com', 'hs-sites.com'],
-                    txtPatterns: ['hubspot-developer-verification', 'hs-site-verification'],
+                    txtPatterns: ['hubspot-developer-verification', 'hubspot-site-verification'],
                     description: 'Marketing automation and CRM platform'
                 },
                 'Salesforce': {
                     patterns: ['salesforce.com', 'force.com'],
-                    txtPatterns: ['salesforce-site-verification', 'pardot-domain-verification'],
+                    txtPatterns: ['pardot_', 'pardot-domain-verification', 'SFMC-'],
                     description: 'CRM and marketing automation'
                 },
                 'Mailchimp': {
                     patterns: ['mailchimp.com'],
-                    txtPatterns: ['mailchimp-domain-verification'],
+                    txtPatterns: ['mailchimp='],
+                    description: 'Email marketing platform'
+                },
+                'Sendinblue': {
+                    patterns: ['sendinblue.com'],
+                    txtPatterns: ['sendinblue-code:', 'Sendinblue-code:'],
+                    description: 'Email marketing platform'
+                },
+                'Mailgun': {
+                    patterns: ['mailgun.org'],
+                    txtPatterns: ['mailjet-domain-validation'],
+                    description: 'Email API service'
+                },
+                'Mailjet': {
+                    patterns: ['mailjet.com'],
+                    txtPatterns: ['mailjet-domain-validation'],
+                    description: 'Email delivery service'
+                },
+                'Mailigen': {
+                    patterns: ['mailigen.com'],
+                    txtPatterns: ['mailigen-site-verification'],
+                    description: 'Email marketing automation'
+                },
+                'EMMA': {
+                    patterns: ['myemma.com'],
+                    txtPatterns: ['e2ma-verification:'],
+                    description: 'Email marketing platform'
+                },
+                'FeedBlitz': {
+                    patterns: ['feedblitz.com'],
+                    txtPatterns: ['blitz='],
+                    description: 'Email marketing and RSS'
+                },
+                'Acumbamail': {
+                    patterns: ['acumbamail.com'],
+                    txtPatterns: ['Acumbamail-domain-verification='],
                     description: 'Email marketing platform'
                 },
                 'Intercom': {
@@ -221,13 +388,43 @@ class ServiceDetectionEngine {
                 },
                 'Zendesk': {
                     patterns: ['zendesk.com'],
-                    txtPatterns: ['zendesk-verification'],
+                    txtPatterns: ['zendeskverification=', 'zendesk-verification'],
                     description: 'Customer support platform'
                 },
                 'Typeform': {
                     patterns: ['typeform.com'],
-                    txtPatterns: ['typeform-verify'],
+                    txtPatterns: ['typeform-site-verification'],
                     description: 'Online form and survey builder'
+                },
+                'Drift': {
+                    patterns: ['drift.com'],
+                    txtPatterns: ['drift-domain-verification'],
+                    description: 'Conversational marketing platform'
+                },
+                'Segment': {
+                    patterns: ['segment.com'],
+                    txtPatterns: ['segment-domain-verification', 'segment-site-verification'],
+                    description: 'Customer data platform'
+                },
+                'Pendo': {
+                    patterns: ['pendo.io'],
+                    txtPatterns: ['pendo-domain-verification'],
+                    description: 'Product analytics and guidance'
+                },
+                'Anodot': {
+                    patterns: ['anodot.com'],
+                    txtPatterns: ['anodot-domain-verification'],
+                    description: 'AI-powered analytics'
+                },
+                'Botify': {
+                    patterns: ['botify.com'],
+                    txtPatterns: ['botify-site-verification'],
+                    description: 'SEO platform'
+                },
+                'Ahrefs': {
+                    patterns: ['ahrefs.com'],
+                    txtPatterns: ['ahrefs-site-verification_'],
+                    description: 'SEO tools and resources'
                 }
             },
             social: {
@@ -275,7 +472,7 @@ class ServiceDetectionEngine {
             payments: {
                 'Stripe': {
                     patterns: ['stripe.com'],
-                    txtPatterns: ['stripe-verification'],
+                    txtPatterns: ['stripe-verification='],
                     description: 'Payment processing platform'
                 },
                 'PayPal': {
@@ -285,13 +482,245 @@ class ServiceDetectionEngine {
                 },
                 'Square': {
                     patterns: ['squareup.com'],
-                    txtPatterns: ['square-site-verification'],
+                    txtPatterns: ['square-verification='],
                     description: 'Payment processing and business tools'
                 },
                 'Shopify': {
                     patterns: ['shopify.com', 'myshopify.com'],
-                    txtPatterns: ['shopify-domain-verification'],
+                    txtPatterns: ['shopify-verification-code='],
                     description: 'E-commerce platform'
+                }
+            },
+            enterprise_software: {
+                'Cisco': {
+                    patterns: ['cisco.com', 'webex.com'],
+                    txtPatterns: ['cisco-ci-domain-verification', 'cisco-ci-domain-verification=', 'cisco-site-verification=', 'ciscocidomainverification=', 'webexdomainverification.', 'webexdomainverification='],
+                    description: 'Enterprise networking and collaboration'
+                },
+                'Citrix': {
+                    patterns: ['citrix.com'],
+                    txtPatterns: ['citrix-verification-code=', 'citrix.mobile.ads.otp='],
+                    description: 'Enterprise application delivery'
+                },
+                'Docker': {
+                    patterns: ['docker.com'],
+                    txtPatterns: ['docker-verification='],
+                    description: 'Container platform'
+                },
+                'MongoDB': {
+                    patterns: ['mongodb.com'],
+                    txtPatterns: ['mongodb-site-verification='],
+                    description: 'Database platform'
+                },
+                'Dynatrace': {
+                    patterns: ['dynatrace.com'],
+                    txtPatterns: ['Dynatrace-site-verification='],
+                    description: 'Application performance monitoring'
+                },
+                'ThousandEyes': {
+                    patterns: ['thousandeyes.com'],
+                    txtPatterns: ['thousandeyes:'],
+                    description: 'Network intelligence platform'
+                },
+                'Broadcom': {
+                    patterns: ['broadcom.com'],
+                    txtPatterns: ['OSIAGENTREGURL='],
+                    description: 'Enterprise software and semiconductors'
+                },
+                'TeamViewer': {
+                    patterns: ['teamviewer.com'],
+                    txtPatterns: ['teamviewer-sso-verification='],
+                    description: 'Remote access and support software'
+                },
+                'LogMeIn/GoTo': {
+                    patterns: ['logmein.com', 'goto.com'],
+                    txtPatterns: ['logmein-domain-confirmation', 'logmein-verification-code='],
+                    description: 'Remote access and collaboration'
+                },
+                'Suitable Technologies': {
+                    patterns: ['suitabletech.com'],
+                    txtPatterns: ['beam-verification='],
+                    description: 'Telepresence robots'
+                },
+                'Sage/Intacct': {
+                    patterns: ['sage.com', 'intacct.com'],
+                    txtPatterns: ['intacct-esk='],
+                    description: 'Financial management software'
+                },
+                'LINE WORKS': {
+                    patterns: ['lineworks.com'],
+                    txtPatterns: ['worksmobile-certification='],
+                    description: 'Business communication platform'
+                }
+            },
+            development_tools: {
+                'Postman': {
+                    patterns: ['postman.com'],
+                    txtPatterns: ['postman-domain-verification='],
+                    description: 'API development and testing'
+                },
+                'Cursor': {
+                    patterns: ['cursor.sh'],
+                    txtPatterns: ['cursor-domain-verification='],
+                    description: 'AI-powered code editor'
+                },
+                'OpenAI': {
+                    patterns: ['openai.com'],
+                    txtPatterns: ['openai-domain-verification='],
+                    description: 'AI research and deployment'
+                },
+                'Gitpod': {
+                    patterns: ['gitpod.io'],
+                    txtPatterns: ['gitpod-verification'],
+                    description: 'Cloud development environment'
+                },
+                'Sonatype': {
+                    patterns: ['sonatype.com'],
+                    txtPatterns: ['OSSRH-', 'sonatype='],
+                    description: 'Software supply chain management'
+                },
+                'Loader.io': {
+                    patterns: ['loader.io'],
+                    txtPatterns: ['loaderio='],
+                    description: 'Load testing service'
+                },
+                'Loadmill': {
+                    patterns: ['loadmill.com'],
+                    txtPatterns: ['loadmill-challenge='],
+                    description: 'API load testing'
+                },
+                'Zapier': {
+                    patterns: ['zapier.com'],
+                    txtPatterns: ['zapier-domain-verification-challenge='],
+                    description: 'Workflow automation'
+                },
+                'Twilio': {
+                    patterns: ['twilio.com'],
+                    txtPatterns: ['twilio-domain-verification='],
+                    description: 'Communications platform'
+                }
+            },
+            mobile_device_management: {
+                'Ivanti': {
+                    patterns: ['ivanti.com'],
+                    txtPatterns: ['android-enroll=', 'android-mdm-enroll=', 'iOS-enroll'],
+                    description: 'IT asset management and MDM'
+                }
+            },
+            domain_services: {
+                'GoDaddy': {
+                    patterns: ['godaddy.com'],
+                    txtPatterns: ['godaddyverification=', 'DZC:'],
+                    description: 'Domain registrar and hosting'
+                },
+                'Fujitsu/Nifty': {
+                    patterns: ['nifty.com'],
+                    txtPatterns: ['nifty-dns-verify:'],
+                    description: 'Cloud and domain services'
+                },
+                'Nethely': {
+                    patterns: ['nethely.hu'],
+                    txtPatterns: ['nethely-dvc:'],
+                    description: 'Domain and hosting services'
+                },
+                'LaunchPad Cloud': {
+                    patterns: ['launchpadcloud.com'],
+                    txtPatterns: ['LDLAUNCHPAD='],
+                    description: 'Cloud hosting services'
+                },
+                'bHosted.nl': {
+                    patterns: ['bhosted.nl'],
+                    txtPatterns: ['http://www.bhosted.nl:'],
+                    description: 'Web hosting services'
+                },
+                'OSTR': {
+                    patterns: ['ostr.io'],
+                    txtPatterns: ['ostrio-domain:'],
+                    description: 'Web infrastructure'
+                }
+            },
+            asian_platforms: {
+                'VK (VKontakte)': {
+                    patterns: ['vk.com'],
+                    txtPatterns: ['mailru-verification', 'mailru-verification='],
+                    description: 'Russian social network'
+                },
+                'Yandex': {
+                    patterns: ['yandex.ru', 'yandex.com'],
+                    txtPatterns: ['yandex-verification='],
+                    description: 'Russian search engine and services'
+                },
+                'Yahoo Japan': {
+                    patterns: ['yahoo.co.jp'],
+                    txtPatterns: ['yahoo-verification-key='],
+                    description: 'Japanese web services'
+                },
+                'Daum': {
+                    patterns: ['daum.net'],
+                    txtPatterns: ['daum-verification:'],
+                    description: 'Korean web portal'
+                },
+                'Openstat': {
+                    patterns: ['openstat.ru'],
+                    txtPatterns: ['openstat-verification='],
+                    description: 'Russian analytics service'
+                }
+            },
+            other_services: {
+                'Ionix': {
+                    patterns: ['ionix.io'],
+                    txtPatterns: ['adstxt-domain-verification='],
+                    description: 'External attack surface management'
+                },
+                'Inumbo': {
+                    patterns: ['inumbo.com'],
+                    txtPatterns: ['inumbo-verification='],
+                    description: 'Domain monitoring service'
+                },
+                'Fortifi': {
+                    patterns: ['fortifi.com'],
+                    txtPatterns: ['fortifi-domain-verification='],
+                    description: 'Business platform'
+                },
+                'Apple': {
+                    patterns: ['apple.com'],
+                    txtPatterns: ['apple-domain-verification='],
+                    description: 'Consumer electronics and services'
+                },
+                'Adobe': {
+                    patterns: ['adobe.com'],
+                    txtPatterns: ['adobe-idp-site-verification=', 'adobe-sign-verification=', 'adobe-domain-verification'],
+                    description: 'Creative and document software'
+                },
+                'Meta/Facebook/Workplace': {
+                    patterns: ['facebook.com', 'workplace.com'],
+                    txtPatterns: ['facebook-domain-verification=', 'workplace-domain-verification='],
+                    description: 'Social media and collaboration'
+                },
+                'Bookry/wmail': {
+                    patterns: ['bookry.com'],
+                    txtPatterns: ['wmail-verification:'],
+                    description: 'Email services'
+                },
+                'Electronic Arts': {
+                    patterns: ['ea.com'],
+                    txtPatterns: ['ulogin-verification:'],
+                    description: 'Video game company'
+                },
+                'Digital Point': {
+                    patterns: ['digitalpoint.com'],
+                    txtPatterns: ['digitalpoint-site-verify:'],
+                    description: 'Web development community'
+                },
+                'Krisp': {
+                    patterns: ['krisp.ai'],
+                    txtPatterns: ['krisp-domain-verification='],
+                    description: 'AI-powered noise cancellation'
+                },
+                'uWSGI': {
+                    patterns: ['uwsgi.it'],
+                    txtPatterns: ['uwsgi:'],
+                    description: 'Application server'
                 }
             },
             monitoring: {
@@ -307,13 +736,18 @@ class ServiceDetectionEngine {
                 },
                 'StatusPage': {
                     patterns: ['statuspage.io'],
-                    txtPatterns: ['statuspage-domain-verification'],
+                    txtPatterns: ['statuspage-domain-verification', 'status-page-domain-verification'],
                     description: 'Status page and incident communication'
                 },
                 'DataDog': {
                     patterns: ['datadoghq.com'],
                     txtPatterns: ['datadog-domain-verification'],
                     description: 'Infrastructure monitoring and analytics'
+                },
+                'Site24x7/Zoho': {
+                    patterns: ['site24x7.com', 'zoho.com'],
+                    txtPatterns: ['site24x7-domain-verification=', 'zoho-verification='],
+                    description: 'Website and server monitoring'
                 }
             },
             productivity: {
@@ -329,18 +763,78 @@ class ServiceDetectionEngine {
                 },
                 'Google Workspace': {
                     patterns: ['google.com', 'googledomains.com'],
-                    txtPatterns: ['google-site-verification', 'googleapps-domain-verification'],
+                    txtPatterns: ['google-site-verification', 'google-domain-verification', 'googleapps-domain-verification'],
                     description: 'Productivity and collaboration suite'
                 },
                 'Zoom': {
                     patterns: ['zoom.us'],
-                    txtPatterns: ['zoom-domain-verification'],
+                    txtPatterns: ['ZOOM_verify_', 'zoom-domain-verification'],
                     description: 'Video conferencing platform'
                 },
                 'Atlassian': {
                     patterns: ['atlassian.com'],
-                    txtPatterns: ['atlassian-domain-verification'],
+                    txtPatterns: ['atlassian-domain-verification', 'status-page-domain-verification', 'statuspage-domain-verification'],
                     description: 'Development and collaboration tools'
+                },
+                'Notion': {
+                    patterns: ['notion.so'],
+                    txtPatterns: ['notion-domain-verification'],
+                    description: 'Workspace and documentation platform'
+                },
+                'Miro': {
+                    patterns: ['miro.com'],
+                    txtPatterns: ['miro-verification'],
+                    description: 'Online collaborative whiteboard'
+                },
+                'Airtable': {
+                    patterns: ['airtable.com'],
+                    txtPatterns: ['airtable-verification='],
+                    description: 'Cloud collaboration service'
+                },
+                'Dropbox': {
+                    patterns: ['dropbox.com'],
+                    txtPatterns: ['dropbox-domain-verification='],
+                    description: 'Cloud storage and file sharing'
+                },
+                'DocuSign': {
+                    patterns: ['docusign.com'],
+                    txtPatterns: ['docusign='],
+                    description: 'Electronic signature platform'
+                },
+                'Loom': {
+                    patterns: ['loom.com'],
+                    txtPatterns: ['loom-site-verification='],
+                    description: 'Video messaging platform'
+                },
+                'Monday.com': {
+                    patterns: ['monday.com'],
+                    txtPatterns: ['storiesonboard-verification'],
+                    description: 'Work operating system'
+                },
+                'Smartsheet': {
+                    patterns: ['smartsheet.com'],
+                    txtPatterns: ['smartsheet-site-validation'],
+                    description: 'Work management platform'
+                },
+                'Wrike': {
+                    patterns: ['wrike.com'],
+                    txtPatterns: ['wrike-verification'],
+                    description: 'Project management software'
+                },
+                'Favro': {
+                    patterns: ['favro.com'],
+                    txtPatterns: ['favro-verification'],
+                    description: 'Collaboration platform'
+                },
+                'Apperio': {
+                    patterns: ['apperio.com'],
+                    txtPatterns: ['apperio-domain-verification'],
+                    description: 'Legal operations platform'
+                },
+                'Reachdesk': {
+                    patterns: ['reachdesk.com'],
+                    txtPatterns: ['reachdesk-verification'],
+                    description: 'Gifting and direct mail platform'
                 }
             },
             content: {
@@ -361,8 +855,33 @@ class ServiceDetectionEngine {
                 },
                 'Webflow': {
                     patterns: ['webflow.io'],
-                    txtPatterns: ['webflow-domain-verification'],
+                    txtPatterns: ['webflow-verification='],
                     description: 'Website design and hosting platform'
+                },
+                'Canva': {
+                    patterns: ['canva.com'],
+                    txtPatterns: ['canva-site-verification'],
+                    description: 'Graphic design platform'
+                },
+                'Dailymotion': {
+                    patterns: ['dailymotion.com'],
+                    txtPatterns: ['dailymotion-domain-verification'],
+                    description: 'Video hosting platform'
+                },
+                'RebelMouse': {
+                    patterns: ['rebelmouse.com'],
+                    txtPatterns: ['rebelmouse='],
+                    description: 'Content management and publishing'
+                },
+                'ClickFunnels': {
+                    patterns: ['clickfunnels.com'],
+                    txtPatterns: ['clickfunnels-domain-verification'],
+                    description: 'Sales funnel builder'
+                },
+                'Perlu': {
+                    patterns: ['perlu.com'],
+                    txtPatterns: ['perlu-site-verification'],
+                    description: 'Creator marketplace'
                 }
             },
             communication: {
@@ -1511,10 +2030,127 @@ class ServiceDetectionEngine {
         return findings;
     }
 
+    // Helper function to check if an IP address is private/internal
+    // Returns false for public IPs, or an object with details for private IPs
+    isPrivateIP(ip) {
+        if (!ip || typeof ip !== 'string') return false;
+        
+        const parts = ip.split('.').map(Number);
+        if (parts.length !== 4 || parts.some(p => isNaN(p) || p < 0 || p > 255)) {
+            return false; // Invalid IP format
+        }
+        
+        const [a, b, c, d] = parts;
+        
+        // 10.0.0.0/8 - Private network (Class A)
+        if (a === 10) {
+            return {
+                isPrivate: true,
+                range: '10.0.0.0/8',
+                type: 'RFC 1918 Private Network (Class A)',
+                description: 'Large private network block commonly used in enterprise environments'
+            };
+        }
+        
+        // 172.16.0.0/12 - Private network (Class B)
+        if (a === 172 && b >= 16 && b <= 31) {
+            return {
+                isPrivate: true,
+                range: '172.16.0.0/12',
+                type: 'RFC 1918 Private Network (Class B)',
+                description: 'Medium-sized private network block'
+            };
+        }
+        
+        // 192.168.0.0/16 - Private network (Class C)
+        if (a === 192 && b === 168) {
+            return {
+                isPrivate: true,
+                range: '192.168.0.0/16',
+                type: 'RFC 1918 Private Network (Class C)',
+                description: 'Small private network block commonly used in home/small office networks'
+            };
+        }
+        
+        // 127.0.0.0/8 - Loopback
+        if (a === 127) {
+            return {
+                isPrivate: true,
+                range: '127.0.0.0/8',
+                type: 'Loopback Address',
+                description: 'Local loopback address (localhost)'
+            };
+        }
+        
+        // 169.254.0.0/16 - Link-local
+        if (a === 169 && b === 254) {
+            return {
+                isPrivate: true,
+                range: '169.254.0.0/16',
+                type: 'Link-Local Address (APIPA)',
+                description: 'Automatic Private IP Addressing - typically indicates DHCP failure'
+            };
+        }
+        
+        // 0.0.0.0/8 - Reserved
+        if (a === 0) {
+            return {
+                isPrivate: true,
+                range: '0.0.0.0/8',
+                type: 'Reserved Address',
+                description: 'Special use address space'
+            };
+        }
+        
+        // 224.0.0.0/4 - Multicast
+        if (a >= 224 && a <= 239) {
+            return {
+                isPrivate: true,
+                range: '224.0.0.0/4',
+                type: 'Multicast Address',
+                description: 'Reserved for multicast groups'
+            };
+        }
+        
+        // 240.0.0.0/4 - Reserved
+        if (a >= 240) {
+            return {
+                isPrivate: true,
+                range: '240.0.0.0/4',
+                type: 'Reserved Address',
+                description: 'Reserved for future use'
+            };
+        }
+        
+        return false;
+    }
+
     detectCloudSecurityIssues(records, subdomains) {
         const issues = [];
         
         const cloudServices = ['s3', 'bucket', 'storage', 'cdn', 'static', 'assets', 'media', 'backup', 'archive', 'logs', 'temp', 'cache'];
+        
+        // Check for private/internal IP addresses in subdomains
+        for (const subdomain of subdomains) {
+            // Check if subdomain has an IP address
+            const ipToCheck = subdomain.ip || (subdomain.ipAddresses && subdomain.ipAddresses.length > 0 ? subdomain.ipAddresses[0] : null);
+            
+            if (ipToCheck) {
+                const privateIPInfo = this.isPrivateIP(ipToCheck);
+                if (privateIPInfo && privateIPInfo.isPrivate) {
+                    issues.push({
+                        type: 'internal_ip_exposure',
+                        risk: 'high',
+                        description: `Subdomain points to ${privateIPInfo.type}: ${ipToCheck}`,
+                        recommendation: 'Internal IP addresses should not be exposed in public DNS. Review network configuration and remove or restrict access to this subdomain.',
+                        subdomain: subdomain.subdomain,
+                        ip: ipToCheck,
+                        ipRange: privateIPInfo.range,
+                        details: `${privateIPInfo.description}. This exposure in public DNS can reveal internal network topology and may indicate misconfiguration.`
+                    });
+                }
+            }
+        }
         
         for (const subdomain of subdomains) {
             for (const service of cloudServices) {
