@@ -790,13 +790,44 @@ class DataProcessor {
 
     // Get processed data
     getProcessedData() {
+        // Apply service consolidation before returning
+        let consolidatedServices = this.applyServiceConsolidation(this.processedData.services);
+        
         return {
-            services: this.processedData.services,
+            services: consolidatedServices,
             subdomains: this.processedData.subdomains,
             redirectsToMain: this.processedData.redirectsToMain,
             historicalRecords: this.processedData.historicalRecords,
             stats: this.calculateStats()
         };
+    }
+
+    // Apply service consolidation (ASN and communication services)
+    applyServiceConsolidation(servicesMap) {
+        // Convert Map to plain object for consolidation
+        const servicesObj = {};
+        for (const [key, service] of servicesMap.entries()) {
+            servicesObj[key] = service;
+        }
+
+        // Initialize service detector if needed
+        if (!this.serviceDetector) {
+            this.serviceDetector = new ServiceDetectionEngine();
+        }
+
+        // Apply ASN consolidation
+        let consolidated = this.serviceDetector.consolidateASNByVendor(servicesObj);
+        
+        // Apply communication service consolidation
+        consolidated = this.serviceDetector.consolidateCommunicationServices(consolidated);
+
+        // Convert back to Map
+        const consolidatedMap = new Map();
+        for (const [key, service] of Object.entries(consolidated)) {
+            consolidatedMap.set(key, service);
+        }
+
+        return consolidatedMap;
     }
 
     // Clear all processed data

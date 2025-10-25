@@ -353,6 +353,18 @@ class AnalysisController {
             this.debug.logJSON('Wildcard certificate issues:', securityResults.wildcardCertificates);
         }
 
+        // CAA record validation against certificates
+        if (mainDomainResults?.records?.CAA && subdomainResults && subdomainResults.length > 0) {
+            const caaViolations = this.serviceDetector.validateCertificatesAgainstCAA(
+                mainDomainResults.records.CAA,
+                subdomainResults
+            );
+            if (caaViolations.length > 0) {
+                securityResults.cloudIssues.push(...caaViolations);
+                this.debug.logJSON('CAA violations:', caaViolations);
+            }
+        }
+
         // Process DNS records separately from services
         const dnsRecords = mainDomainResults?.records ? 
             this.serviceDetector.processDNSRecords(mainDomainResults.records) : [];

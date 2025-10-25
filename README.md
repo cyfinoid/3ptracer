@@ -14,6 +14,12 @@ This project was developed with the assistance of AI tools, most notably **Curso
 
 ---
 
+## 🙏 Credits where credit is due
+
+1. Special thanks to **[OWASP Amass](https://github.com/owasp-amass/amass)** for their aggregating different TXT record patterns, we augmented our TXT record pattern database for third-party service detection with the publically available data from Amass.
+
+---
+
 ## 💬 Community & Discussion
 
 Join our Discord server for discussions, questions, and collaboration:

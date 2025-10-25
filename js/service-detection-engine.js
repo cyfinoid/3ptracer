@@ -2212,4 +2212,241 @@ class ServiceDetectionEngine {
 
         return takeovers;
     }
+
+    // ASN to Vendor mapping for consolidation
+    getASNVendorMap() {
+        return {
+            'Cloudflare': [13335, 209242, 395747, 132892],
+            'Amazon': [16509, 14618, 8987, 7224],
+            'Google': [15169, 36040, 36384, 36385, 36492, 36561],
+            'Microsoft': [8075, 3598, 8068, 8069],
+            'Fastly': [54113, 394192],
+            'Akamai': [16625, 20940, 21357, 21399, 22207],
+            'DigitalOcean': [14061, 46652],
+            'Linode': [63949],
+            'Vultr': [20473],
+            'OVH': [16276],
+            'Hetzner': [24940, 213230],
+            'Alibaba': [37963, 45102, 45090],
+            'Tencent': [45090, 132203],
+            'Oracle': [31898, 134141],
+            'IBM': [36351, 12182]
+        };
+    }
+
+    // Extract ASN number from ASN string (e.g., "AS13335 Cloudflare, Inc." => 13335)
+    extractASNNumber(asnString) {
+        if (!asnString) return null;
+        const match = asnString.match(/AS(\d+)/i);
+        return match ? parseInt(match[1]) : null;
+    }
+
+    // Get vendor name from ASN number
+    getVendorFromASN(asnNumber) {
+        const asnMap = this.getASNVendorMap();
+        for (const [vendor, asns] of Object.entries(asnMap)) {
+            if (asns.includes(asnNumber)) {
+                return vendor;
+            }
+        }
+        return null;
+    }
+
+    // Validate certificates against CAA records
+    validateCertificatesAgainstCAA(caaRecords, subdomains) {
+        console.log(`🔒 Validating certificates against CAA records...`);
+        
+        if (!caaRecords || caaRecords.length === 0) {
+            console.log(`  ℹ️ No CAA records found - skipping validation`);
+            return [];
+        }
+
+        // Parse authorized CAs from CAA records
+        const authorizedCAs = [];
+        for (const record of caaRecords) {
+            const caaInfo = this.parseCAARecord(record.data);
+            if (caaInfo && (caaInfo.tag === 'issue' || caaInfo.tag === 'issuewild')) {
+                if (caaInfo.value && caaInfo.value !== ';') {  // Empty value means no CA is authorized
+                    authorizedCAs.push(caaInfo.value.toLowerCase());
+                }
+            }
+        }
+
+        console.log(`  📋 Authorized CAs:`, authorizedCAs);
+
+        if (authorizedCAs.length === 0) {
+            console.log(`  ℹ️ No authorized CAs in CAA records - skipping validation`);
+            return [];
+        }
+
+        // Check each subdomain's certificate issuer
+        const violations = [];
+        for (const subdomain of subdomains) {
+            if (subdomain.certificateInfo && subdomain.certificateInfo.issuer) {
+                const issuer = subdomain.certificateInfo.issuer.toLowerCase();
+                
+                // Check if issuer matches any authorized CA
+                const isAuthorized = authorizedCAs.some(ca => 
+                    issuer.includes(ca) || ca.includes(issuer.split('.')[0])
+                );
+
+                if (!isAuthorized && issuer !== 'no certificate found' && issuer !== 'no certificate info available') {
+                    // Extract CA name from issuer
+                    const caMatch = issuer.match(/CN=([^,]+)/);
+                    const caName = caMatch ? caMatch[1] : issuer;
+
+                    violations.push({
+                        type: 'caa_violation',
+                        risk: 'high',
+                        description: `Certificate issued by unauthorized CA: ${caName}`,
+                        recommendation: `Certificate authority not authorized in CAA records. Update CAA records to authorize ${caName} or use an authorized CA.`,
+                        subdomain: subdomain.subdomain,
+                        issuer: caName,
+                        authorizedCAs: authorizedCAs.join(', '),
+                        category: 'certificate'
+                    });
+                }
+            }
+        }
+
+        console.log(`  ✅ CAA validation complete: ${violations.length} violations found`);
+        return violations;
+    }
+
+    // Consolidate ASN by vendor
+    consolidateASNByVendor(services) {
+        console.log(`🔄 Consolidating ASN by vendor...`);
+        
+        const asnServices = {};
+        const otherServices = {};
+
+        // Separate ASN services from others
+        for (const [key, service] of Object.entries(services)) {
+            if (service.name && service.name.startsWith('AS')) {
+                const asnNumber = this.extractASNNumber(service.name);
+                if (asnNumber) {
+                    asnServices[key] = { ...service, asnNumber };
+                } else {
+                    otherServices[key] = service;
+                }
+            } else {
+                otherServices[key] = service;
+            }
+        }
+
+        // Group ASN services by vendor
+        const vendorGroups = {};
+        for (const [key, service] of Object.entries(asnServices)) {
+            const vendor = this.getVendorFromASN(service.asnNumber);
+            if (vendor) {
+                if (!vendorGroups[vendor]) {
+                    vendorGroups[vendor] = [];
+                }
+                vendorGroups[vendor].push({ key, service });
+            } else {
+                // No vendor match - keep as-is
+                otherServices[key] = service;
+            }
+        }
+
+        // Create consolidated vendor services
+        for (const [vendor, group] of Object.entries(vendorGroups)) {
+            if (group.length > 1) {
+                // Multiple ASNs for same vendor - consolidate
+                const consolidatedKey = `consolidated_${vendor.toLowerCase()}`;
+                const totalRecords = group.reduce((sum, item) => sum + (item.service.records?.length || 0), 0);
+                const allRecords = group.flatMap(item => item.service.records || []);
+                const allSubdomains = [...new Set(group.flatMap(item => item.service.sourceSubdomains || []))];
+
+                otherServices[consolidatedKey] = {
+                    originalKey: consolidatedKey,
+                    name: vendor,
+                    category: group[0].service.category,
+                    description: `Infrastructure services (${group.length} ASNs, ${totalRecords} records)`,
+                    records: allRecords,
+                    recordTypes: [...new Set(group.flatMap(item => item.service.recordTypes || []))],
+                    sourceSubdomains: allSubdomains,
+                    isConsolidated: true,
+                    asnBreakdown: group.map(item => ({
+                        asn: item.service.asnNumber,
+                        name: item.service.name,
+                        recordCount: item.service.records?.length || 0
+                    }))
+                };
+            } else {
+                // Single ASN - keep as-is
+                otherServices[group[0].key] = group[0].service;
+            }
+        }
+
+        console.log(`  ✅ Consolidated ${Object.keys(asnServices).length} ASN services into ${Object.keys(vendorGroups).length} vendor groups`);
+        return otherServices;
+    }
+
+    // Consolidate communication services (SRV records)
+    consolidateCommunicationServices(services) {
+        console.log(`🔄 Consolidating communication services...`);
+        
+        const commServices = {};
+        const otherServices = {};
+
+        // Find communication services
+        for (const [key, service] of Object.entries(services)) {
+            if (service.originalKey && service.originalKey.includes('communication-service')) {
+                commServices[key] = service;
+            } else {
+                otherServices[key] = service;
+            }
+        }
+
+        // Group by protocol (extract protocol from service name)
+        const protocolGroups = {};
+        for (const [key, service] of Object.entries(commServices)) {
+            // Extract protocol from name like "_xmpp-server._tcp" or "_xmpp-client._tcp"
+            const match = service.originalKey.match(/_([a-z]+)-(server|client)\._tcp/i);
+            if (match) {
+                const protocol = match[1].toUpperCase(); // e.g., "XMPP", "SIP"
+                if (!protocolGroups[protocol]) {
+                    protocolGroups[protocol] = [];
+                }
+                protocolGroups[protocol].push({ key, service, serviceType: match[2] });
+            } else {
+                // No protocol match - keep as-is
+                otherServices[key] = service;
+            }
+        }
+
+        // Create consolidated protocol services
+        for (const [protocol, group] of Object.entries(protocolGroups)) {
+            if (group.length > 1) {
+                // Multiple service types for same protocol - consolidate
+                const consolidatedKey = `consolidated_comm_${protocol.toLowerCase()}`;
+                const totalRecords = group.reduce((sum, item) => sum + (item.service.records?.length || 0), 0);
+                const allRecords = group.flatMap(item => item.service.records || []);
+                
+                otherServices[consolidatedKey] = {
+                    originalKey: consolidatedKey,
+                    name: `Communication Service (${protocol})`,
+                    category: 'communication',
+                    description: `${protocol} communication services (${group.length} types, ${totalRecords} targets)`,
+                    records: allRecords,
+                    recordTypes: ['SRV'],
+                    sourceSubdomains: [...new Set(group.flatMap(item => item.service.sourceSubdomains || []))],
+                    isConsolidated: true,
+                    serviceBreakdown: group.map(item => ({
+                        type: item.serviceType,
+                        name: item.service.name,
+                        recordCount: item.service.records?.length || 0,
+                        records: item.service.records || []
+                    }))
+                };
+            } else {
+                // Single service type - keep as-is
+                otherServices[group[0].key] = group[0].service;
+            }
+        }
+
+        console.log(`  ✅ Consolidated ${Object.keys(commServices).length} communication services into ${Object.keys(protocolGroups).length} protocol groups`);
+        return otherServices;
+    }
 } 

@@ -96,6 +96,24 @@ class UIRenderer {
         }
     }
 
+    // Toggle collapse for inline expandable sections
+    static toggleCollapse(elementId) {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+        
+        // Find the parent container with the toggle icon
+        const parent = element.previousElementSibling;
+        const icon = parent ? parent.querySelector('span[style*="float: right"]') : null;
+        
+        if (element.style.display === 'none') {
+            element.style.display = 'block';
+            if (icon) icon.textContent = '▲';
+        } else {
+            element.style.display = 'none';
+            if (icon) icon.textContent = '▼';
+        }
+    }
+
     // Display all results
     displayResults(processedData, securityResults, interestingFindings, apiNotifications, isProgressive = false) {
         if (this.resultsDiv) {
@@ -385,6 +403,54 @@ class UIRenderer {
             `;
         }
         
+        // Show ASN breakdown for consolidated vendor services
+        if (service.isConsolidated && service.asnBreakdown) {
+            const breakdownId = `asn_${service.originalKey}_${Math.random().toString(36).substr(2, 9)}`;
+            html += `
+                <div style="background: #e8f4f8; padding: 8px; margin: 8px 0; border-radius: 4px; border-left: 3px solid #17a2b8;">
+                    <div style="cursor: pointer;" onclick="UIRenderer.toggleCollapse('${breakdownId}')">
+                        <strong>🌐 ASN Breakdown (${service.asnBreakdown.length} ASNs)</strong>
+                        <span style="float: right;">▼</span>
+                    </div>
+                    <div id="${breakdownId}" style="display: none; margin-top: 10px;">
+                        <ul style="margin: 5px 0; padding-left: 20px; list-style: none;">`;
+            
+            service.asnBreakdown.forEach(asn => {
+                html += `<li style="margin: 5px 0;">
+                    📍 ${asn.name} - ${asn.recordCount} ${asn.recordCount === 1 ? 'record' : 'records'}
+                </li>`;
+            });
+            
+            html += `</ul>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Show service breakdown for consolidated communication services
+        if (service.isConsolidated && service.serviceBreakdown) {
+            const breakdownId = `comm_${service.originalKey}_${Math.random().toString(36).substr(2, 9)}`;
+            html += `
+                <div style="background: #e8f4f8; padding: 8px; margin: 8px 0; border-radius: 4px; border-left: 3px solid #17a2b8;">
+                    <div style="cursor: pointer;" onclick="UIRenderer.toggleCollapse('${breakdownId}')">
+                        <strong>📞 Service Types (${service.serviceBreakdown.length} types)</strong>
+                        <span style="float: right;">▼</span>
+                    </div>
+                    <div id="${breakdownId}" style="display: none; margin-top: 10px;">
+                        <ul style="margin: 5px 0; padding-left: 20px; list-style: none;">`;
+            
+            service.serviceBreakdown.forEach(svc => {
+                html += `<li style="margin: 5px 0;">
+                    📡 ${svc.type.charAt(0).toUpperCase() + svc.type.slice(1)}: ${svc.name} - ${svc.recordCount} ${svc.recordCount === 1 ? 'target' : 'targets'}
+                </li>`;
+            });
+            
+            html += `</ul>
+                    </div>
+                </div>
+            `;
+        }
+        
         // Show infrastructure information
         if (service.infrastructure) {
             html += `
@@ -515,40 +581,120 @@ class UIRenderer {
         
         if (section) section.style.display = 'block';
         
-        // Group by risk level
+        // Group by risk level first, then by type within each risk level
         const riskGroups = {
-            high: allIssues.filter(issue => issue.risk === 'high'),
-            medium: allIssues.filter(issue => issue.risk === 'medium'),
-            low: allIssues.filter(issue => issue.risk === 'low')
+            high: this.groupSecurityIssuesByType(allIssues.filter(issue => issue.risk === 'high')),
+            medium: this.groupSecurityIssuesByType(allIssues.filter(issue => issue.risk === 'medium')),
+            low: this.groupSecurityIssuesByType(allIssues.filter(issue => issue.risk === 'low'))
         };
         
         let html = '';
         
-        if (riskGroups.high.length > 0) {
-            html += `<div class="risk-section"><h4>🚨 High Risk Issues (${riskGroups.high.length})</h4>`;
-            riskGroups.high.forEach(issue => {
-                html += this.formatSecurityIssue(issue);
-            });
+        if (Object.keys(riskGroups.high).length > 0) {
+            const totalIssues = Object.values(riskGroups.high).reduce((sum, group) => sum + group.length, 0);
+            const typeCount = Object.keys(riskGroups.high).length;
+            html += `<div class="risk-section"><h4>🚨 High Risk Issues (${typeCount} ${typeCount === 1 ? 'type' : 'types'}, ${totalIssues} total)</h4>`;
+            html += this.formatGroupedSecurityIssues(riskGroups.high, 'high');
             html += '</div>';
         }
         
-        if (riskGroups.medium.length > 0) {
-            html += `<div class="risk-section"><h4>⚠️ Medium Risk Issues (${riskGroups.medium.length})</h4>`;
-            riskGroups.medium.forEach(issue => {
-                html += this.formatSecurityIssue(issue);
-            });
+        if (Object.keys(riskGroups.medium).length > 0) {
+            const totalIssues = Object.values(riskGroups.medium).reduce((sum, group) => sum + group.length, 0);
+            const typeCount = Object.keys(riskGroups.medium).length;
+            html += `<div class="risk-section"><h4>⚠️ Medium Risk Issues (${typeCount} ${typeCount === 1 ? 'type' : 'types'}, ${totalIssues} total)</h4>`;
+            html += this.formatGroupedSecurityIssues(riskGroups.medium, 'medium');
             html += '</div>';
         }
         
-        if (riskGroups.low.length > 0) {
-            html += `<div class="risk-section"><h4>ℹ️ Low Risk Issues (${riskGroups.low.length})</h4>`;
-            riskGroups.low.forEach(issue => {
-                html += this.formatSecurityIssue(issue);
-            });
+        if (Object.keys(riskGroups.low).length > 0) {
+            const totalIssues = Object.values(riskGroups.low).reduce((sum, group) => sum + group.length, 0);
+            const typeCount = Object.keys(riskGroups.low).length;
+            html += `<div class="risk-section"><h4>ℹ️ Low Risk Issues (${typeCount} ${typeCount === 1 ? 'type' : 'types'}, ${totalIssues} total)</h4>`;
+            html += this.formatGroupedSecurityIssues(riskGroups.low, 'low');
             html += '</div>';
         }
         
         container.innerHTML = html;
+    }
+
+    // Group security issues by type and subtype
+    groupSecurityIssuesByType(issues) {
+        const groups = {};
+        for (const issue of issues) {
+            // Create a group key that includes type and service/pattern for better grouping
+            let groupKey = issue.type;
+            if (issue.type === 'exposed_cloud_service' && issue.service) {
+                groupKey = `${issue.type}_${issue.service}`;
+            }
+            
+            if (!groups[groupKey]) {
+                groups[groupKey] = [];
+            }
+            groups[groupKey].push(issue);
+        }
+        return groups;
+    }
+
+    // Format grouped security issues with expandable sections
+    formatGroupedSecurityIssues(groupedIssues, riskLevel) {
+        const riskColors = {
+            critical: '#8B0000', high: '#FF8C00', medium: '#FFD700',
+            low: '#0066CC', info: '#FFFFFF'
+        };
+        const color = riskColors[riskLevel] || '#6c757d';
+        
+        let html = '';
+        for (const [groupKey, issues] of Object.entries(groupedIssues)) {
+            if (issues.length === 1) {
+                // Single issue - display normally
+                html += this.formatSecurityIssue(issues[0]);
+            } else {
+                // Multiple issues of same type - create grouped expandable section
+                const firstIssue = issues[0];
+                const categoryIcons = {
+                    takeover: '🎯', dns: '🌐', email: '📧',
+                    infrastructure: '🏗️', cloud: '☁️', certificate: '🔐'
+                };
+                const icon = categoryIcons[firstIssue.category] || '🔍';
+                
+                // Create group title
+                let groupTitle = firstIssue.description;
+                if (firstIssue.type === 'exposed_cloud_service' && firstIssue.service) {
+                    groupTitle = `Potential exposed cloud services: ${firstIssue.service}`;
+                }
+                
+                const groupId = `sec_${groupKey}_${Math.random().toString(36).substr(2, 9)}`;
+                
+                html += `
+                    <div class="service-item security-issues" style="border-left: 4px solid ${color};">
+                        <div class="service-name" style="cursor: pointer;" onclick="UIRenderer.toggleCollapse('${groupId}')">
+                            ${icon} ${groupTitle} (${issues.length} ${issues.length === 1 ? 'subdomain' : 'subdomains'})
+                            <span style="float: right;">▼</span>
+                        </div>
+                        <div id="${groupId}" style="display: none; margin-top: 10px;">
+                            <div class="service-description">
+                                <strong>Risk:</strong> ${firstIssue.risk.toUpperCase()}<br>
+                                <strong>Type:</strong> ${firstIssue.type}<br>
+                                ${firstIssue.recommendation ? `<strong>Recommendation:</strong> ${firstIssue.recommendation}<br>` : ''}
+                            </div>
+                            <div class="service-records">
+                                <strong>Affected Subdomains:</strong><br>
+                                <ul style="margin: 5px 0; padding-left: 20px;">`;
+                
+                issues.forEach(issue => {
+                    html += `<li>${issue.subdomain ? this.createSubdomainLink(issue.subdomain) : 'Unknown'}`;
+                    if (issue.ip) html += ` - IP: ${issue.ip}`;
+                    if (issue.issuer) html += ` - Issuer: ${issue.issuer}`;
+                    html += `</li>`;
+                });
+                
+                html += `</ul>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+        }
+        return html;
     }
 
     // Format security issue
@@ -619,10 +765,19 @@ class UIRenderer {
         }
         
         if (patternFindings.length > 0) {
-            html += `<div style="margin-bottom: 20px;"><h5 style="color: #17a2b8; margin-bottom: 10px;">🔍 Interesting Patterns (${patternFindings.length})</h5>`;
-            patternFindings.forEach(finding => {
-                html += this.formatInterestingFinding(finding);
-            });
+            // Group pattern findings by pattern
+            const groupedPatterns = this.groupFindingsByPattern(patternFindings);
+            const patternCount = Object.keys(groupedPatterns).length;
+            
+            html += `<div style="margin-bottom: 20px;"><h5 style="color: #17a2b8; margin-bottom: 10px;">🔍 Interesting Patterns (${patternCount} ${patternCount === 1 ? 'pattern' : 'patterns'}, ${patternFindings.length} ${patternFindings.length === 1 ? 'subdomain' : 'subdomains'})</h5>`;
+            
+            for (const [pattern, findings] of Object.entries(groupedPatterns)) {
+                if (findings.length === 1) {
+                    html += this.formatInterestingFinding(findings[0]);
+                } else {
+                    html += this.formatGroupedPatternFindings(pattern, findings);
+                }
+            }
             html += '</div>';
         }
         
@@ -655,6 +810,50 @@ class UIRenderer {
                 </div>
             </div>
         `;
+        
+        return html;
+    }
+
+    // Group findings by pattern
+    groupFindingsByPattern(findings) {
+        const groups = {};
+        for (const finding of findings) {
+            const pattern = finding.pattern || 'unknown';
+            if (!groups[pattern]) {
+                groups[pattern] = [];
+            }
+            groups[pattern].push(finding);
+        }
+        return groups;
+    }
+
+    // Format grouped pattern findings with expandable section
+    formatGroupedPatternFindings(pattern, findings) {
+        const groupId = `pattern_${pattern}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        let html = `
+            <div class="service-item" style="border-left: 4px solid #17a2b8;">
+                <div class="service-name" style="cursor: pointer;" onclick="UIRenderer.toggleCollapse('${groupId}')">
+                    🔍 Interesting subdomain pattern: ${pattern} (${findings.length} ${findings.length === 1 ? 'subdomain' : 'subdomains'})
+                    <span style="float: right;">▼</span>
+                </div>
+                <div id="${groupId}" style="display: none; margin-top: 10px;">
+                    <div class="service-description">
+                        <strong>Pattern:</strong> ${pattern}<br>
+                        ${findings[0].recommendation ? `<strong>Note:</strong> ${findings[0].recommendation}<br>` : ''}
+                    </div>
+                    <div class="service-records">
+                        <strong>Subdomains:</strong><br>
+                        <ul style="margin: 5px 0; padding-left: 20px;">`;
+        
+        findings.forEach(finding => {
+            html += `<li>${this.createSubdomainLink(finding.subdomain)}</li>`;
+        });
+        
+        html += `</ul>
+                    </div>
+                </div>
+            </div>`;
         
         return html;
     }
