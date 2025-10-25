@@ -410,9 +410,9 @@ class UIRenderer {
                 <div style="background: #e8f4f8; padding: 8px; margin: 8px 0; border-radius: 4px; border-left: 3px solid #17a2b8;">
                     <div style="cursor: pointer;" onclick="UIRenderer.toggleCollapse('${breakdownId}')">
                         <strong>🌐 ASN Breakdown (${service.asnBreakdown.length} ASNs)</strong>
-                        <span style="float: right;">▼</span>
+                        <span style="float: right;">▲</span>
                     </div>
-                    <div id="${breakdownId}" style="display: none; margin-top: 10px;">
+                    <div id="${breakdownId}" style="display: block; margin-top: 10px;">
                         <ul style="margin: 5px 0; padding-left: 20px; list-style: none;">`;
             
             service.asnBreakdown.forEach(asn => {
@@ -434,9 +434,9 @@ class UIRenderer {
                 <div style="background: #e8f4f8; padding: 8px; margin: 8px 0; border-radius: 4px; border-left: 3px solid #17a2b8;">
                     <div style="cursor: pointer;" onclick="UIRenderer.toggleCollapse('${breakdownId}')">
                         <strong>📞 Service Types (${service.serviceBreakdown.length} types)</strong>
-                        <span style="float: right;">▼</span>
+                        <span style="float: right;">▲</span>
                     </div>
-                    <div id="${breakdownId}" style="display: none; margin-top: 10px;">
+                    <div id="${breakdownId}" style="display: block; margin-top: 10px;">
                         <ul style="margin: 5px 0; padding-left: 20px; list-style: none;">`;
             
             service.serviceBreakdown.forEach(svc => {
@@ -669,9 +669,9 @@ class UIRenderer {
                     <div class="service-item security-issues" style="border-left: 4px solid ${color};">
                         <div class="service-name" style="cursor: pointer;" onclick="UIRenderer.toggleCollapse('${groupId}')">
                             ${icon} ${groupTitle} (${issues.length} ${issues.length === 1 ? 'subdomain' : 'subdomains'})
-                            <span style="float: right;">▼</span>
+                            <span style="float: right;">▲</span>
                         </div>
-                        <div id="${groupId}" style="display: none; margin-top: 10px;">
+                        <div id="${groupId}" style="display: block; margin-top: 10px;">
                             <div class="service-description">
                                 <strong>Risk:</strong> ${firstIssue.risk.toUpperCase()}<br>
                                 <strong>Type:</strong> ${firstIssue.type}<br>
@@ -835,9 +835,9 @@ class UIRenderer {
             <div class="service-item" style="border-left: 4px solid #17a2b8;">
                 <div class="service-name" style="cursor: pointer;" onclick="UIRenderer.toggleCollapse('${groupId}')">
                     🔍 Interesting subdomain pattern: ${pattern} (${findings.length} ${findings.length === 1 ? 'subdomain' : 'subdomains'})
-                    <span style="float: right;">▼</span>
+                    <span style="float: right;">▲</span>
                 </div>
-                <div id="${groupId}" style="display: none; margin-top: 10px;">
+                <div id="${groupId}" style="display: block; margin-top: 10px;">
                     <div class="service-description">
                         <strong>Pattern:</strong> ${pattern}<br>
                         ${findings[0].recommendation ? `<strong>Note:</strong> ${findings[0].recommendation}<br>` : ''}
