@@ -321,6 +321,15 @@ class DNSAnalyzer {
             // Analyze the subdomain
             const analysis = await this.analyzeSingleSubdomain(subdomain);
             
+            // Add source information from discovery queue
+            const discoveryInfo = this.discoveryQueue?.discoveredSubdomains?.get(subdomain);
+            if (discoveryInfo && discoveryInfo.sources) {
+                analysis.sources = discoveryInfo.sources;
+            } else {
+                // Fallback to the source parameter if discovery info not available
+                analysis.sources = [source];
+            }
+            
             // Check if this is a CNAME redirect to main domain
             if (analysis.records.CNAME && analysis.records.CNAME.length > 0) {
                 const cnameTarget = analysis.records.CNAME[0].data;
@@ -372,12 +381,14 @@ class DNSAnalyzer {
             console.warn(`❌ Failed to process subdomain ${subdomain}:`, error.message);
             
             // Store error result
+            const discoveryInfo = this.discoveryQueue?.discoveredSubdomains?.get(subdomain);
             const errorResult = {
                 subdomain: subdomain,
                 records: {},
                 ip: null,
                 status: 'error',
-                error: error.message
+                error: error.message,
+                sources: discoveryInfo?.sources || [source]
             };
             this.processedSubdomainResults.set(subdomain, errorResult);
         }
@@ -973,6 +984,15 @@ class DNSAnalyzer {
             try {
                 // Process single subdomain
                 const result = await this.analyzeSingleSubdomain(subdomain);
+                
+                // Add source information from discovery queue
+                const discoveryInfo = this.discoveryQueue?.discoveredSubdomains?.get(subdomain);
+                if (discoveryInfo && discoveryInfo.sources) {
+                    result.sources = discoveryInfo.sources;
+                } else {
+                    result.sources = ['discovery'];
+                }
+                
                 this.discoveryQueue.markCompleted(subdomain, result);
                 results.push(result);
                 
@@ -987,10 +1007,12 @@ class DNSAnalyzer {
                 
             } catch (error) {
                 console.warn(`❌ Failed to process ${subdomain}:`, error.message);
+                const discoveryInfo = this.discoveryQueue?.discoveredSubdomains?.get(subdomain);
                 this.discoveryQueue.markCompleted(subdomain, {
                     subdomain: subdomain,
                     status: 'error',
-                    error: error.message
+                    error: error.message,
+                    sources: discoveryInfo?.sources || ['discovery']
                 });
             }
         }

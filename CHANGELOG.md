@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Proper link styling for subdomain links using `--accent-blue` for all states (visited and unvisited)
+- Removed duplicate `createSubdomainLink()` method in ui-renderer.js
+
+### Fixed
+- Historical records now correctly display discovery source (e.g., "crt.sh", "HackerTarget") instead of "undefined" in UI, PDF, and XLSX exports
+- Source information is now properly preserved throughout the subdomain analysis pipeline
+- Both immediate and batch processing flows now include source tracking
+- PDF and XLSX exports now correctly handle both `source` (string) and `sources` (array) formats
+- Fixed dark mode styling for Historical Records table, Geographic Distribution table, and all Data Sovereignty sections
+- All sovereignty cards, alerts, and tables now properly respect dark mode theme
+- Replaced all hardcoded gray colors (#495057, #6c757d) with CSS variables for proper dark mode support
+
 ## [1.0.1] - 2025-10-27
 
 ### Changed

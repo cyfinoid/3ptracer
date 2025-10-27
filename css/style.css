@@ -54,6 +54,25 @@ body {
     transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+/* Subdomain Links - No distinction between visited/unvisited */
+.subdomain-link {
+    color: var(--accent-blue);
+    text-decoration: underline;
+    transition: opacity 0.2s ease;
+}
+
+.subdomain-link:visited {
+    color: var(--accent-blue);
+}
+
+.subdomain-link:hover {
+    opacity: 0.8;
+}
+
+.subdomain-link:active {
+    opacity: 0.6;
+}
+
 .container {
     max-width: 1200px;
     margin: 0 auto;
@@ -545,11 +564,11 @@ input[type="checkbox"] {
 }
 
 .historical-record .service-name {
-    color: #6c757d;
+    color: var(--text-secondary);
 }
 
 .historical-record {
-    border-left: 4px solid #6c757d;
+    border-left: 4px solid var(--border-color);
 }
 
 .error-message {
@@ -847,7 +866,7 @@ input[type="checkbox"] {
 .sovereignty-stat {
     text-align: center;
     padding: 15px 10px;
-    background: white;
+    background: var(--card-bg);
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
@@ -861,7 +880,7 @@ input[type="checkbox"] {
 
 .sovereignty-stat .stat-label {
     font-size: 0.85rem;
-    color: #6c757d;
+    color: var(--text-secondary);
     font-weight: 500;
 }
 
@@ -872,10 +891,10 @@ input[type="checkbox"] {
 .sovereignty-section-title {
     font-size: 1.1rem;
     font-weight: 600;
-    color: #2c3e50;
+    color: var(--text-color);
     margin-bottom: 15px;
     padding-bottom: 8px;
-    border-bottom: 2px solid #e9ecef;
+    border-bottom: 2px solid var(--border-color);
 }
 
 /* Compliance Alerts */
@@ -889,7 +908,7 @@ input[type="checkbox"] {
     padding: 15px;
     border-radius: 8px;
     border-left: 4px solid;
-    background: white;
+    background: var(--card-bg);
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     display: grid;
     grid-template-columns: auto 1fr auto;
@@ -899,17 +918,20 @@ input[type="checkbox"] {
 
 .sovereignty-alert.alert-high {
     border-left-color: #dc3545;
-    background: #fff5f5;
+    background: var(--card-bg);
+    border: 1px solid rgba(220, 53, 69, 0.2);
 }
 
 .sovereignty-alert.alert-medium {
     border-left-color: #ffc107;
-    background: #fffbf0;
+    background: var(--card-bg);
+    border: 1px solid rgba(255, 193, 7, 0.2);
 }
 
 .sovereignty-alert.alert-low {
     border-left-color: #28a745;
-    background: #f8fff8;
+    background: var(--card-bg);
+    border: 1px solid rgba(40, 167, 69, 0.2);
 }
 
 .alert-severity {
@@ -940,7 +962,7 @@ input[type="checkbox"] {
 
 .alert-type {
     font-size: 0.8rem;
-    color: #6c757d;
+    color: var(--text-secondary);
     font-weight: 500;
 }
 
@@ -952,11 +974,11 @@ input[type="checkbox"] {
 }
 
 .location-card {
-    background: white;
+    background: var(--card-bg);
     border-radius: 8px;
     padding: 15px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    border: 1px solid #e9ecef;
+    border: 1px solid var(--border-color);
     transition: transform 0.2s ease;
 }
 
@@ -990,8 +1012,8 @@ input[type="checkbox"] {
 
 .location-stat {
     font-size: 0.85rem;
-    color: #6c757d;
-    background: #f8f9fa;
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
     padding: 4px 8px;
     border-radius: 4px;
     font-weight: 500;
@@ -1034,12 +1056,12 @@ input[type="checkbox"] {
 }
 
 .service-name, .subdomain-name {
-    color: #495057;
+    color: var(--text-color);
     font-weight: 500;
 }
 
 .service-provider {
-    color: #6c757d;
+    color: var(--text-secondary);
     font-size: 0.8rem;
     font-style: italic;
 }
@@ -1068,7 +1090,7 @@ input[type="checkbox"] {
 }
 
 .risk-card {
-    background: white;
+    background: var(--card-bg);
     border-radius: 8px;
     padding: 18px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
@@ -1137,8 +1159,8 @@ input[type="checkbox"] {
 
 .risk-stat {
     font-size: 0.8rem;
-    color: #6c757d;
-    background: #f8f9fa;
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
     padding: 4px 8px;
     border-radius: 4px;
     font-weight: 500;
@@ -1146,7 +1168,7 @@ input[type="checkbox"] {
 
 .risk-region, .risk-timezone {
     font-size: 0.85rem;
-    color: #6c757d;
+    color: var(--text-secondary);
     margin-bottom: 8px;
 }
 
@@ -1166,16 +1188,16 @@ input[type="checkbox"] {
 
 .risk-issues li {
     font-size: 0.85rem;
-    color: #495057;
+    color: var(--text-color);
     margin-bottom: 4px;
     line-height: 1.4;
 }
 
 .risk-providers {
     font-size: 0.85rem;
-    color: #6c757d;
+    color: var(--text-secondary);
     padding-top: 10px;
-    border-top: 1px solid #e9ecef;
+    border-top: 1px solid var(--border-color);
 }
 
 .risk-providers strong {
@@ -1184,11 +1206,11 @@ input[type="checkbox"] {
 
 /* Distribution Table */
 .distribution-table {
-    background: white;
+    background: var(--card-bg);
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    border: 1px solid #e9ecef;
+    border: 1px solid var(--border-color);
 }
 
 .distribution-table table {
@@ -1208,13 +1230,13 @@ input[type="checkbox"] {
 
 .distribution-table td {
     padding: 12px 15px;
-    border-bottom: 1px solid #e9ecef;
+    border-bottom: 1px solid var(--border-color);
     font-size: 0.85rem;
-    color: #495057;
+    color: var(--text-color);
 }
 
 .distribution-table tr:hover {
-    background: #f8f9fa;
+    background: var(--hover-bg);
 }
 
 .distribution-table .country-flag {

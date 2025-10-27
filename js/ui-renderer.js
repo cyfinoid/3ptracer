@@ -542,10 +542,7 @@ class UIRenderer {
         return grouped;
     }
 
-    // Create subdomain link
-    createSubdomainLink(subdomain) {
-        return `<a href="https://${subdomain}" target="_blank" style="color: #2196f3; text-decoration: underline;">${subdomain}</a>`;
-    }
+    // Removed duplicate - see line ~1293 for the actual implementation
 
     // Get DNS record type name
     getDNSRecordTypeName(typeNumber) {
@@ -1195,14 +1192,14 @@ class UIRenderer {
         
         html += `
             <div style="overflow-x: auto; margin-top: 15px;">
-                <table style="width: 100%; border-collapse: collapse; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <table style="width: 100%; border-collapse: collapse; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; background: var(--card-bg); border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <thead>
-                        <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: #495057; border-bottom: 2px solid #dee2e6; min-width: 200px;">📜 Subdomain</th>
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: #495057; border-bottom: 2px solid #dee2e6; min-width: 100px;">Source</th>
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: #495057; border-bottom: 2px solid #dee2e6; min-width: 100px;">Discovered</th>
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: #495057; border-bottom: 2px solid #dee2e6; min-width: 120px;">Issuer</th>
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: #495057; border-bottom: 2px solid #dee2e6; min-width: 100px;">Expiry</th>
+                        <tr style="background: var(--table-header-bg); border-bottom: 2px solid var(--border-color);">
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 200px;">📜 Subdomain</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 100px;">Source</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 100px;">Discovered</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 120px;">Issuer</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 100px;">Expiry</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1211,6 +1208,14 @@ class UIRenderer {
         historicalRecords.forEach(record => {
             const certInfo = record.certificateInfo || {};
             const discoveredDate = new Date(record.discoveredAt || Date.now()).toLocaleDateString();
+            
+            // Handle both source (string) and sources (array)
+            let source = 'Unknown';
+            if (record.source) {
+                source = record.source;
+            } else if (record.sources && Array.isArray(record.sources) && record.sources.length > 0) {
+                source = record.sources.join(', ');
+            }
             
             let issuer = 'Unknown';
             if (certInfo.issuer && certInfo.issuer !== 'No certificate found') {
@@ -1233,14 +1238,14 @@ class UIRenderer {
             }
             
             html += `
-                <tr style="border-bottom: 1px solid #e9ecef;">
-                    <td style="padding: 12px 8px; color: #495057; word-break: break-all;">
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 12px 8px; color: var(--text-color); word-break: break-all;">
                         ${this.createSubdomainLink(record.subdomain)}
                     </td>
-                    <td style="padding: 12px 8px; color: #6c757d; font-size: 0.8rem;">${record.source}</td>
-                    <td style="padding: 12px 8px; color: #6c757d; font-size: 0.8rem;">${discoveredDate}</td>
-                    <td style="padding: 12px 8px; color: #6c757d; font-size: 0.8rem;">${issuer}</td>
-                    <td style="padding: 12px 8px; color: #6c757d; font-size: 0.8rem;">${expiryDate}</td>
+                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${source}</td>
+                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${discoveredDate}</td>
+                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${issuer}</td>
+                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${expiryDate}</td>
                 </tr>
             `;
         });

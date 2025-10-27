@@ -603,6 +603,14 @@ class ExportManager {
         const records = this.analysisData.processedData.historicalRecords || [];
         
         records.forEach(record => {
+            // Handle both source (string) and sources (array)
+            let source = 'Unknown';
+            if (record.source) {
+                source = record.source;
+            } else if (record.sources && Array.isArray(record.sources) && record.sources.length > 0) {
+                source = record.sources.join(', ');
+            }
+            
             const issuer = record.certificateInfo?.issuer || 'No cert';
             const cleanIssuer = issuer.includes('Let\'s Encrypt') ? 'Let\'s Encrypt' : 
                               issuer.includes('No cert') ? 'Unknown' : 
@@ -610,7 +618,7 @@ class ExportManager {
             
             historical.push([
                 record.subdomain || 'Unknown',
-                record.source || 'Unknown',
+                source,
                 cleanIssuer
             ]);
         });
@@ -874,9 +882,17 @@ class ExportManager {
         records.forEach(record => {
             const certInfo = record.certificateInfo || {};
             
+            // Handle both source (string) and sources (array)
+            let source = 'Unknown';
+            if (record.source) {
+                source = record.source;
+            } else if (record.sources && Array.isArray(record.sources) && record.sources.length > 0) {
+                source = record.sources.join(', ');
+            }
+            
             data.push([
                 record.subdomain || 'Unknown',
-                record.source || 'Unknown',
+                source,
                 record.discoveredAt ? new Date(record.discoveredAt).toLocaleDateString() : 'Unknown',
                 record.status || 'Historical',
                 certInfo.issuer || 'No certificate info',
