@@ -1793,28 +1793,18 @@ class DNSAnalyzer {
                         'User-Agent': '3rdPartyTracer/1.0'
                     }
                 });
-
-                if (!response.ok) {
-                    console.warn(`Provider ${provider.name} failed for ${ip}: ${response.status}`);
-                    continue;
-                }
-
-                const data = await response.json();
                 
-                // Check if we got valid data
-                if (data && (data.asn || data.org || data.as)) {
-                    const result = provider.transform(data);
-                    console.log(`✅ ASN info for ${ip} from ${provider.name}:`, result);
-                    return result;
+                if (response.ok) {
+                    const data = await response.json();
+                    return provider.transform(data);
                 }
             } catch (error) {
-                console.warn(`Provider ${provider.name} error for ${ip}:`, error.message);
+                console.warn(`Failed to get ASN from ${provider.name}:`, error.message);
                 continue;
             }
         }
-
-        // All providers failed
-        console.warn(`❌ All ASN providers failed for ${ip}`);
+        
+        // If all providers fail, return unknown
         return {
             asn: 'Unknown',
             isp: 'Unknown',
