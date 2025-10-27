@@ -457,11 +457,6 @@ class DataProcessor {
         );
     }
 
-    // Get all services
-    getAllServices() {
-        return Array.from(this.processedData.services.values());
-    }
-
     // Calculate statistics
     calculateStats() {
         const services = Array.from(this.processedData.services.values());

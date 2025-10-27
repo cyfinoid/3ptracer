@@ -9,34 +9,6 @@ class AnalysisController {
         
         // API notifications
         this.apiNotifications = [];
-        
-        // Debug utility
-        this.debug = {
-            isEnabled: false,
-            log: (message, data = null) => {
-                if (this.debug.isEnabled) {
-                    if (data) {
-                        console.log(`🔍 DEBUG: ${message}`, data);
-                    } else {
-                        console.log(`🔍 DEBUG: ${message}`);
-                    }
-                }
-            },
-            logJSON: (message, data) => {
-                if (this.debug.isEnabled) {
-                    console.log(`🔍 DEBUG: ${message}`);
-                    console.log(JSON.stringify(data, null, 2));
-                }
-            },
-            logStats: (stats) => {
-                if (this.debug.isEnabled) {
-                    console.log('📊 DEBUG: Final Statistics');
-                    console.log(JSON.stringify(stats, null, 2));
-                } else {
-                    console.log(`📊 Analysis Complete: ${stats.totalServices} services, ${stats.totalSubdomains} subdomains`);
-                }
-            }
-        };
     }
 
     // Main analysis method with progressive display
@@ -106,7 +78,9 @@ class AnalysisController {
             }
             
             console.log(`🎉 Analysis complete for ${domain}!`);
-            this.debug.logStats(processedData.stats);
+            if (window.logger) {
+                window.logger.stats('Analysis Complete', processedData.stats);
+            }
             
         } catch (error) {
             console.error('❌ Analysis failed:', error);
@@ -117,10 +91,11 @@ class AnalysisController {
     // Setup debug mode
     setupDebugMode() {
         const debugCheckbox = document.getElementById('debugMode');
-        this.debug.isEnabled = debugCheckbox ? debugCheckbox.checked : false;
+        const isEnabled = debugCheckbox ? debugCheckbox.checked : false;
         
-        if (this.debug.isEnabled) {
-            console.log('🔍 DEBUG MODE ENABLED - Detailed output will be shown');
+        // Set global logger debug mode
+        if (window.logger) {
+            window.logger.setDebugMode(isEnabled);
         }
     }
 
@@ -146,13 +121,17 @@ class AnalysisController {
         console.log(`📋 Analyzing main domain: ${domain}`);
         
         const mainDomainResults = await this.dnsAnalyzer.analyzeMainDomain(domain);
-        this.debug.logJSON('Main domain analysis complete:', mainDomainResults.records || {});
+        if (window.logger) {
+            window.logger.debugJSON('Main domain analysis complete:', mainDomainResults.records || {});
+        }
         
         // Detect services from main domain
         if (mainDomainResults.records) {
             const services = this.serviceDetector.detectServices(mainDomainResults.records, domain);
             mainDomainResults.services = services;
-            this.debug.logJSON('Services detected from main domain:', services);
+            if (window.logger) {
+                window.logger.debugJSON('Services detected from main domain:', services);
+            }
             console.log(`✅ Found ${services.length} services from main domain`);
         }
         
@@ -164,7 +143,9 @@ class AnalysisController {
         console.log(`🔍 Discovering subdomains for: ${domain}`);
         
         const subdomains = await this.dnsAnalyzer.getSubdomainsFromCT(domain);
-        this.debug.logJSON('Subdomains discovered:', subdomains);
+        if (window.logger) {
+            window.logger.debugJSON('Subdomains discovered:', subdomains);
+        }
         console.log(`✅ Found ${subdomains.length} subdomains`);
         
         return subdomains;
@@ -188,7 +169,9 @@ class AnalysisController {
             this.uiRenderer.updateProgress(35, `Found ${discoveryStats.total} subdomains, processed ${discoveryStats.processed}`);
             this.addAPINotification('Subdomain Discovery', `Found ${discoveryStats.total} subdomains from Certificate Transparency logs`, 'success');
             
-            this.debug.logJSON('Subdomains discovered:', subdomains);
+            if (window.logger) {
+                window.logger.debugJSON('Subdomains discovered:', subdomains);
+            }
             console.log(`✅ Found and processed ${subdomains.length} subdomains`);
             
             return subdomains;
@@ -239,17 +222,6 @@ class AnalysisController {
         }
     }
 
-    // Analyze subdomains
-    async analyzeSubdomains(subdomains) {
-        console.log(`📊 Analyzing ${subdomains.length} subdomains...`);
-        
-        const subdomainResults = await this.dnsAnalyzer.analyzeSubdomains(subdomains);
-        this.debug.logJSON('Subdomain analysis results:', subdomainResults);
-        console.log(`✅ Analyzed ${subdomainResults.length} subdomains`);
-        
-        return subdomainResults;
-    }
-
     // Analyze subdomains with progressive updates
     async analyzeSubdomainsWithProgress(subdomains, mainDomainResults) {
         console.log(`📊 Analyzing ${subdomains.length} subdomains with progressive updates...`);
@@ -277,7 +249,9 @@ class AnalysisController {
         await this.displayProgressiveResults(mainDomainResults, subdomains, [], {});
         
         this.addAPINotification('DNS Analysis', `Completed analysis of ${subdomains.length} subdomains`, 'success');
-        this.debug.logJSON('Subdomain analysis results:', subdomains);
+        if (window.logger) {
+            window.logger.debugJSON('Subdomain analysis results:', subdomains);
+        }
         console.log(`✅ Subdomain analysis complete: ${subdomains.length} results`);
         
         return subdomains;
@@ -300,7 +274,9 @@ class AnalysisController {
                         subdomain.vendor = this.serviceDetector.classifyVendor(asnInfo);
                         // FIXED: Store the raw ASN info for sovereignty analysis
                         subdomain.asnInfo = asnInfo;
-                        this.debug.log(`ASN info for ${subdomain.ip}: ${asnInfo.asn || 'Unknown'}`);
+                        if (window.logger) {
+                            window.logger.debug(`ASN info for ${subdomain.ip}: ${asnInfo.asn || 'Unknown'}`);
+                        }
                     } else {
                         console.warn(`⚠️ Invalid ASN response for ${subdomain.ip}`);
                         subdomain.vendor = { vendor: 'Unknown', category: 'Unknown' };
@@ -332,20 +308,28 @@ class AnalysisController {
         if (mainDomainResults?.records) {
             // DNS security issues
             securityResults.dnsIssues = this.serviceDetector.detectDNSSecurityIssues(mainDomainResults.records);
-            this.debug.logJSON('DNS security issues:', securityResults.dnsIssues);
+            if (window.logger) {
+                window.logger.debugJSON('DNS security issues:', securityResults.dnsIssues);
+            }
             
             // Email security issues
             securityResults.emailIssues = this.serviceDetector.detectEmailSecurityIssues(mainDomainResults.records);
-            this.debug.logJSON('Email security issues:', securityResults.emailIssues);
+            if (window.logger) {
+                window.logger.debugJSON('Email security issues:', securityResults.emailIssues);
+            }
             
             // Cloud security issues
             securityResults.cloudIssues = this.serviceDetector.detectCloudSecurityIssues(mainDomainResults.records, subdomainResults);
-            this.debug.logJSON('Cloud security issues:', securityResults.cloudIssues);
+            if (window.logger) {
+                window.logger.debugJSON('Cloud security issues:', securityResults.cloudIssues);
+            }
             
             // Subdomain takeover detection
             if (mainDomainResults.records.CNAME) {
                 securityResults.takeovers = this.serviceDetector.detectTakeoverFromCNAME(mainDomainResults.records.CNAME);
-                this.debug.logJSON('Takeover vulnerabilities:', securityResults.takeovers);
+                if (window.logger) {
+                    window.logger.debugJSON('Takeover vulnerabilities:', securityResults.takeovers);
+                }
             }
         }
 
@@ -353,7 +337,9 @@ class AnalysisController {
         const wildcardCerts = this.dnsAnalyzer.getWildcardCertificates();
         if (wildcardCerts && wildcardCerts.length > 0) {
             securityResults.wildcardCertificates = this.serviceDetector.detectWildcardCertificateIssues(wildcardCerts);
-            this.debug.logJSON('Wildcard certificate issues:', securityResults.wildcardCertificates);
+            if (window.logger) {
+                window.logger.debugJSON('Wildcard certificate issues:', securityResults.wildcardCertificates);
+            }
         }
 
         // CAA record validation against certificates
@@ -364,14 +350,18 @@ class AnalysisController {
             );
             if (caaViolations.length > 0) {
                 securityResults.cloudIssues.push(...caaViolations);
-                this.debug.logJSON('CAA violations:', caaViolations);
+                if (window.logger) {
+                    window.logger.debugJSON('CAA violations:', caaViolations);
+                }
             }
         }
 
         // Process DNS records separately from services
         const dnsRecords = mainDomainResults?.records ? 
             this.serviceDetector.processDNSRecords(mainDomainResults.records) : [];
-        this.debug.logJSON('DNS records:', dnsRecords);
+        if (window.logger) {
+            window.logger.debugJSON('DNS records:', dnsRecords);
+        }
         
         securityResults.dnsRecords = dnsRecords;
 
@@ -413,10 +403,12 @@ class AnalysisController {
         
         // NEW: Add Data Sovereignty Analysis
         console.log(`🌍 Running data sovereignty analysis...`);
-        const sovereigntyData = this.dataProcessor.analyzeSovereignty();
+        const sovereigntyData = this.dataProcessor.analyzeSovereignty();        
         processedData.sovereigntyAnalysis = sovereigntyData;
         
-        this.debug.logJSON('Processed data:', processedData);
+        if (window.logger) {
+            window.logger.debugJSON('Processed data:', processedData);
+        }
         console.log(`✅ Data processing complete with sovereignty analysis`);
         
         return processedData;
@@ -481,7 +473,9 @@ class AnalysisController {
         const activeSubdomains = this.dataProcessor.getActiveSubdomains();
         const totalSubdomains = Array.from(processedData.subdomains.values()).length;
         
-        this.debug.log(`Analyzing interesting findings for ${activeSubdomains.length} active subdomains (out of ${totalSubdomains} total)`);
+        if (window.logger) {
+            window.logger.debug(`Analyzing interesting findings for ${activeSubdomains.length} active subdomains (out of ${totalSubdomains} total)`);
+        }
         
         return this.serviceDetector.detectInterestingInfrastructureFindings({}, activeSubdomains);
     }
@@ -494,7 +488,9 @@ class AnalysisController {
             message: message,
             timestamp: new Date().toLocaleTimeString()
         });
-        this.debug.log(`API ${apiName}: ${status} - ${message}`);
+        if (window.logger) {
+            window.logger.debug(`API ${apiName}: ${status} - ${message}`);
+        }
     }
 
     // Get analysis statistics

@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Proper link styling for subdomain links using `--accent-blue` for all states (visited and unvisited)
 - Removed duplicate `createSubdomainLink()` method in ui-renderer.js
+- New global logging utility (`logger.js`) with debug mode support for conditional console output
+
+### Optimizations
+- **Removed unused files:** `service-registry.js` and `subdomain-registry.js` (functionality already implemented elsewhere)
+- **Removed duplicate functions:** Duplicate `getAllServices()` in `DataProcessor`
+- **Removed unused functions:** `startCTQueries()`, `analyzeSubdomains()`, and `loadResults()`
+- **Improved logging:** All debug logging now respects debug mode toggle, reducing console overhead
+- **Reduced HTTP requests:** 2 fewer JavaScript files to load on initial page load
 
 ### Fixed
 - Historical records now correctly display discovery source (e.g., "crt.sh", "HackerTarget") instead of "undefined" in UI, PDF, and XLSX exports

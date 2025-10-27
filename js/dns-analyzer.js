@@ -666,18 +666,6 @@ class DNSAnalyzer {
         return this.detectPrimaryService(cnameTarget);
     }
 
-    // Start certificate transparency queries early (non-blocking)
-    startCTQueries(domain) {
-        if (this.ctCache.has(domain)) {
-            return this.ctCache.get(domain);
-        }
-        
-        console.log(`🚀 Starting early CT queries for ${domain}...`);
-        const promise = this.getSubdomainsFromCT(domain);
-        this.ctCache.set(domain, promise);
-        return promise;
-    }
-
     // Query DNS with fallback strategy
     async queryDNS(domain, type = 'A', server = null) {
         await this.rateLimiter.throttle();
@@ -1213,110 +1201,6 @@ class DNSAnalyzer {
             console.log(`    ❌ HackerTarget failed:`, error.message);
             this.notifyAPIStatus('HackerTarget', 'error', error.message);
         }
-    }
-
-
-
-    // Analyze subdomains
-    async analyzeSubdomains(subdomains) {
-        const results = [];
-        
-        console.log(`🔍 Analyzing ${subdomains.length} subdomains...`);
-        
-        for (const subdomain of subdomains) {
-            try {
-                console.log(`  📡 Querying DNS for subdomain: ${subdomain}`);
-                // Query for both A and CNAME records to detect redirects
-                const records = await this.queryDNS(subdomain);
-                if (records && records.length > 0) {
-                    // Check for CNAME records first
-                    const cnameRecords = records.filter(r => r.type === 5); // CNAME type
-                    const aRecords = records.filter(r => r.type === 1); // A type
-                    
-                    if (cnameRecords.length > 0) {
-                        const cnameTarget = cnameRecords[0].data;
-                        
-                        // Check if this is a redirect to main domain
-                        if (this.isCNAMEToMainDomain(cnameTarget)) {
-                            console.log(`  🔄 Redirect detected: ${subdomain} → ${cnameTarget} (main domain)`);
-                            results.push({
-                                subdomain: subdomain,
-                                records: records,
-                                isRedirectToMain: true,
-                                redirectTarget: cnameTarget,
-                                ip: null
-                            });
-                            continue; // Skip further analysis for redirects
-                        }
-                        
-                        // Regular CNAME (not to main domain)
-                        console.log(`  🔗 Subdomain ${subdomain} has CNAME to ${cnameTarget}`);
-                        
-                        // Detect third-party service from CNAME target
-                        const detectedService = this.detectPrimaryService(cnameTarget);
-                        
-                        const subdomainResult = {
-                            subdomain: subdomain,
-                            records: records,
-                            ip: null, // CNAME doesn't have direct IP
-                            cnameTarget: cnameTarget
-                        };
-                        
-                        // Add service information if detected
-                        if (detectedService) {
-                            subdomainResult.detectedService = detectedService;
-                            console.log(`  🎯 Detected service: ${detectedService.name} (${detectedService.category}) for ${subdomain}`);
-                        }
-                        
-                        results.push(subdomainResult);
-                    } else if (aRecords.length > 0) {
-                        // Check if the record data is an IP address
-                        const recordData = aRecords[0].data;
-                        const isIP = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(recordData);
-                        
-                        if (isIP) {
-                            results.push({
-                                subdomain: subdomain,
-                                records: records,
-                                ip: recordData
-                            });
-                            console.log(`  ✅ Subdomain ${subdomain} resolved to IP ${recordData}`);
-                        } else {
-                            console.log(`  ⚠️  Subdomain ${subdomain} resolved to domain ${recordData} (not an IP)`);
-                            results.push({
-                                subdomain: subdomain,
-                                records: records,
-                                ip: null
-                            });
-                        }
-                    } else {
-                        console.log(`  ⚠️  Subdomain ${subdomain} has no A or CNAME records`);
-                        results.push({
-                            subdomain: subdomain,
-                            records: records,
-                            ip: null
-                        });
-                    }
-                } else {
-                    console.log(`  ⚠️  Subdomain ${subdomain} has no DNS records`);
-                    results.push({
-                        subdomain: subdomain,
-                        records: [],
-                        ip: null
-                    });
-                }
-            } catch (error) {
-                console.warn(`  ❌ Failed to analyze subdomain ${subdomain}:`, error.message);
-                results.push({
-                    subdomain: subdomain,
-                    records: [],
-                    ip: null
-                });
-            }
-        }
-
-        console.log(`📊 Subdomain analysis complete: ${results.length}/${subdomains.length} subdomains resolved`);
-        return results;
     }
 
     // Query DKIM records using common selectors

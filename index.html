@@ -206,51 +206,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
+    <script src="js/logger.js?v=1.0.1"></script>
     <script src="js/export-manager.js?v=1.0.1"></script>
-    <script src="js/subdomain-registry.js?v=1.0.1"></script>
-    <script src="js/service-registry.js?v=1.0.1"></script>
     <script src="js/dns-analyzer.js?v=1.0.1"></script>
     <script src="js/service-detection-engine.js?v=1.0.1"></script>
     <script src="js/data-processor.js?v=1.0.1"></script>
     <script src="js/ui-renderer.js?v=1.0.1"></script>
     <script src="js/analysis-controller.js?v=1.0.1"></script>
     <script src="js/app.js?v=1.0.1"></script>
-    
-    <!-- Theme Toggle Script -->
-    <script>
-        // Initialize theme from localStorage or default to dark mode
-        function initTheme() {
-            const savedTheme = localStorage.getItem('theme') || 'dark';
-            document.documentElement.setAttribute('data-theme', savedTheme);
-            updateThemeButton(savedTheme);
-        }
-        
-        // Toggle between light and dark themes
-        function toggleTheme() {
-            const currentTheme = document.documentElement.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            
-            document.documentElement.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-            updateThemeButton(newTheme);
-        }
-        
-        // Update theme button icon and text
-        function updateThemeButton(theme) {
-            const themeIcon = document.getElementById('themeIcon');
-            const themeText = document.getElementById('themeText');
-            
-            if (theme === 'dark') {
-                themeIcon.textContent = '🌙';
-                themeText.textContent = 'Light Mode';
-            } else {
-                themeIcon.textContent = '☀️';
-                themeText.textContent = 'Dark Mode';
-            }
-        }
-        
-        // Initialize theme on page load
-        initTheme();
-    </script>
+    <script src="js/theme-toggle.js?v=1.0.1"></script>
 </body>
 </html> 

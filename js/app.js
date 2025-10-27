@@ -17,12 +17,6 @@ class App {
             localStorage.setItem(`3ptracer_last_domain`, this.currentDomain);
         }
     }
-
-    // Load results from localStorage (simplified)
-    loadResults(domain) {
-        const saved = localStorage.getItem(`3ptracer_last_domain`);
-        return saved === domain;
-    }
 }
 
 // Global app instance
