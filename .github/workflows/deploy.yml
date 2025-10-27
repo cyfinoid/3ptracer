@@ -18,15 +18,15 @@ on:
           - staging
   
   # Trigger on push to main branch (optional - remove if not needed)
-  push:
-    branches:
-      - main
-    paths:
-      - '**.html'
-      - '**.css'
-      - '**.js'
-      - '!docs/**'
-      - '!_site/**'
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - '**.html'
+  #     - '**.css'
+  #     - '**.js'
+  #     - '!docs/**'
+  #     - '!_site/**'
 
 # Minimal permissions following principle of least privilege
 permissions:
@@ -73,16 +73,15 @@ jobs:
           echo "✅ Copied CSS file"
           
           # JavaScript files
+          cp js/logger.js _site/js/
           cp js/app.js _site/js/
           cp js/dns-analyzer.js _site/js/
           cp js/service-detection-engine.js _site/js/
           cp js/data-processor.js _site/js/
           cp js/ui-renderer.js _site/js/
           cp js/analysis-controller.js _site/js/
-          cp js/service-registry.js _site/js/
-          cp js/subdomain-registry.js _site/js/
           cp js/export-manager.js _site/js/
-          echo "✅ Copied 9 JavaScript files"
+          echo "✅ Copied 8 JavaScript files"
       
       - name: Generate release status
         run: |
@@ -110,14 +109,13 @@ jobs:
             "index.html"
             "about.html"
             "css/style.css"
+            "js/logger.js"
             "js/app.js"
             "js/dns-analyzer.js"
             "js/service-detection-engine.js"
             "js/data-processor.js"
             "js/ui-renderer.js"
             "js/analysis-controller.js"
-            "js/service-registry.js"
-            "js/subdomain-registry.js"
             "js/export-manager.js"
             "release-status.txt"
             ".nojekyll"
@@ -179,5 +177,5 @@ jobs:
           echo "### 📊 Deployment Details" >> $GITHUB_STEP_SUMMARY
           echo "- Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- Trigger: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Files deployed: 14 (2 HTML, 1 CSS, 9 JS, 2 metadata)" >> $GITHUB_STEP_SUMMARY
+          echo "- Files deployed: 13 (2 HTML, 1 CSS, 8 JS, 2 metadata)" >> $GITHUB_STEP_SUMMARY
 
