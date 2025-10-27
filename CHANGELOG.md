@@ -21,10 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 - **Fixed domain confusion vulnerability:** Replaced unsafe `includes()` domain checks with proper subdomain validation
-  - Added `isDomainOrSubdomain()` helper to prevent malicious domains like `s3.amazonaws.com.attacker.com` from being incorrectly matched
-  - Fixed S3 bucket detection to validate actual domain hierarchy
+  - Added `isDomainOrSubdomain()` helper to `ServiceDetectionEngine` and `DNSAnalyzer` classes
+  - Fixed S3 bucket detection to validate actual domain hierarchy (prevents `s3.amazonaws.com.attacker.com` from matching)
   - Fixed subdomain takeover detection to prevent false positives from domain confusion attacks
-  - Addresses CodeQL security warning about arbitrary host matching
+  - Fixed infrastructure detection in DNS analyzer (AWS, Azure, DigitalOcean, Cloudflare)
+  - Addresses CodeQL security warnings about arbitrary host matching in domain checks
 
 ### Fixed
 - Historical records now correctly display discovery source (e.g., "crt.sh", "HackerTarget") instead of "undefined" in UI, PDF, and XLSX exports

@@ -86,6 +86,22 @@ class DiscoveryQueue {
 // DNS Analyzer Module
 class DNSAnalyzer {
     constructor() {
+        // Helper function to safely match domain suffixes (prevents domain confusion attacks)
+        this.isDomainOrSubdomain = (target, domain) => {
+            if (!target || !domain) return false;
+            
+            const targetLower = target.toLowerCase().trim();
+            const domainLower = domain.toLowerCase().trim();
+            
+            // Exact match
+            if (targetLower === domainLower) return true;
+            
+            // Subdomain match - must end with .domain (not just contain it)
+            if (targetLower.endsWith('.' + domainLower)) return true;
+            
+            return false;
+        };
+        
         // Primary DNS servers (Google and Cloudflare only - more reliable)
         this.primaryDNSServers = [
             'https://dns.google/resolve',
@@ -632,29 +648,30 @@ class DNSAnalyzer {
         
         const target = finalCNAME.toLowerCase();
         
+        // SECURITY FIX: Use isDomainOrSubdomain to prevent domain confusion attacks
         // AWS services
-        if (target.includes('awsglobalaccelerator.com')) {
+        if (this.isDomainOrSubdomain(target, 'awsglobalaccelerator.com')) {
             return { name: 'AWS Global Accelerator', category: 'cloud', description: 'Global application accelerator' };
         }
-        if (target.includes('awsapprunner.com')) {
+        if (this.isDomainOrSubdomain(target, 'awsapprunner.com')) {
             return { name: 'AWS App Runner', category: 'cloud', description: 'Containerized application hosting' };
         }
-        if (target.includes('amazonaws.com')) {
+        if (this.isDomainOrSubdomain(target, 'amazonaws.com')) {
             return { name: 'Amazon Web Services (AWS)', category: 'cloud', description: 'Cloud computing platform' };
         }
         
         // Azure services
-        if (target.includes('azurewebsites.net')) {
+        if (this.isDomainOrSubdomain(target, 'azurewebsites.net')) {
             return { name: 'Microsoft Azure', category: 'cloud', description: 'Cloud computing platform' };
         }
         
         // DigitalOcean services
-        if (target.includes('ondigitalocean.app')) {
+        if (this.isDomainOrSubdomain(target, 'ondigitalocean.app')) {
             return { name: 'DigitalOcean App Platform', category: 'cloud', description: 'Application hosting platform' };
         }
         
         // Cloudflare
-        if (target.includes('cloudflare.com')) {
+        if (this.isDomainOrSubdomain(target, 'cloudflare.com')) {
             return { name: 'Cloudflare', category: 'cloud', description: 'CDN and security services' };
         }
         
