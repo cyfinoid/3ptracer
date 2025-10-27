@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2025-10-27
+
+### Changed
+- Optimized PDF export with better space management and compact layout (20-25% reduction in file size)
+- PDF export now includes all data with proper subdomain associations in Services section
+- Fixed PDF Interesting Findings to match webpage display (no longer generates duplicate findings)
+- Added cache busting for CSS and JavaScript files to ensure users get latest updates
+
+### Fixed
+- Services section in PDF now shows associated subdomains
+- Interesting findings in PDF now match exactly what's displayed on webpage
+- Export manager now properly receives and uses interesting findings from analysis
+
 ## [1.0.0] - 2025-10-24
 
 ### Added

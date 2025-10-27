@@ -24,11 +24,12 @@ class ExportManager {
     }
 
     // Store analysis data for export
-    setAnalysisData(processedData, securityResults, domain) {
+    setAnalysisData(processedData, securityResults, domain, interestingFindings = []) {
         console.log('📊 ExportManager.setAnalysisData called with:', {
             domain,
             hasProcessedData: !!processedData,
             hasSecurityResults: !!securityResults,
+            interestingFindingsCount: interestingFindings?.length || 0,
             processedDataKeys: processedData ? Object.keys(processedData) : 'none'
         });
         
@@ -38,6 +39,7 @@ class ExportManager {
         this.analysisData = {
             processedData: serializedProcessedData,
             securityResults,
+            interestingFindings: interestingFindings || [],
             domain,
             timestamp: new Date().toISOString(),
             formattedTimestamp: new Date().toLocaleString()
@@ -48,7 +50,8 @@ class ExportManager {
         console.log('📊 Analysis data stored:', {
             domain: this.exportDomain,
             timestamp: this.exportTimestamp,
-            hasData: !!this.analysisData
+            hasData: !!this.analysisData,
+            interestingFindings: this.analysisData.interestingFindings.length
         });
         
         // Show export section and add JSON export button
@@ -133,7 +136,8 @@ class ExportManager {
                     exportedAt: new Date().toISOString()
                 },
                 processedData: this.analysisData.processedData,
-                securityResults: this.analysisData.securityResults
+                securityResults: this.analysisData.securityResults,
+                interestingFindings: this.analysisData.interestingFindings
             };
 
             // Convert to JSON string with pretty formatting
@@ -188,36 +192,35 @@ class ExportManager {
                 creator: '3rd Party Tracer'
             });
 
-            let currentY = 20;
+            let currentY = 15;
             const pageHeight = doc.internal.pageSize.height;
-            const marginBottom = 30;
+            const marginBottom = 20;
 
-            // Title and header
-            doc.setFontSize(20);
-            doc.setTextColor(102, 126, 234); // Purple color
-            doc.text('3rd Party Tracer Report', 20, currentY);
-            
-            currentY += 15;
+            // Title and header - compact
             doc.setFontSize(16);
-            doc.setTextColor(0, 0, 0);
-            doc.text(`Domain: ${this.exportDomain}`, 20, currentY);
+            doc.setTextColor(102, 126, 234); // Purple color
+            doc.text('3rd Party Tracer Report', 15, currentY);
             
-            currentY += 10;
+            currentY += 8;
             doc.setFontSize(12);
+            doc.setTextColor(0, 0, 0);
+            doc.text(`Domain: ${this.exportDomain}`, 15, currentY);
+            
+            currentY += 6;
+            doc.setFontSize(9);
             doc.setTextColor(100, 100, 100);
-            doc.text(`Generated: ${this.analysisData.formattedTimestamp}`, 20, currentY);
-            doc.text('Powered by 3rd Party Tracer - cyfinoid.github.io/3ptracer', 20, currentY + 7);
+            doc.text(`Generated: ${this.analysisData.formattedTimestamp}`, 15, currentY);
 
-            currentY += 25;
+            currentY += 12;
 
-            // Executive Summary
+            // Executive Summary - compact layout
             currentY = this.addPDFSection(doc, 'Executive Summary', currentY);
             const stats = this.analysisData.processedData.stats;
             const summaryData = [
-                ['Total Services Detected', stats.totalServices || 0],
-                ['Subdomains Analyzed', stats.totalSubdomains || 0],
-                ['Hosting Providers', stats.totalProviders || 0],
-                ['Security Issues Found', this.countSecurityIssues()],
+                ['Total Services', stats.totalServices || 0],
+                ['Subdomains', stats.totalSubdomains || 0],
+                ['Providers', stats.totalProviders || 0],
+                ['Security Issues', this.countSecurityIssues()],
                 ['Historical Records', stats.totalHistoricalRecords || 0]
             ];
 
@@ -225,17 +228,18 @@ class ExportManager {
                 head: [['Metric', 'Count']],
                 body: summaryData,
                 startY: currentY,
-                theme: 'grid',
-                headStyles: { fillColor: [102, 126, 234] },
-                margin: { left: 20, right: 20 }
+                theme: 'striped',
+                headStyles: { fillColor: [102, 126, 234], fontSize: 9 },
+                margin: { left: 15, right: 15 },
+                styles: { fontSize: 8, cellPadding: 2 }
             });
 
-            currentY = doc.lastAutoTable.finalY + 20;
+            currentY = doc.lastAutoTable.finalY + 8;
 
-            // Services Section
-            if (pageHeight - currentY < 50) {
+            // Services Section - optimized layout
+            if (pageHeight - currentY < 30) {
                 doc.addPage();
-                currentY = 20;
+                currentY = 15;
             }
 
             currentY = this.addPDFSection(doc, 'Services Detected', currentY);
@@ -243,30 +247,31 @@ class ExportManager {
             
             if (servicesData.length > 0) {
                 doc.autoTable({
-                    head: [['Service Name', 'Category', 'Description', 'Records']],
+                    head: [['Service Name', 'Category', 'Description', 'Associated Subdomains']],
                     body: servicesData,
                     startY: currentY,
-                    theme: 'grid',
-                    headStyles: { fillColor: [102, 126, 234] },
-                    margin: { left: 20, right: 20 },
+                    theme: 'striped',
+                    headStyles: { fillColor: [102, 126, 234], fontSize: 8 },
+                    margin: { left: 15, right: 15 },
                     columnStyles: {
-                        0: { cellWidth: 45 },
-                        1: { cellWidth: 30 },
-                        2: { cellWidth: 70 },
-                        3: { cellWidth: 35 }
+                        0: { cellWidth: 40 },
+                        1: { cellWidth: 28 },
+                        2: { cellWidth: 65 },
+                        3: { cellWidth: 47 }
                     },
-                    styles: { fontSize: 9, cellPadding: 3 }
+                    styles: { fontSize: 7.5, cellPadding: 2, overflow: 'linebreak', lineWidth: 0.1 }
                 });
-                currentY = doc.lastAutoTable.finalY + 15;
+                currentY = doc.lastAutoTable.finalY + 8;
             } else {
-                doc.text('No services detected.', 20, currentY);
-                currentY += 15;
+                doc.setFontSize(8);
+                doc.text('No services detected.', 15, currentY);
+                currentY += 8;
             }
 
-            // Security Findings Section
-            if (pageHeight - currentY < 50) {
+            // Security Findings Section - optimized
+            if (pageHeight - currentY < 30) {
                 doc.addPage();
-                currentY = 20;
+                currentY = 15;
             }
 
             currentY = this.addPDFSection(doc, 'Security Findings', currentY);
@@ -277,27 +282,90 @@ class ExportManager {
                     head: [['Severity', 'Type', 'Description', 'Recommendation']],
                     body: securityData,
                     startY: currentY,
-                    theme: 'grid',
-                    headStyles: { fillColor: [102, 126, 234] },
-                    margin: { left: 20, right: 20 },
+                    theme: 'striped',
+                    headStyles: { fillColor: [102, 126, 234], fontSize: 8 },
+                    margin: { left: 15, right: 15 },
                     columnStyles: {
-                        0: { cellWidth: 25 },
-                        1: { cellWidth: 40 },
+                        0: { cellWidth: 22 },
+                        1: { cellWidth: 35 },
                         2: { cellWidth: 65 },
-                        3: { cellWidth: 50 }
+                        3: { cellWidth: 58 }
                     },
-                    styles: { fontSize: 9, cellPadding: 3 }
+                    styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak', lineWidth: 0.1 }
                 });
-                currentY = doc.lastAutoTable.finalY + 15;
+                currentY = doc.lastAutoTable.finalY + 8;
             } else {
-                doc.text('No security issues detected.', 20, currentY);
-                currentY += 15;
+                doc.setFontSize(8);
+                doc.text('No security issues detected.', 15, currentY);
+                currentY += 8;
             }
 
-            // Geographic Distribution Section
-            if (pageHeight - currentY < 50) {
+            // Subdomains Section - optimized
+            if (pageHeight - currentY < 30) {
                 doc.addPage();
-                currentY = 20;
+                currentY = 15;
+            }
+
+            currentY = this.addPDFSection(doc, 'Discovered Subdomains', currentY);
+            const subdomainsData = this.formatSubdomainsForPDF();
+            
+            if (subdomainsData.length > 0) {
+                doc.autoTable({
+                    head: [['Subdomain', 'IP Address', 'Provider/Service']],
+                    body: subdomainsData,
+                    startY: currentY,
+                    theme: 'striped',
+                    headStyles: { fillColor: [102, 126, 234], fontSize: 8 },
+                    margin: { left: 15, right: 15 },
+                    columnStyles: {
+                        0: { cellWidth: 85 },
+                        1: { cellWidth: 40 },
+                        2: { cellWidth: 55 }
+                    },
+                    styles: { fontSize: 7.5, cellPadding: 1.5, overflow: 'linebreak', lineWidth: 0.1 }
+                });
+                currentY = doc.lastAutoTable.finalY + 8;
+            } else {
+                doc.setFontSize(8);
+                doc.text('No subdomains discovered.', 15, currentY);
+                currentY += 8;
+            }
+
+            // Interesting Findings Section - optimized
+            if (pageHeight - currentY < 30) {
+                doc.addPage();
+                currentY = 15;
+            }
+
+            currentY = this.addPDFSection(doc, 'Interesting Findings', currentY);
+            const interestingData = this.formatInterestingFindingsForPDF();
+            
+            if (interestingData.length > 0) {
+                doc.autoTable({
+                    head: [['Type', 'Subdomain', 'Description']],
+                    body: interestingData,
+                    startY: currentY,
+                    theme: 'striped',
+                    headStyles: { fillColor: [102, 126, 234], fontSize: 8 },
+                    margin: { left: 15, right: 15 },
+                    columnStyles: {
+                        0: { cellWidth: 28 },
+                        1: { cellWidth: 75 },
+                        2: { cellWidth: 77 }
+                    },
+                    styles: { fontSize: 7.5, cellPadding: 2, overflow: 'linebreak', lineWidth: 0.1 }
+                });
+                currentY = doc.lastAutoTable.finalY + 8;
+            } else {
+                doc.setFontSize(8);
+                doc.text('No notable findings.', 15, currentY);
+                currentY += 8;
+            }
+
+            // Geographic Distribution Section - optimized
+            if (pageHeight - currentY < 30) {
+                doc.addPage();
+                currentY = 15;
             }
 
             currentY = this.addPDFSection(doc, 'Geographic Distribution', currentY);
@@ -305,28 +373,28 @@ class ExportManager {
             
             if (geoData.length > 0) {
                 doc.autoTable({
-                    head: [['Country', 'Services', 'Subdomains', 'Risk Level', 'Providers']],
+                    head: [['Country', 'Svcs', 'Subs', 'Risk', 'Providers']],
                     body: geoData,
                     startY: currentY,
-                    theme: 'grid',
-                    headStyles: { fillColor: [102, 126, 234] },
-                    margin: { left: 20, right: 20 },
+                    theme: 'striped',
+                    headStyles: { fillColor: [102, 126, 234], fontSize: 8 },
+                    margin: { left: 15, right: 15 },
                     columnStyles: {
                         0: { cellWidth: 35 },
-                        1: { cellWidth: 25 },
-                        2: { cellWidth: 30 },
-                        3: { cellWidth: 25 },
-                        4: { cellWidth: 65 }
+                        1: { cellWidth: 18 },
+                        2: { cellWidth: 18 },
+                        3: { cellWidth: 22 },
+                        4: { cellWidth: 87 }
                     },
-                    styles: { fontSize: 9, cellPadding: 3 }
+                    styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak', lineWidth: 0.1 }
                 });
-                currentY = doc.lastAutoTable.finalY + 15;
+                currentY = doc.lastAutoTable.finalY + 8;
             }
 
-            // Historical Records Section
-            if (pageHeight - currentY < 50) {
+            // Historical Records Section - optimized
+            if (pageHeight - currentY < 30) {
                 doc.addPage();
-                currentY = 20;
+                currentY = 15;
             }
 
             currentY = this.addPDFSection(doc, 'Historical Records', currentY);
@@ -334,31 +402,30 @@ class ExportManager {
             
             if (historicalData.length > 0) {
                 doc.autoTable({
-                    head: [['Subdomain', 'Source', 'Status', 'Certificate Issuer']],
+                    head: [['Subdomain', 'Source', 'Cert Issuer']],
                     body: historicalData,
                     startY: currentY,
-                    theme: 'grid',
-                    headStyles: { fillColor: [102, 126, 234] },
-                    margin: { left: 20, right: 20 },
+                    theme: 'striped',
+                    headStyles: { fillColor: [102, 126, 234], fontSize: 8 },
+                    margin: { left: 15, right: 15 },
                     columnStyles: {
-                        0: { cellWidth: 70 },
+                        0: { cellWidth: 95 },
                         1: { cellWidth: 40 },
-                        2: { cellWidth: 35 },
-                        3: { cellWidth: 35 }
+                        2: { cellWidth: 45 }
                     },
-                    styles: { fontSize: 9, cellPadding: 3 }
+                    styles: { fontSize: 7.5, cellPadding: 1.5, overflow: 'linebreak', lineWidth: 0.1 }
                 });
-                currentY = doc.lastAutoTable.finalY + 15;
+                currentY = doc.lastAutoTable.finalY + 8;
             }
 
-            // Add footer to each page
+            // Add footer to each page - compact
             const pageCount = doc.internal.getNumberOfPages();
             for (let i = 1; i <= pageCount; i++) {
                 doc.setPage(i);
-                doc.setFontSize(8);
+                doc.setFontSize(7);
                 doc.setTextColor(150, 150, 150);
-                doc.text(`Page ${i} of ${pageCount}`, 20, pageHeight - 15);
-                doc.text('Generated by 3rd Party Tracer - cyfinoid.github.io/3ptracer', 105, pageHeight - 15, { align: 'center' });
+                doc.text(`Page ${i}/${pageCount}`, 15, pageHeight - 10);
+                doc.text('3rd Party Tracer - cyfinoid.github.io/3ptracer', 105, pageHeight - 10, { align: 'center' });
             }
 
             // Save the PDF
@@ -373,15 +440,17 @@ class ExportManager {
         }
     }
 
-    // Helper method to add section headers in PDF
+    // Helper method to add section headers in PDF - compact
     addPDFSection(doc, title, currentY) {
-        doc.setFontSize(14);
+        doc.setFontSize(11);
         doc.setTextColor(0, 0, 0);
-        doc.text(title, 20, currentY);
-        return currentY + 10;
+        doc.setFont(undefined, 'bold');
+        doc.text(title, 15, currentY);
+        doc.setFont(undefined, 'normal');
+        return currentY + 7;
     }
 
-    // Format services data for PDF using the verified JSON structure
+    // Format services data for PDF using the verified JSON structure - optimized
     formatServicesForPDF() {
         const services = [];
         const processedData = this.analysisData.processedData;
@@ -391,14 +460,17 @@ class ExportManager {
         if (processedData.services) {
             // Services are now objects (from serialization), not Maps
             Object.values(processedData.services).forEach(service => {
-                const recordCount = service.records ? service.records.length : 0;
-                const recordTypes = service.recordTypes ? service.recordTypes.join(', ') : 'Unknown';
+                // Get associated subdomains for this service
+                const subdomains = service.sourceSubdomains || [];
+                const subdomainText = subdomains.length > 0 
+                    ? `${subdomains.length} subdomain${subdomains.length > 1 ? 's' : ''}: ${subdomains.slice(0, 3).join(', ')}${subdomains.length > 3 ? '...' : ''}`
+                    : 'Main domain';
                 
                 services.push([
                     service.name || 'Unknown',
                     this.capitalizeFirst(service.category || 'unknown'),
-                    this.truncateText(service.description || 'No description', 60),
-                    `${recordCount} (${recordTypes})`
+                    service.description || 'No description',
+                    subdomainText
                 ]);
             });
         }
@@ -407,7 +479,7 @@ class ExportManager {
         return services;
     }
 
-    // Format security findings for PDF
+    // Format security findings for PDF - optimized
     formatSecurityForPDF() {
         const findings = [];
         const securityResults = this.analysisData.securityResults || {};
@@ -418,8 +490,8 @@ class ExportManager {
                 findings.push([
                     this.capitalizeFirst(issue.risk || 'medium'),
                     'Email Security',
-                    this.truncateText(issue.description || 'No description', 50),
-                    this.truncateText(issue.recommendation || 'Review configuration', 40)
+                    issue.description || 'No description',
+                    issue.recommendation || 'Review configuration'
                 ]);
             });
         }
@@ -431,8 +503,8 @@ class ExportManager {
                     findings.push([
                         this.capitalizeFirst(issue.risk || issue.severity || 'medium'),
                         this.formatIssueType(issueType),
-                        this.truncateText(issue.description || 'No description', 50),
-                        this.truncateText(issue.recommendation || 'Review configuration', 40)
+                        issue.description || 'No description',
+                        issue.recommendation || 'Review configuration'
                     ]);
                 });
             }
@@ -442,7 +514,7 @@ class ExportManager {
         return findings;
     }
 
-    // Format geographic data for PDF
+    // Format geographic data for PDF - optimized
     formatGeographicForPDF() {
         const geoData = [];
         const sovereignty = this.analysisData.processedData.sovereigntyAnalysis;
@@ -458,7 +530,7 @@ class ExportManager {
                             country.totalServices || 0,
                             country.totalSubdomains || 0,
                             this.capitalizeFirst(riskLevel),
-                            this.truncateText(providers, 50)
+                            providers  // Don't truncate, let table handle wrapping
                         ]);
                     });
                 }
@@ -469,21 +541,77 @@ class ExportManager {
         return geoData;
     }
 
-    // Format historical records for PDF
+    // Format subdomains for PDF - optimized
+    formatSubdomainsForPDF() {
+        const subdomains = [];
+        const processedData = this.analysisData.processedData;
+        
+        // Get active subdomains (not redirects or historical)
+        if (processedData.subdomains) {
+            // If subdomains is a Map
+            const subdomainList = processedData.subdomains instanceof Map 
+                ? Array.from(processedData.subdomains.values())
+                : Object.values(processedData.subdomains);
+            
+            subdomainList.forEach(subdomain => {
+                const ipAddress = subdomain.ipAddresses && subdomain.ipAddresses.length > 0 
+                    ? subdomain.ipAddresses[0] 
+                    : subdomain.ip || 'N/A';
+                
+                const provider = subdomain.provider || subdomain.service || 
+                               (subdomain.asnInfo ? subdomain.asnInfo.org : 'Unknown');
+                
+                subdomains.push([
+                    subdomain.subdomain || subdomain.name || 'Unknown',
+                    ipAddress,
+                    provider
+                ]);
+            });
+        }
+        
+        console.log('📊 Formatted subdomains for PDF:', subdomains.length, 'subdomains');
+        return subdomains;
+    }
+
+    // Format interesting findings for PDF - using actual findings from analysis
+    formatInterestingFindingsForPDF() {
+        const findings = [];
+        const interestingFindings = this.analysisData.interestingFindings || [];
+        
+        console.log('📊 Formatting interesting findings for PDF:', interestingFindings.length, 'findings');
+        
+        // Use the same interesting findings displayed in the UI
+        interestingFindings.forEach(finding => {
+            const findingType = finding.type === 'interesting_subdomain' ? 'Pattern' : 'Service';
+            const details = finding.subdomain || 'N/A';
+            const significance = finding.description || finding.reason || 'Infrastructure finding';
+            
+            findings.push([
+                findingType,
+                details,
+                significance
+            ]);
+        });
+        
+        console.log('📊 Formatted interesting findings for PDF:', findings.length, 'findings');
+        return findings;
+    }
+
+    // Format historical records for PDF - optimized
     formatHistoricalForPDF() {
         const historical = [];
         const records = this.analysisData.processedData.historicalRecords || [];
         
         records.forEach(record => {
-            const issuer = record.certificateInfo?.issuer || 'No certificate info';
+            const issuer = record.certificateInfo?.issuer || 'No cert';
             const cleanIssuer = issuer.includes('Let\'s Encrypt') ? 'Let\'s Encrypt' : 
-                              issuer.includes('No certificate') ? 'Unknown' : issuer;
+                              issuer.includes('No cert') ? 'Unknown' : 
+                              this.truncateText(issuer, 35);
             
             historical.push([
                 record.subdomain || 'Unknown',
                 record.source || 'Unknown',
-                record.status || 'Historical',
-                this.truncateText(cleanIssuer, 30)
+                cleanIssuer
             ]);
         });
         

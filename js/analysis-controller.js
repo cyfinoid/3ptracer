@@ -90,13 +90,16 @@ class AnalysisController {
             if (window.exportManager) {
                 console.log('📊 Setting analysis data for export...');
                 
+                // Get interesting findings (same as displayed in UI)
+                const interestingFindings = this.getInterestingFindings(processedData);
+                
                 // Add dataProcessor reference to processedData for export (same as UIRenderer)
                 const enhancedProcessedData = {
                     ...processedData,
                     dataProcessor: this.dataProcessor
                 };
                 
-                window.exportManager.setAnalysisData(enhancedProcessedData, securityResults, domain);
+                window.exportManager.setAnalysisData(enhancedProcessedData, securityResults, domain, interestingFindings);
                 console.log('✅ Export data set successfully');
             } else {
                 console.error('❌ Export manager not available');
