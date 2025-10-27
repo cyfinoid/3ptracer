@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2025-10-27
+
 ### Added
 - Proper link styling for subdomain links using `--accent-blue` for all states (visited and unvisited)
 - Removed duplicate `createSubdomainLink()` method in ui-renderer.js
@@ -17,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Removed duplicate functions:** Duplicate `getAllServices()` in `DataProcessor`
 - **Removed unused functions:** `startCTQueries()`, `analyzeSubdomains()`, and `loadResults()`
 - **Improved logging:** All debug logging now respects debug mode toggle, reducing console overhead
-- **Reduced HTTP requests:** 2 fewer JavaScript files to load on initial page load
+- **Reduced HTTP requests:** 2 fewer JavaScript files to load on initial page load (~300 lines of dead code removed)
 
 ### Security
 - **Fixed domain confusion vulnerability:** Replaced unsafe `includes()` domain checks with proper subdomain validation
