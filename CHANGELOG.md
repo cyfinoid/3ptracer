@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Improved logging:** All debug logging now respects debug mode toggle, reducing console overhead
 - **Reduced HTTP requests:** 2 fewer JavaScript files to load on initial page load
 
+### Security
+- **Fixed domain confusion vulnerability:** Replaced unsafe `includes()` domain checks with proper subdomain validation
+  - Added `isDomainOrSubdomain()` helper to prevent malicious domains like `s3.amazonaws.com.attacker.com` from being incorrectly matched
+  - Fixed S3 bucket detection to validate actual domain hierarchy
+  - Fixed subdomain takeover detection to prevent false positives from domain confusion attacks
+  - Addresses CodeQL security warning about arbitrary host matching
+
 ### Fixed
 - Historical records now correctly display discovery source (e.g., "crt.sh", "HackerTarget") instead of "undefined" in UI, PDF, and XLSX exports
 - Source information is now properly preserved throughout the subdomain analysis pipeline

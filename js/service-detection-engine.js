@@ -5,6 +5,22 @@ class ServiceDetectionEngine {
         this.vendorPatterns = this.initializeVendorPatterns();
     }
 
+    // Helper function to safely match domain suffixes (prevents domain confusion attacks)
+    isDomainOrSubdomain(target, domain) {
+        if (!target || !domain) return false;
+        
+        const targetLower = target.toLowerCase().trim();
+        const domainLower = domain.toLowerCase().trim();
+        
+        // Exact match
+        if (targetLower === domainLower) return true;
+        
+        // Subdomain match - must end with .domain (not just contain it)
+        if (targetLower.endsWith('.' + domainLower)) return true;
+        
+        return false;
+    }
+
     // Initialize service patterns in a cleaner structure
     initializeServicePatterns() {
         return {
@@ -2169,7 +2185,10 @@ class ServiceDetectionEngine {
         if (records.CNAME) {
             for (const cnameRecord of records.CNAME) {
                 const cnameData = cnameRecord.data.toLowerCase();
-                if (cnameData.includes('s3.amazonaws.com')) {
+                // SECURITY FIX: Use isDomainOrSubdomain to prevent domain confusion attacks
+                if (this.isDomainOrSubdomain(cnameData, 's3.amazonaws.com') || 
+                    cnameData.includes('.s3.') || 
+                    cnameData.includes('.s3-')) {
                     issues.push({
                         type: 's3_bucket_detected',
                         risk: 'medium',
@@ -2197,7 +2216,8 @@ class ServiceDetectionEngine {
         for (const record of cnameRecords) {
             const cnameTarget = record.data;
             for (const service of vulnerableServices) {
-                if (cnameTarget.includes(service)) {
+                // SECURITY FIX: Use isDomainOrSubdomain to prevent domain confusion attacks
+                if (this.isDomainOrSubdomain(cnameTarget, service)) {
                     takeovers.push({
                         subdomain: record.name,
                         cname: cnameTarget,
