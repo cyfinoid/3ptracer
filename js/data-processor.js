@@ -366,7 +366,7 @@ class DataProcessor {
         
         // Prefer certain sources
         if (record.source === 'crt.sh') score += 1;
-        if (record.source === 'Cert Spotter') score += 1;
+        if (record.source === 'Cert Spotter' || record.source === 'SSLMate CT Search') score += 1;
         
         return score;
     }

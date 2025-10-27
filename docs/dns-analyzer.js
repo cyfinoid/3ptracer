@@ -934,7 +934,6 @@ class DNSAnalyzer {
         // Phase 1: Start ALL sources in parallel (no waiting)
         const discoveryPromises = [
             this.queryCrtSh(domain),
-            this.queryOTX(domain),
             this.queryHackerTarget(domain),
             this.queryCertSpotter(domain)
         ];
@@ -1083,13 +1082,15 @@ class DNSAnalyzer {
         }
     }
 
-    // Query Cert Spotter for subdomains
+    // Query SSLMate CT Search API (formerly Cert Spotter) for subdomains
     async queryCertSpotter(domain) {
-        console.log(`  📡 Querying Cert Spotter for subdomains...`);
+        console.log(`  📡 Querying SSLMate CT Search API for subdomains...`);
         this.stats.apiCalls++;
         
         try {
-            const response = await fetch(`https://certspotter.com/api/v0/certs?domain=${domain}`, {
+            // New API endpoint: https://api.certspotter.com/v1/issuances
+            // Documentation: https://sslmate.com/help/reference/ct_search_api_v1
+            const response = await fetch(`https://api.certspotter.com/v1/issuances?domain=${domain}&include_subdomains=true&expand=dns_names`, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json'
@@ -1098,24 +1099,25 @@ class DNSAnalyzer {
             
             if (!response.ok) {
                 const errorMsg = `Service unavailable (${response.status})`;
-                this.notifyAPIStatus('Cert Spotter', 'error', errorMsg);
-                throw new Error(`Cert Spotter query failed: ${response.status}`);
+                this.notifyAPIStatus('SSLMate CT Search', 'error', errorMsg);
+                throw new Error(`SSLMate CT Search query failed: ${response.status}`);
             }
             
             const data = await response.json();
-            console.log(`    📊 Cert Spotter returned ${data.length} certificates`);
+            console.log(`    📊 SSLMate CT Search returned ${data.length} certificate issuances`);
             
             // Process entries and add to discovery queue
             let processedCount = 0;
             let addedCount = 0;
-            for (const cert of data) {
-                if (cert.dns_names) {
-                    for (const dnsName of cert.dns_names) {
-                        if (dnsName.endsWith(`.${domain}`) && dnsName !== domain) {
+            for (const issuance of data) {
+                if (issuance.dns_names) {
+                    for (const dnsName of issuance.dns_names) {
+                        // Filter out wildcards and only include subdomains
+                        if (dnsName.endsWith(`.${domain}`) && dnsName !== domain && !dnsName.includes('*')) {
                             processedCount++;
                             // Check if this subdomain was actually added (not a duplicate)
                             const beforeCount = this.discoveryQueue.discoveredSubdomains.size;
-                            this.discoveryQueue.addDiscovered(dnsName, 'Cert Spotter');
+                            this.discoveryQueue.addDiscovered(dnsName, 'SSLMate CT Search');
                             const afterCount = this.discoveryQueue.discoveredSubdomains.size;
                             if (afterCount > beforeCount) {
                                 addedCount++;
@@ -1125,66 +1127,17 @@ class DNSAnalyzer {
                 }
             }
             
-            console.log(`    ✅ Cert Spotter: Processed ${processedCount} entries, added ${addedCount} unique subdomains to discovery queue`);
-            this.notifyAPIStatus('Cert Spotter', 'success', `Found ${addedCount} unique subdomains from ${processedCount} entries`);
+            console.log(`    ✅ SSLMate CT Search: Processed ${processedCount} entries, added ${addedCount} unique subdomains to discovery queue`);
+            this.notifyAPIStatus('SSLMate CT Search', 'success', `Found ${addedCount} unique subdomains from ${processedCount} entries`);
             
         } catch (error) {
-            console.log(`    ❌ Cert Spotter failed:`, error.message);
-            this.notifyAPIStatus('Cert Spotter', 'error', error.message);
+            console.log(`    ❌ SSLMate CT Search failed:`, error.message);
+            this.notifyAPIStatus('SSLMate CT Search', 'error', error.message);
         }
     }
 
 
 
-    // Query OTX AlienVault for subdomains
-    async queryOTX(domain) {
-        console.log(`  📡 Querying OTX AlienVault for subdomains...`);
-        this.stats.apiCalls++;
-        
-        try {
-            const response = await fetch(`https://otx.alienvault.com/api/v1/indicators/domain/${domain}/passive_dns`, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json'
-                }
-            });
-            
-            if (!response.ok) {
-                const errorMsg = `Service unavailable (${response.status})`;
-                this.notifyAPIStatus('OTX AlienVault', 'error', errorMsg);
-                throw new Error(`OTX query failed: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            console.log(`    📊 OTX returned ${data.passive_dns?.length || 0} entries`);
-            
-            // Process entries and add to discovery queue
-            let processedCount = 0;
-            let addedCount = 0;
-            if (data.passive_dns) {
-                for (const entry of data.passive_dns) {
-                    const subdomain = entry.hostname;
-                    if (subdomain && subdomain.endsWith(`.${domain}`) && subdomain !== domain) {
-                        processedCount++;
-                        // Check if this subdomain was actually added (not a duplicate)
-                        const beforeCount = this.discoveryQueue.discoveredSubdomains.size;
-                        this.discoveryQueue.addDiscovered(subdomain, 'OTX AlienVault');
-                        const afterCount = this.discoveryQueue.discoveredSubdomains.size;
-                        if (afterCount > beforeCount) {
-                            addedCount++;
-                        }
-                    }
-                }
-            }
-            
-            console.log(`    ✅ OTX: Processed ${processedCount} entries, added ${addedCount} unique subdomains to discovery queue`);
-            this.notifyAPIStatus('OTX AlienVault', 'success', `Found ${addedCount} unique subdomains from ${processedCount} entries`);
-            
-        } catch (error) {
-            console.log(`    ❌ OTX failed:`, error.message);
-            this.notifyAPIStatus('OTX AlienVault', 'error', error.message);
-        }
-    }
 
     // Query HackerTarget for subdomains
     async queryHackerTarget(domain) {

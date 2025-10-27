@@ -215,7 +215,7 @@ class AnalysisController {
                     timeoutMessage += timeoutDetails.join('; ');
                 } else {
                     // Fallback message when API status tracking isn't available
-                    timeoutMessage += 'External Certificate Transparency APIs (crt.sh, Cert Spotter, OTX, HackerTarget) are responding slowly';
+                    timeoutMessage += 'External Certificate Transparency APIs (crt.sh, SSLMate CT Search, HackerTarget) are responding slowly';
                 }
                 
                 this.addAPINotification('Certificate Transparency', timeoutMessage + '. Continuing analysis with any available subdomain data.', 'warning');

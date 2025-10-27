@@ -14,11 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PDF export now includes all data with proper subdomain associations in Services section
 - Fixed PDF Interesting Findings to match webpage display (no longer generates duplicate findings)
 - Added cache busting for CSS and JavaScript files to ensure users get latest updates
+- Migrated from deprecated Cert Spotter API v0 to SSLMate CT Search API v1
+
+### Removed
+- Removed OTX AlienVault API integration (requires authentication, not suitable for client-side use)
 
 ### Fixed
 - Services section in PDF now shows associated subdomains
 - Interesting findings in PDF now match exactly what's displayed on webpage
 - Export manager now properly receives and uses interesting findings from analysis
+- Updated Certificate Transparency subdomain discovery to use new SSLMate CT Search API (fixes CORS errors)
 
 ## [1.0.0] - 2025-10-24
 
