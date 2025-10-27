@@ -25,9 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed S3 bucket detection to validate actual domain hierarchy (prevents `s3.amazonaws.com.attacker.com` from matching)
   - Fixed subdomain takeover detection to prevent false positives from domain confusion attacks
   - Fixed infrastructure detection in DNS analyzer (AWS, Azure, DigitalOcean, Cloudflare)
-  - Addresses CodeQL security warnings about arbitrary host matching in domain checks
+  - Fixed DNS server detection in `queryDNSServer()` - extracts hostname from URL and validates with proper domain checking
+  - Addresses all CodeQL security warnings about arbitrary host matching in domain checks
 
 ### Fixed
+- Fixed dark mode styling for disclaimer recommendation boxes (was too bright with white background)
+- Updated disclaimer text colors to use proper theme-aware colors (#ffc107 for dark mode)
 - Historical records now correctly display discovery source (e.g., "crt.sh", "HackerTarget") instead of "undefined" in UI, PDF, and XLSX exports
 - Source information is now properly preserved throughout the subdomain analysis pipeline
 - Both immediate and batch processing flows now include source tracking

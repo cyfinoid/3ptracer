@@ -814,18 +814,30 @@ input[type="checkbox"] {
 
 .disclaimer-header strong {
     font-size: 1.1rem;
+    color: #ffc107;
+}
+
+[data-theme="light"] .disclaimer-header strong {
     color: #856404;
 }
 
 .disclaimer-content p {
-    color: #856404;
+    color: #ffc107;
     margin-bottom: 12px;
     line-height: 1.5;
+}
+
+[data-theme="light"] .disclaimer-content p {
+    color: #856404;
 }
 
 .disclaimer-list {
     margin: 15px 0;
     padding-left: 20px;
+    color: #ffc107;
+}
+
+[data-theme="light"] .disclaimer-list {
     color: #856404;
 }
 
@@ -835,11 +847,15 @@ input[type="checkbox"] {
 }
 
 .disclaimer-list li strong {
+    color: #ffc107;
+}
+
+[data-theme="light"] .disclaimer-list li strong {
     color: #664d03;
 }
 
 .disclaimer-recommendation {
-    background: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 193, 7, 0.1);
     padding: 12px;
     border-radius: 6px;
     border-left: 4px solid #ffc107;
@@ -848,6 +864,15 @@ input[type="checkbox"] {
 }
 
 .disclaimer-recommendation strong {
+    color: #ffc107;
+}
+
+/* Light mode override for disclaimer recommendation */
+[data-theme="light"] .disclaimer-recommendation {
+    background: rgba(255, 255, 255, 0.7);
+}
+
+[data-theme="light"] .disclaimer-recommendation strong {
     color: #664d03;
 }
 

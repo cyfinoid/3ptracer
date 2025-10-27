@@ -763,7 +763,17 @@ class DNSAnalyzer {
     // Query specific DNS server
     async queryDNSServer(domain, type, server) {
         try {
-            if (server.includes('dns.google')) {
+            // SECURITY FIX: Extract hostname from URL and use isDomainOrSubdomain for DNS provider detection
+            let serverHostname = server;
+            try {
+                const urlObj = new URL(server);
+                serverHostname = urlObj.hostname;
+            } catch (e) {
+                // If not a valid URL, treat as hostname
+                serverHostname = server;
+            }
+            
+            if (this.isDomainOrSubdomain(serverHostname, 'dns.google')) {
                 // Google DNS format
                 const url = new URL(server);
                 url.searchParams.set('name', domain);
@@ -784,7 +794,7 @@ class DNSAnalyzer {
                 }
                 
                 return await response.json();
-            } else if (server.includes('cloudflare-dns.com')) {
+            } else if (this.isDomainOrSubdomain(serverHostname, 'cloudflare-dns.com')) {
                 // Cloudflare DNS format
                 const cloudflareUrl = `https://cloudflare-dns.com/dns-query?name=${domain}${type ? `&type=${type}` : ''}`;
                 const response = await fetch(cloudflareUrl, {
@@ -799,7 +809,7 @@ class DNSAnalyzer {
                 }
                 
                 return await response.json();
-            } else if (server.includes('doh.pub')) {
+            } else if (this.isDomainOrSubdomain(serverHostname, 'doh.pub')) {
                 // DoH.pub format
                 const dohUrl = `https://doh.pub/dns-query?name=${domain}&type=${type}`;
                 const response = await fetch(dohUrl, {
@@ -814,10 +824,30 @@ class DNSAnalyzer {
                 }
                 
                 return await response.json();
-            } else if (server.includes('dns.alidns.com')) {
+            } else if (this.isDomainOrSubdomain(serverHostname, 'dns.alidns.com')) {
                 // Alibaba DNS format
                 const alibabaUrl = `https://dns.alidns.com/resolve?name=${domain}&type=${type}`;
                 const response = await fetch(alibabaUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/dns-json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`DNS query failed: ${response.status}`);
+                }
+                
+                return await response.json();
+            } else if (this.isDomainOrSubdomain(serverHostname, 'doh.powerdns.org')) {
+                // PowerDNS format (fallback server)
+                const url = new URL(server);
+                url.searchParams.set('name', domain);
+                if (type) {
+                    url.searchParams.set('type', type);
+                }
+                
+                const response = await fetch(url.toString(), {
                     method: 'GET',
                     headers: {
                         'Accept': 'application/dns-json'

@@ -407,7 +407,7 @@ class UIRenderer {
         if (service.isConsolidated && service.asnBreakdown) {
             const breakdownId = `asn_${service.originalKey}_${Math.random().toString(36).substr(2, 9)}`;
             html += `
-                <div style="background: #e8f4f8; padding: 8px; margin: 8px 0; border-radius: 4px; border-left: 3px solid #17a2b8;">
+                <div style="padding: 8px; margin: 8px 0; border-radius: 4px; border: 1px solid #17a2b8;">
                     <div style="cursor: pointer;" onclick="UIRenderer.toggleCollapse('${breakdownId}')">
                         <strong>🌐 ASN Breakdown (${service.asnBreakdown.length} ASNs)</strong>
                         <span style="float: right;">▲</span>
