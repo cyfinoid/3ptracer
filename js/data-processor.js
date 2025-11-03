@@ -889,6 +889,21 @@ class DataProcessor {
                     let host = record.subdomain || record.name || baseHost;
                     let data = record.data || '';
                     
+                    // Check if this record has a CNAME chain (e.g., DKIM via CNAME)
+                    if (record.cnameChain && record.cnameChain.length > 0) {
+                        // First, add the CNAME record(s)
+                        for (const cnameLink of record.cnameChain) {
+                            rawRecords.push({
+                                host: formatHost(cnameLink.from),
+                                ttl: cnameLink.ttl || 'N/A',
+                                type: 'CNAME',
+                                data: cnameLink.to
+                            });
+                            // Update host to the target for the final TXT record
+                            host = cnameLink.to;
+                        }
+                    }
+                    
                     // Determine the actual DNS type to display
                     // SPF, DMARC, DKIM are all TXT records in reality
                     let displayType = recordType;

@@ -131,12 +131,10 @@ class UIRenderer {
         this.displayStats(processedData.stats, securityResults);
         this.displayAPINotifications(apiNotifications);
         
-        // NEW: Display Raw DNS Records in Zone File Format (only for complete analysis) - First section after export
+        // NEW: Display Raw DNS Records in Zone File Format inside export section (only for complete analysis)
         if (!isProgressive && processedData.dataProcessor) {
             const rawRecords = processedData.dataProcessor.getRawDNSRecords();
-            this.displayCollapsibleSection('Raw DNS Records (Zone File Format)', () => {
-                this.displayRawDNSRecords(rawRecords);
-            }, false, rawRecords?.length || 0);
+            this.displayRawDNSInExportSection(rawRecords);
         }
         
         // Wrap major sections in collapsible containers
@@ -1298,6 +1296,71 @@ class UIRenderer {
         
         html += '</tbody></table></div>';
         this.resultsDiv.innerHTML += html;
+    }
+
+    // Display Raw DNS Records right after the Export Section
+    displayRawDNSInExportSection(rawRecords) {
+        const exportSection = document.getElementById('exportSection');
+        if (!exportSection) return;
+        
+        // Check if Raw DNS section already exists (avoid duplicates)
+        const existingSection = document.getElementById('rawDNSWrapper');
+        if (existingSection) {
+            existingSection.remove();
+        }
+        
+        if (!rawRecords || rawRecords.length === 0) {
+            return;
+        }
+        
+        // Create collapsible section matching the exact structure of other sections
+        const sectionId = 'rawDNSContent';
+        const itemCountText = ` (${rawRecords.length})`;
+        
+        // Build table content
+        let tableRows = '';
+        rawRecords.forEach(record => {
+            tableRows += `
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 12px 8px; color: var(--text-color); word-break: break-all; font-family: monospace;">${record.host}</td>
+                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.9rem; font-family: monospace;">${record.ttl}</td>
+                    <td style="padding: 12px 8px; color: var(--text-color); font-weight: 600; font-family: monospace;">${record.type}</td>
+                    <td style="padding: 12px 8px; color: var(--text-secondary); word-break: break-word; font-family: monospace; font-size: 0.9rem;">${record.data}</td>
+                </tr>
+            `;
+        });
+        
+        // Match the exact structure from createCollapsibleSection
+        const sectionHTML = `
+            <div id="rawDNSWrapper" class="collapsible-section">
+                <div class="section-header" onclick="toggleSection('${sectionId}')">
+                    <div class="section-title">
+                        <span class="toggle-icon">▶</span>
+                        <h2>Raw DNS Records (Zone File Format)${itemCountText}</h2>
+                    </div>
+                </div>
+                <div id="${sectionId}" class="section-content" style="display: none;">
+                    <div class="dns-records-table" style="overflow-x: auto; margin-top: 15px;">
+                        <table style="width: 100%; border-collapse: collapse; background: var(--card-bg); border-radius: 8px; overflow: hidden;">
+                            <thead>
+                                <tr style="background: var(--bg-secondary);">
+                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 200px;">Host Label</th>
+                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 80px;">TTL</th>
+                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 80px;">Record Type</th>
+                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 300px;">Record Data</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableRows}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Insert right after the export section
+        exportSection.insertAdjacentHTML('afterend', sectionHTML);
     }
 
     // Display API notifications

@@ -9,13 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Raw DNS Records (Zone File Format)** - New collapsible section displaying all DNS records exactly as received from DNS server in zone file table format
-  - **Positioned at the top** - Appears immediately after Export section and before all service details for quick access
+  - **Positioned after Export section** - Appears immediately after the Export Analysis Results section for convenient access at the top of the analysis
   - Shows main domain and subdomain DNS records with Host Label, TTL, Record Type, and Record Data columns
   - Records formatted with proper FQDN notation (trailing dots)
   - Supports all record types (A, AAAA, CNAME, MX, TXT, NS, CAA, etc.)
   - Displays raw TXT records without reclassification (SPF, DMARC, DKIM all shown as TXT)
   - NS and MX records properly included from main domain
   - **CNAME chains consolidated into single entries** - Shows full resolution path (e.g., `subdomain → cname1 → cname2 → IP`)
+  - **DKIM CNAME chains fully visible** - When DKIM records are CNAMEs pointing to TXT records (e.g., iCloud Mail), both the CNAME and final TXT record are displayed
   - MX records include priority values
   - TXT records properly quoted
   - Records sorted by host label and type
@@ -25,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **iCloud Mail detection** - Added comprehensive detection for Apple iCloud Mail service via MX records, SPF records, and DKIM selectors
 
 ### Fixed
+- **Raw DNS Records section styling** - Fixed incorrect HTML structure to match all other sections (toggle icon placement, h2 usage, proper CSS classes)
 - **iCloud Mail misclassified as Microsoft Office 365** - Fixed overly broad Microsoft DKIM selector pattern that matched iCloud's `sig1`, `sig2` selectors
   - Added specific iCloud/Apple Mail pattern detection for `sig1`, `sig2`, `sig3` DKIM selectors
   - Made Microsoft Office 365 DKIM pattern more specific (now only matches `selector1`, `selector2` exactly)

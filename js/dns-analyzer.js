@@ -1322,17 +1322,37 @@ class DNSAnalyzer {
                 
                 const records = await this.queryDNS(dkimSubdomain, 'TXT');
                 if (records && records.length > 0) {
+                    // Check if there's a CNAME chain before the TXT record
+                    let cnameChain = [];
+                    let txtRecord = null;
+                    
                     for (const record of records) {
-                        // Check if this is a valid DKIM record
-                        if (this.isDKIMRecord(record.data)) {
-                            const dkimInfo = {
-                                ...record,
-                                selector: selector,
-                                subdomain: dkimSubdomain,
-                                parsedInfo: this.parseDKIMRecord(record.data, selector)
-                            };
-                            
-                            dkimRecords.push(dkimInfo);
+                        if (record.type === 5) { // CNAME record
+                            cnameChain.push({
+                                from: record.name,
+                                to: record.data,
+                                ttl: record.TTL
+                            });
+                        } else if (this.isDKIMRecord(record.data)) {
+                            // This is the final TXT record
+                            txtRecord = record;
+                        }
+                    }
+                    
+                    // If we found a valid DKIM record, store it with CNAME info
+                    if (txtRecord) {
+                        const dkimInfo = {
+                            ...txtRecord,
+                            selector: selector,
+                            subdomain: dkimSubdomain,
+                            cnameChain: cnameChain.length > 0 ? cnameChain : null,
+                            parsedInfo: this.parseDKIMRecord(txtRecord.data, selector)
+                        };
+                        
+                        dkimRecords.push(dkimInfo);
+                        if (cnameChain.length > 0) {
+                            console.log(`  ✅ Found DKIM record with selector '${selector}' (via CNAME chain):`, dkimInfo.parsedInfo);
+                        } else {
                             console.log(`  ✅ Found DKIM record with selector '${selector}':`, dkimInfo.parsedInfo);
                         }
                     }
