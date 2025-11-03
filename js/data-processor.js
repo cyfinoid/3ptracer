@@ -8,12 +8,22 @@ class DataProcessor {
             historicalRecords: [],
             dnsRecords: []
         };
+        this.mainDomain = '';
+        this.mainDomainRecords = null; // Store raw main domain DNS records
     }
 
     // Process and consolidate all analysis results
     processAnalysisResults(mainDomainResults, subdomainResults, historicalRecords, dnsRecords = []) {
         // Clear previous data
         this.clearProcessedData();
+
+        // Store main domain and raw records for raw DNS records display
+        if (mainDomainResults?.domain) {
+            this.mainDomain = mainDomainResults.domain;
+        }
+        if (mainDomainResults?.records) {
+            this.mainDomainRecords = mainDomainResults.records;
+        }
 
         // Process main domain services
         if (mainDomainResults?.services) {
@@ -832,6 +842,130 @@ class DataProcessor {
         this.processedData.redirectsToMain = [];
         this.processedData.historicalRecords = [];
         this.processedData.dnsRecords = [];
+        this.mainDomainRecords = null;
+    }
+
+    // Get raw DNS records in zone file format
+    getRawDNSRecords() {
+        const rawRecords = [];
+        
+        // Helper function to convert numeric DNS type to name
+        const getTypeName = (type) => {
+            const typeMap = {
+                1: 'A',
+                2: 'NS',
+                5: 'CNAME',
+                15: 'MX',
+                16: 'TXT',
+                28: 'AAAA',
+                257: 'CAA'
+            };
+            return typeMap[type] || (typeof type === 'string' ? type : `TYPE${type}`);
+        };
+        
+        // Helper function to format host with trailing dot
+        const formatHost = (host) => {
+            if (!host) return '';
+            return host.endsWith('.') ? host : `${host}.`;
+        };
+        
+        // Process RAW main domain DNS records (as received from DNS server)
+        if (this.mainDomainRecords) {
+            // Process each record type from the raw records
+            for (const [recordType, records] of Object.entries(this.mainDomainRecords)) {
+                if (!Array.isArray(records)) continue;
+                
+                // Determine the base host for this record type
+                let baseHost = this.mainDomain;
+                
+                // Special handling for DMARC records (_dmarc subdomain)
+                if (recordType === 'DMARC') {
+                    baseHost = `_dmarc.${this.mainDomain}`;
+                }
+                
+                for (const record of records) {
+                    // Extract host (use subdomain field if available, otherwise use baseHost)
+                    let host = record.subdomain || record.name || baseHost;
+                    let data = record.data || '';
+                    
+                    // Determine the actual DNS type to display
+                    // SPF, DMARC, DKIM are all TXT records in reality
+                    let displayType = recordType;
+                    if (recordType === 'SPF' || recordType === 'DMARC' || recordType === 'DKIM') {
+                        displayType = 'TXT';
+                    } else if (typeof record.type === 'number') {
+                        displayType = getTypeName(record.type);
+                    }
+                    
+                    // Handle MX records with priority
+                    if ((displayType === 'MX' || recordType === 'MX') && 
+                        (record.priority !== null && record.priority !== undefined)) {
+                        data = `${record.priority} ${data}`;
+                    }
+                    
+                    // Handle TXT records - ensure proper quoting
+                    if (displayType === 'TXT' && data && !data.startsWith('"')) {
+                        data = `"${data}"`;
+                    }
+                    
+                    rawRecords.push({
+                        host: formatHost(host),
+                        ttl: record.TTL || record.ttl || 'N/A',
+                        type: displayType,
+                        data: data
+                    });
+                }
+            }
+        }
+        
+        // Process subdomain DNS records
+        const subdomains = Array.from(this.processedData.subdomains.values());
+        for (const subdomain of subdomains) {
+            if (!subdomain.records) continue;
+            
+            // Process each record type
+            for (const [recordType, records] of Object.entries(subdomain.records)) {
+                if (!Array.isArray(records)) continue;
+                
+                for (const record of records) {
+                    let data = record.data || '';
+                    
+                    // Determine display type (convert numeric to name)
+                    let displayType = recordType;
+                    if (typeof record.type === 'number') {
+                        displayType = getTypeName(record.type);
+                    }
+                    
+                    // Handle MX records with priority
+                    if ((displayType === 'MX' || recordType === 'MX') && 
+                        (record.priority !== null && record.priority !== undefined)) {
+                        data = `${record.priority} ${data}`;
+                    }
+                    
+                    // Handle TXT records - ensure proper quoting
+                    if (displayType === 'TXT' && data && !data.startsWith('"')) {
+                        data = `"${data}"`;
+                    }
+                    
+                    rawRecords.push({
+                        host: formatHost(subdomain.subdomain),
+                        ttl: record.TTL || record.ttl || 'N/A',
+                        type: displayType,
+                        data: data
+                    });
+                }
+            }
+        }
+        
+        // Sort records by host, then by type
+        rawRecords.sort((a, b) => {
+            const hostCompare = a.host.localeCompare(b.host);
+            if (hostCompare !== 0) return hostCompare;
+            return a.type.localeCompare(b.type);
+        });
+        
+        console.log(`📋 Collected ${rawRecords.length} raw DNS records from main domain and subdomains`);
+        return rawRecords;
     }
 
     // Group subdomains by provider (for display)

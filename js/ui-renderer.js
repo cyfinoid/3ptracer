@@ -163,6 +163,14 @@ class UIRenderer {
             this.displayDNSRecords(processedData.dnsRecords);
         }, false, processedData.dnsRecords?.length || 0);
         
+        // NEW: Display Raw DNS Records in Zone File Format (only for complete analysis)
+        if (!isProgressive && processedData.dataProcessor) {
+            const rawRecords = processedData.dataProcessor.getRawDNSRecords();
+            this.displayCollapsibleSection('Raw DNS Records (Zone File Format)', () => {
+                this.displayRawDNSRecords(rawRecords);
+            }, false, rawRecords?.length || 0);
+        }
+        
         this.displayCollapsibleSection('Subdomains', () => {
             this.displaySubdomains(processedData);
         }, true, processedData.stats.totalSubdomains || 0);
@@ -1252,6 +1260,44 @@ class UIRenderer {
         
         html += '</tbody></table></div>';
         container.innerHTML = html;
+    }
+
+    // Display raw DNS records in zone file format
+    displayRawDNSRecords(rawRecords) {
+        if (!this.resultsDiv) return;
+        
+        if (!rawRecords || rawRecords.length === 0) {
+            this.resultsDiv.innerHTML += '<p>No DNS records available.</p>';
+            return;
+        }
+        
+        let html = `
+            <div class="dns-records-table" style="overflow-x: auto; margin-top: 15px;">
+                <table style="width: 100%; border-collapse: collapse; background: var(--card-bg); border-radius: 8px; overflow: hidden;">
+                    <thead>
+                        <tr style="background: var(--bg-secondary);">
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 200px;">Host Label</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 80px;">TTL</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 80px;">Record Type</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 300px;">Record Data</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        rawRecords.forEach(record => {
+            html += `
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 12px 8px; color: var(--text-color); word-break: break-all; font-family: monospace;">${record.host}</td>
+                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.9rem; font-family: monospace;">${record.ttl}</td>
+                    <td style="padding: 12px 8px; color: var(--text-color); font-weight: 600; font-family: monospace;">${record.type}</td>
+                    <td style="padding: 12px 8px; color: var(--text-secondary); word-break: break-word; font-family: monospace; font-size: 0.9rem;">${record.data}</td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table></div>';
+        this.resultsDiv.innerHTML += html;
     }
 
     // Display API notifications
