@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Collapsed by default to reduce initial display clutter
   - Monospace font for better readability
   - Only appears in final analysis (not during progressive updates)
+- **iCloud Mail detection** - Added comprehensive detection for Apple iCloud Mail service via MX records, SPF records, and DKIM selectors
+
+### Fixed
+- **iCloud Mail misclassified as Microsoft Office 365** - Fixed overly broad Microsoft DKIM selector pattern that matched iCloud's `sig1`, `sig2` selectors
+  - Added specific iCloud/Apple Mail pattern detection for `sig1`, `sig2`, `sig3` DKIM selectors
+  - Made Microsoft Office 365 DKIM pattern more specific (now only matches `selector1`, `selector2` exactly)
+  - Added iCloud Mail to service detection engine with proper MX patterns (`icloud`), SPF patterns (`include:icloud.com`), and domain patterns
+  - Corrected DKIM selector attribution in common selectors list (moved `sig1`, `sig2` from Microsoft to iCloud section)
 
 ## [1.0.2] - 2025-10-27
 

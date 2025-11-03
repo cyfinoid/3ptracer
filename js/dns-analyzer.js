@@ -1257,13 +1257,16 @@ class DNSAnalyzer {
         // Common DKIM selectors used by various email services
         const commonSelectors = [
             // Generic/Default selectors
-            'default', 'selector1', 'selector2', 'dkim', 'key1', 'key2', 's1', 's2',
+            'default', 'dkim', 'key1', 'key2',
             
             // Google Workspace / Gmail
             'google', '20161025', '20210112',
             
             // Microsoft Office 365 / Outlook
-            'selector1', 'selector2', 'sig1', 'sig2',
+            'selector1', 'selector2',
+            
+            // iCloud / Apple Mail
+            'sig1', 'sig2', 'sig3',
             
             // SendGrid
             's1', 's2', 'em1', 'em2', 'em3', 'em4', 'em5', 'em6', 'em7', 'em8', 'em9', 'em10',
@@ -1410,10 +1413,17 @@ class DNSAnalyzer {
             return { name: 'Google Workspace', category: 'email-service', confidence: 'medium' };
         }
         
-        // Microsoft Office 365 patterns
-        if (lowerSelector.includes('selector') || 
-            lowerSelector.includes('sig')) {
-            return { name: 'Microsoft Office 365', category: 'email-service', confidence: 'low' };
+        // iCloud / Apple Mail patterns
+        if (lowerSelector.startsWith('sig') && /^sig\d+$/.test(lowerSelector)) {
+            return { name: 'iCloud Mail', category: 'email-service', confidence: 'high' };
+        }
+        
+        // Microsoft Office 365 patterns (more specific to avoid false positives)
+        if (lowerSelector === 'selector1' || 
+            lowerSelector === 'selector2' ||
+            lowerSelector.startsWith('selector1-') ||
+            lowerSelector.startsWith('selector2-')) {
+            return { name: 'Microsoft Office 365', category: 'email-service', confidence: 'medium' };
         }
         
         // SendGrid patterns

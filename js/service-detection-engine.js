@@ -49,6 +49,12 @@ class ServiceDetectionEngine {
                     spfPatterns: ['include:_spf.protonmail.ch'],
                     description: 'Secure email service'
                 },
+                'iCloud Mail': {
+                    patterns: ['icloud.com', 'mail.icloud.com', 'icloudmailadmin.com'],
+                    mxPatterns: ['icloud'],
+                    spfPatterns: ['include:icloud.com'],
+                    description: 'Apple iCloud email service'
+                },
                 'SendGrid': {
                     patterns: ['sendgrid.net'],
                     spfPatterns: ['include:sendgrid.net'],
