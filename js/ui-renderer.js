@@ -131,6 +131,14 @@ class UIRenderer {
         this.displayStats(processedData.stats, securityResults);
         this.displayAPINotifications(apiNotifications);
         
+        // NEW: Display Raw DNS Records in Zone File Format (only for complete analysis) - First section after export
+        if (!isProgressive && processedData.dataProcessor) {
+            const rawRecords = processedData.dataProcessor.getRawDNSRecords();
+            this.displayCollapsibleSection('Raw DNS Records (Zone File Format)', () => {
+                this.displayRawDNSRecords(rawRecords);
+            }, false, rawRecords?.length || 0);
+        }
+        
         // Wrap major sections in collapsible containers
         this.displayCollapsibleSection('Third-Party Services', () => {
             this.displayServicesByVendor(processedData.services);
@@ -162,14 +170,6 @@ class UIRenderer {
         this.displayCollapsibleSection('DNS Records', () => {
             this.displayDNSRecords(processedData.dnsRecords);
         }, false, processedData.dnsRecords?.length || 0);
-        
-        // NEW: Display Raw DNS Records in Zone File Format (only for complete analysis)
-        if (!isProgressive && processedData.dataProcessor) {
-            const rawRecords = processedData.dataProcessor.getRawDNSRecords();
-            this.displayCollapsibleSection('Raw DNS Records (Zone File Format)', () => {
-                this.displayRawDNSRecords(rawRecords);
-            }, false, rawRecords?.length || 0);
-        }
         
         this.displayCollapsibleSection('Subdomains', () => {
             this.displaySubdomains(processedData);

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Raw DNS Records (Zone File Format)** - New collapsible section displaying all DNS records exactly as received from DNS server in zone file table format
+  - **Positioned at the top** - Appears immediately after Export section and before all service details for quick access
   - Shows main domain and subdomain DNS records with Host Label, TTL, Record Type, and Record Data columns
   - Records formatted with proper FQDN notation (trailing dots)
   - Supports all record types (A, AAAA, CNAME, MX, TXT, NS, CAA, etc.)
