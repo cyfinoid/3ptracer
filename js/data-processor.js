@@ -848,6 +848,7 @@ class DataProcessor {
     // Get raw DNS records in zone file format
     getRawDNSRecords() {
         const rawRecords = [];
+        const processedHosts = new Set(); // Track processed hosts to avoid duplicates
         
         // Helper function to convert numeric DNS type to name
         const getTypeName = (type) => {
@@ -918,10 +919,42 @@ class DataProcessor {
             }
         }
         
-        // Process subdomain DNS records
+        // Process subdomain DNS records with CNAME chain handling
         const subdomains = Array.from(this.processedData.subdomains.values());
         for (const subdomain of subdomains) {
+            const subHost = formatHost(subdomain.subdomain);
+            
+            // Check if this subdomain has a CNAME chain
+            if (subdomain.cnameChain && subdomain.cnameChain.length > 0) {
+                // Build the full CNAME chain display
+                const chain = [subdomain.subdomain];
+                subdomain.cnameChain.forEach(link => {
+                    chain.push(link.to);
+                });
+                
+                // Get the final IP if available
+                if (subdomain.ipAddresses && subdomain.ipAddresses.length > 0) {
+                    chain.push(subdomain.ipAddresses[0]);
+                }
+                
+                // Create a single entry showing the full chain
+                rawRecords.push({
+                    host: subHost,
+                    ttl: subdomain.cnameChain[0].ttl || 'N/A',
+                    type: 'CNAME',
+                    data: chain.slice(1).join(' → '),
+                    isCnameChain: true
+                });
+                
+                processedHosts.add(subHost);
+                continue; // Skip normal processing for this subdomain
+            }
+            
+            // Normal processing for non-CNAME or simple records
             if (!subdomain.records) continue;
+            
+            // Skip if already processed as part of a chain
+            if (processedHosts.has(subHost)) continue;
             
             // Process each record type
             for (const [recordType, records] of Object.entries(subdomain.records)) {
@@ -948,7 +981,7 @@ class DataProcessor {
                     }
                     
                     rawRecords.push({
-                        host: formatHost(subdomain.subdomain),
+                        host: subHost,
                         ttl: record.TTL || record.ttl || 'N/A',
                         type: displayType,
                         data: data
@@ -964,7 +997,7 @@ class DataProcessor {
             return a.type.localeCompare(b.type);
         });
         
-        console.log(`📋 Collected ${rawRecords.length} raw DNS records from main domain and subdomains`);
+        console.log(`📋 Collected ${rawRecords.length} raw DNS records from main domain and subdomains (CNAME chains consolidated)`);
         return rawRecords;
     }
 

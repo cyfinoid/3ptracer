@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Supports all record types (A, AAAA, CNAME, MX, TXT, NS, CAA, etc.)
   - Displays raw TXT records without reclassification (SPF, DMARC, DKIM all shown as TXT)
   - NS and MX records properly included from main domain
+  - **CNAME chains consolidated into single entries** - Shows full resolution path (e.g., `subdomain → cname1 → cname2 → IP`)
   - MX records include priority values
   - TXT records properly quoted
   - Records sorted by host label and type
