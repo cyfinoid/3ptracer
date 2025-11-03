@@ -891,17 +891,20 @@ class DataProcessor {
                     
                     // Check if this record has a CNAME chain (e.g., DKIM via CNAME)
                     if (record.cnameChain && record.cnameChain.length > 0) {
-                        // First, add the CNAME record(s)
-                        for (const cnameLink of record.cnameChain) {
-                            rawRecords.push({
-                                host: formatHost(cnameLink.from),
-                                ttl: cnameLink.ttl || 'N/A',
-                                type: 'CNAME',
-                                data: cnameLink.to
-                            });
-                            // Update host to the target for the final TXT record
-                            host = cnameLink.to;
-                        }
+                        // Consolidate CNAME chain with final TXT record into single entry
+                        const cnameTarget = record.cnameChain[0].to;
+                        const txtData = data.startsWith('"') ? data : `"${data}"`;
+                        
+                        // Create a single CNAME entry showing the full resolution
+                        rawRecords.push({
+                            host: formatHost(host),
+                            ttl: record.cnameChain[0].ttl || 'N/A',
+                            type: 'CNAME',
+                            data: `${cnameTarget} → TXT: ${txtData}`
+                        });
+                        
+                        // Skip adding the separate TXT record
+                        continue;
                     }
                     
                     // Determine the actual DNS type to display

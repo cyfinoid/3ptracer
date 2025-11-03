@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Displays raw TXT records without reclassification (SPF, DMARC, DKIM all shown as TXT)
   - NS and MX records properly included from main domain
   - **CNAME chains consolidated into single entries** - Shows full resolution path (e.g., `subdomain → cname1 → cname2 → IP`)
-  - **DKIM CNAME chains fully visible** - When DKIM records are CNAMEs pointing to TXT records (e.g., iCloud Mail), both the CNAME and final TXT record are displayed
+  - **DKIM CNAME chains consolidated** - When DKIM records are CNAMEs pointing to TXT records (e.g., iCloud Mail), shows as single CNAME entry with format: `target.domain. → TXT: "v=DKIM1..."`
   - MX records include priority values
   - TXT records properly quoted
   - Records sorted by host label and type
