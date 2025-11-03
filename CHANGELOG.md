@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **iCloud Mail detection** - Added comprehensive detection for Apple iCloud Mail service via MX records, SPF records, and DKIM selectors
 
 ### Fixed
+- **Google Workspace false positive detection** - Removed `google-site-verification` from Google Workspace TXT patterns as it only indicates Google Search Console verification, not actual Workspace usage. Google Workspace now only detected by MX records, SPF records, or `googleapps-domain-verification` TXT record
 - **Raw DNS Records section styling** - Fixed incorrect HTML structure to match all other sections (toggle icon placement, h2 usage, proper CSS classes)
 - **iCloud Mail misclassified as Microsoft Office 365** - Fixed overly broad Microsoft DKIM selector pattern that matched iCloud's `sig1`, `sig2` selectors
   - Added specific iCloud/Apple Mail pattern detection for `sig1`, `sig2`, `sig3` DKIM selectors

@@ -785,7 +785,7 @@ class ServiceDetectionEngine {
                 },
                 'Google Workspace': {
                     patterns: ['google.com', 'googledomains.com'],
-                    txtPatterns: ['google-site-verification', 'google-domain-verification', 'googleapps-domain-verification'],
+                    txtPatterns: ['googleapps-domain-verification'],
                     description: 'Productivity and collaboration suite'
                 },
                 'Zoom': {
