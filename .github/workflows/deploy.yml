@@ -81,7 +81,8 @@ jobs:
           cp js/ui-renderer.js _site/js/
           cp js/analysis-controller.js _site/js/
           cp js/export-manager.js _site/js/
-          echo "✅ Copied 8 JavaScript files"
+          cp js/theme-toggle.js _site/js/
+          echo "✅ Copied 9 JavaScript files"
       
       - name: Generate release status
         run: |
@@ -117,6 +118,7 @@ jobs:
             "js/ui-renderer.js"
             "js/analysis-controller.js"
             "js/export-manager.js"
+            "js/theme-toggle.js"
             "release-status.txt"
             ".nojekyll"
           )
@@ -177,5 +179,5 @@ jobs:
           echo "### 📊 Deployment Details" >> $GITHUB_STEP_SUMMARY
           echo "- Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- Trigger: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Files deployed: 13 (2 HTML, 1 CSS, 8 JS, 2 metadata)" >> $GITHUB_STEP_SUMMARY
+          echo "- Files deployed: 14 (2 HTML, 1 CSS, 9 JS, 2 metadata)" >> $GITHUB_STEP_SUMMARY
 

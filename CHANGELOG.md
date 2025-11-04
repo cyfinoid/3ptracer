@@ -7,32 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] - 2025-11-04
+
 ### Added
-- **Raw DNS Records (Zone File Format)** - New collapsible section displaying all DNS records exactly as received from DNS server in zone file table format
-  - **Positioned after Export section** - Appears immediately after the Export Analysis Results section for convenient access at the top of the analysis
-  - Shows main domain and subdomain DNS records with Host Label, TTL, Record Type, and Record Data columns
-  - Records formatted with proper FQDN notation (trailing dots)
-  - Supports all record types (A, AAAA, CNAME, MX, TXT, NS, CAA, etc.)
-  - Displays raw TXT records without reclassification (SPF, DMARC, DKIM all shown as TXT)
-  - NS and MX records properly included from main domain
-  - **CNAME chains consolidated into single entries** - Shows full resolution path (e.g., `subdomain → cname1 → cname2 → IP`)
-  - **DKIM CNAME chains consolidated** - When DKIM records are CNAMEs pointing to TXT records (e.g., iCloud Mail), shows as single CNAME entry with format: `target.domain. → TXT: "v=DKIM1..."`
-  - MX records include priority values
-  - TXT records properly quoted
-  - Records sorted by host label and type
-  - Collapsed by default to reduce initial display clutter
-  - Monospace font for better readability
-  - Only appears in final analysis (not during progressive updates)
-- **iCloud Mail detection** - Added comprehensive detection for Apple iCloud Mail service via MX records, SPF records, and DKIM selectors
+- **Raw DNS Records (Zone File Format)** - New collapsible section displaying DNS records in zone file table format
+  - Positioned immediately after Export section for convenient access
+  - Shows main domain and subdomain records with Host Label, TTL, Record Type, and Record Data
+  - All record types supported (A, AAAA, CNAME, MX, TXT, NS, CAA, etc.) with FQDN notation
+  - TXT records displayed as-is without reclassification (SPF, DMARC, DKIM shown as TXT type)
+  - CNAME chains consolidated into single entries showing full resolution path
+  - DKIM CNAME chains consolidated (e.g., `target.domain. → TXT: "v=DKIM1..."`)
+  - Collapsed by default with monospace font for readability
+- **iCloud Mail detection** - Added comprehensive Apple iCloud Mail detection via MX, SPF, and DKIM selectors
 
 ### Fixed
-- **Google Workspace false positive detection** - Removed `google-site-verification` from Google Workspace TXT patterns as it only indicates Google Search Console verification, not actual Workspace usage. Google Workspace now only detected by MX records, SPF records, or `googleapps-domain-verification` TXT record
-- **Raw DNS Records section styling** - Fixed incorrect HTML structure to match all other sections (toggle icon placement, h2 usage, proper CSS classes)
-- **iCloud Mail misclassified as Microsoft Office 365** - Fixed overly broad Microsoft DKIM selector pattern that matched iCloud's `sig1`, `sig2` selectors
-  - Added specific iCloud/Apple Mail pattern detection for `sig1`, `sig2`, `sig3` DKIM selectors
-  - Made Microsoft Office 365 DKIM pattern more specific (now only matches `selector1`, `selector2` exactly)
-  - Added iCloud Mail to service detection engine with proper MX patterns (`icloud`), SPF patterns (`include:icloud.com`), and domain patterns
-  - Corrected DKIM selector attribution in common selectors list (moved `sig1`, `sig2` from Microsoft to iCloud section)
+- **Google Workspace false positive** - Removed `google-site-verification` from Workspace detection patterns (only indicates Search Console verification). Now detects via MX, SPF, or `googleapps-domain-verification` TXT only
+- **iCloud Mail misclassified as Microsoft 365** - Fixed overly broad Microsoft DKIM pattern that matched iCloud's `sig1`, `sig2`, `sig3` selectors. Microsoft pattern now specific to `selector1`, `selector2` only
+- **Raw DNS Records section styling** - Fixed HTML structure for consistent toggle icon placement and CSS classes
+- **GitHub Actions deployment** - Added missing `theme-toggle.js` to deployment workflow and updated file count to 9 JS files
+
+### Optimizations
+- **Code size reduction** - Removed 110 lines of unused code (~1.2% reduction from 8900 to 8790 lines)
+  - Removed unused methods from `analysis-controller.js`: `getAnalysisStats()`, `printFinalStats()`, `discoverSubdomains()` (-23 lines)
+  - Removed unused Logger methods: `info()`, `warn()`, `error()`, `success()`, `isDebugEnabled()` (-25 lines)
+  - Removed unused DNS analyzer methods: `printStats()`, `onSubdomainDiscovered()` (-62 lines)
+  - Removed dead callback code (subdomain callback infrastructure with no registered callbacks)
+
+### Removed
+- **deploy.sh** - Removed legacy bash deployment script; GitHub Actions workflow now handles all deployments
 
 ## [1.0.2] - 2025-10-27
 

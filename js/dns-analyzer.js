@@ -142,8 +142,7 @@ class DNSAnalyzer {
         // NEW: Discovery queue for centralized management
         this.discoveryQueue = new DiscoveryQueue();
         
-        // Callbacks for real-time notifications
-        this.subdomainCallbacks = [];
+        // Callbacks for API notifications
         this.apiCallbacks = [];
         
         // Rate limiting
@@ -176,7 +175,6 @@ class DNSAnalyzer {
         this.historicalRecords = [];
         this.wildcardCertificates = [];
         this.discoveryQueue.clear(); // Clear discovery queue
-        this.subdomainCallbacks = [];
         this.apiCallbacks = [];
         this.currentDomain = null;
         
@@ -188,49 +186,16 @@ class DNSAnalyzer {
         this.currentDomain = domain;
     }
 
-    // Print final statistics
-    printStats() {
-        const duration = (Date.now() - this.stats.startTime) / 1000;
-        
-        console.log('\n' + '='.repeat(60));
-        console.log('📊 ANALYSIS STATISTICS');
-        console.log('='.repeat(60));
-        console.log(`⏱️  Total Duration: ${duration.toFixed(2)} seconds`);
-        console.log(`🔍 DNS Queries: ${this.stats.dnsQueries}`);
-        console.log(`🌐 API Calls: ${this.stats.apiCalls}`);
-        console.log(`🔍 Subdomains Discovered: ${this.stats.subdomainsDiscovered}`);
-        console.log(`⚡ Subdomains Analyzed: ${this.stats.subdomainsAnalyzed}`);
-        console.log(`🏢 ASN Lookups: ${this.stats.asnLookups}`);
-        console.log(`🔧 Services Detected: ${this.stats.servicesDetected}`);
-        console.log(`⚠️  Takeovers Detected: ${this.stats.takeoversDetected}`);
-        console.log(`📈 Performance: ${this.stats.subdomainsAnalyzed > 0 ? (this.stats.subdomainsAnalyzed / duration).toFixed(2) : 0} subdomains/second`);
-        console.log('='.repeat(60));
-    }
-
-    // Register callback for real-time subdomain updates
-    onSubdomainDiscovered(callback) {
-        this.subdomainCallbacks.push(callback);
-    }
-
     // Register callback for API notifications
     onAPINotification(callback) {
         this.apiCallbacks.push(callback);
     }
 
-    // Notify all callbacks about new subdomain
+    // Notify about new subdomain discovery
     notifySubdomainDiscovered(subdomain, source) {
         this.processedSubdomains.add(subdomain);
         this.stats.subdomainsDiscovered++;
         console.log(`🆕 New subdomain discovered: ${subdomain} (from ${source})`);
-        
-        // Notify all registered callbacks
-        this.subdomainCallbacks.forEach(callback => {
-            try {
-                callback(subdomain, source);
-            } catch (error) {
-                console.warn('Callback error:', error);
-            }
-        });
     }
 
     // Send API notification
@@ -357,15 +322,6 @@ class DNSAnalyzer {
                     
                     // Store the result
                     this.processedSubdomainResults.set(subdomain, analysis);
-                    
-                    // Notify about redirect completion
-                    this.subdomainCallbacks.forEach(callback => {
-                        try {
-                            callback(subdomain, source, analysis);
-                        } catch (error) {
-                            console.warn('Redirect callback error:', error);
-                        }
-                    });
                     return; // Skip further analysis
                 }
             }
@@ -383,15 +339,6 @@ class DNSAnalyzer {
             
             // Store the result
             this.processedSubdomainResults.set(subdomain, analysis);
-            
-            // Notify about completion
-            this.subdomainCallbacks.forEach(callback => {
-                try {
-                    callback(subdomain, source, analysis);
-                } catch (error) {
-                    console.warn('Subdomain callback error:', error);
-                }
-            });
             
         } catch (error) {
             console.warn(`❌ Failed to process subdomain ${subdomain}:`, error.message);
@@ -1030,15 +977,6 @@ class DNSAnalyzer {
                 
                 this.discoveryQueue.markCompleted(subdomain, result);
                 results.push(result);
-                
-                // Notify about completion
-                this.subdomainCallbacks.forEach(callback => {
-                    try {
-                        callback(subdomain, 'Sequential Processing', result);
-                    } catch (error) {
-                        console.warn('Subdomain callback error:', error);
-                    }
-                });
                 
             } catch (error) {
                 console.warn(`❌ Failed to process ${subdomain}:`, error.message);

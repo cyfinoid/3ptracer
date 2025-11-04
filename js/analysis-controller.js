@@ -138,19 +138,6 @@ class AnalysisController {
         return mainDomainResults;
     }
 
-    // Discover subdomains
-    async discoverSubdomains(domain) {
-        console.log(`🔍 Discovering subdomains for: ${domain}`);
-        
-        const subdomains = await this.dnsAnalyzer.getSubdomainsFromCT(domain);
-        if (window.logger) {
-            window.logger.debugJSON('Subdomains discovered:', subdomains);
-        }
-        console.log(`✅ Found ${subdomains.length} subdomains`);
-        
-        return subdomains;
-    }
-
     // Discover subdomains with progress feedback and timeout
     async discoverSubdomainsWithProgress(domain) {
         console.log(`🔍 Discovering subdomains for ${domain} with progress feedback...`);
@@ -491,16 +478,6 @@ class AnalysisController {
         if (window.logger) {
             window.logger.debug(`API ${apiName}: ${status} - ${message}`);
         }
-    }
-
-    // Get analysis statistics
-    getAnalysisStats() {
-        return this.dnsAnalyzer.stats;
-    }
-
-    // Print final statistics
-    printFinalStats() {
-        this.dnsAnalyzer.printStats();
     }
 
     // Static factory method for creating a configured instance

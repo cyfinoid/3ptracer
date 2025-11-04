@@ -12,36 +12,11 @@ class Logger {
         }
     }
 
-    // Check if debug mode is enabled
-    isDebugEnabled() {
-        return this.debugMode;
-    }
-
     // Debug logs - only shown when debug mode is enabled
     debug(message, ...args) {
         if (this.debugMode) {
             console.log(`🔍 DEBUG: ${message}`, ...args);
         }
-    }
-
-    // Info logs - always shown
-    info(message, ...args) {
-        console.log(message, ...args);
-    }
-
-    // Warning logs - always shown
-    warn(message, ...args) {
-        console.warn(message, ...args);
-    }
-
-    // Error logs - always shown
-    error(message, ...args) {
-        console.error(message, ...args);
-    }
-
-    // Success logs - always shown
-    success(message, ...args) {
-        console.log(`✅ ${message}`, ...args);
     }
 
     // JSON debug logging
