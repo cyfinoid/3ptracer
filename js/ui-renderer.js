@@ -1363,7 +1363,7 @@ class UIRenderer {
         exportSection.insertAdjacentHTML('afterend', sectionHTML);
     }
 
-    // Display API notifications
+    // Display API notifications - consolidated to show only one per service/API
     displayAPINotifications(apiNotifications) {
         const container = document.getElementById('apiNotifications');
         const section = document.getElementById('apiStatusSection');
@@ -1378,8 +1378,38 @@ class UIRenderer {
         
         section.style.display = 'block';
         
-        let html = '';
+        // Consolidate notifications by API name - keep only the most important one per API
+        // Priority: error > warning > info > success
+        const statusPriority = { 'error': 3, 'warning': 2, 'info': 1, 'success': 0 };
+        const consolidated = new Map();
+        
         errorNotifications.forEach(notification => {
+            const apiName = notification.api;
+            const existing = consolidated.get(apiName);
+            
+            if (!existing) {
+                // First notification for this API
+                consolidated.set(apiName, notification);
+            } else {
+                // Compare priority - keep the one with higher priority
+                const existingPriority = statusPriority[existing.status] || 0;
+                const newPriority = statusPriority[notification.status] || 0;
+                
+                if (newPriority > existingPriority) {
+                    // New notification is more important, replace it
+                    consolidated.set(apiName, notification);
+                } else if (newPriority === existingPriority && notification.status === 'error') {
+                    // Same priority but error - prefer the most recent error message
+                    consolidated.set(apiName, notification);
+                }
+            }
+        });
+        
+        // Convert map to array and display
+        const uniqueNotifications = Array.from(consolidated.values());
+        
+        let html = '';
+        uniqueNotifications.forEach(notification => {
             const statusIcon = notification.status === 'warning' ? '⚠️' : '❌';
             const statusClass = notification.status === 'warning' ? 'warning' : 'error';
             

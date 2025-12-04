@@ -145,6 +145,9 @@ class DNSAnalyzer {
         // Callbacks for API notifications
         this.apiCallbacks = [];
         
+        // Track rate-limited providers to avoid notification spam
+        this.rateLimitedProviders = new Set();
+        
         // Rate limiting
         this.rateLimiter = new RateLimiter(10, 1000); // 10 requests per second
         
@@ -176,6 +179,7 @@ class DNSAnalyzer {
         this.wildcardCertificates = [];
         this.discoveryQueue.clear(); // Clear discovery queue
         this.apiCallbacks = [];
+        this.rateLimitedProviders.clear(); // Clear rate limit tracking
         this.currentDomain = null;
         
         console.log('🧹 DNS Analyzer internal state cleared for new analysis');
@@ -1705,6 +1709,9 @@ class DNSAnalyzer {
             }
         ];
 
+        let rateLimitedProviders = [];
+        let lastError = null;
+
         for (const provider of providers) {
             try {
                 const response = await fetch(provider.url, {
@@ -1715,14 +1722,42 @@ class DNSAnalyzer {
                     }
                 });
                 
+                // Check for rate limit (429 Too Many Requests)
+                if (response.status === 429) {
+                    rateLimitedProviders.push(provider.name);
+                    // Notify about rate limit via callback (only once per provider per session)
+                    if (!this.rateLimitedProviders.has(provider.name)) {
+                        this.rateLimitedProviders.add(provider.name);
+                        this.notifyAPIRateLimit(provider.name);
+                    }
+                    // Continue to next provider, but track that we hit rate limits
+                    continue;
+                }
+                
                 if (response.ok) {
                     const data = await response.json();
+                    // If we had rate limits on other providers, notify about successful fallback
+                    if (rateLimitedProviders.length > 0) {
+                        this.notifyAPIFallback(rateLimitedProviders, provider.name);
+                    }
                     return provider.transform(data);
+                } else {
+                    // Non-429 error - log but continue to next provider
+                    lastError = `HTTP ${response.status}`;
+                    console.warn(`Failed to get ASN from ${provider.name}: HTTP ${response.status}`);
                 }
             } catch (error) {
+                lastError = error.message;
                 console.warn(`Failed to get ASN from ${provider.name}:`, error.message);
                 continue;
             }
+        }
+        
+        // If all providers failed or were rate-limited, notify user
+        if (rateLimitedProviders.length > 0) {
+            this.notifyAPIAllRateLimited(rateLimitedProviders);
+        } else if (lastError) {
+            this.notifyAPIAllFailed();
         }
         
         // If all providers fail, return unknown
@@ -1738,6 +1773,50 @@ class DNSAnalyzer {
             coordinates: null,
             postal: 'Unknown'
         };
+    }
+
+    // Notify about API rate limit
+    notifyAPIRateLimit(providerName) {
+        for (const callback of this.apiCallbacks) {
+            try {
+                callback('IP Geolocation', 'error', `${providerName} rate limit exceeded (429). Too many requests. Stopping requests to this provider.`);
+            } catch (error) {
+                console.warn('Error in API notification callback:', error);
+            }
+        }
+    }
+
+    // Notify about successful fallback after rate limits
+    notifyAPIFallback(rateLimitedProviders, successfulProvider) {
+        for (const callback of this.apiCallbacks) {
+            try {
+                callback('IP Geolocation', 'warning', `${rateLimitedProviders.join(', ')} rate-limited, using ${successfulProvider} as fallback.`);
+            } catch (error) {
+                console.warn('Error in API notification callback:', error);
+            }
+        }
+    }
+
+    // Notify when all providers are rate-limited
+    notifyAPIAllRateLimited(rateLimitedProviders) {
+        for (const callback of this.apiCallbacks) {
+            try {
+                callback('IP Geolocation', 'error', `All IP geolocation APIs rate-limited (${rateLimitedProviders.join(', ')}). Location data unavailable. Please wait before analyzing another domain.`);
+            } catch (error) {
+                console.warn('Error in API notification callback:', error);
+            }
+        }
+    }
+
+    // Notify when all providers fail (non-rate-limit errors)
+    notifyAPIAllFailed() {
+        for (const callback of this.apiCallbacks) {
+            try {
+                callback('IP Geolocation', 'warning', 'All IP geolocation APIs failed. Location data unavailable for some IPs.');
+            } catch (error) {
+                console.warn('Error in API notification callback:', error);
+            }
+        }
     }
 
     // Helper method to get full country names from country codes

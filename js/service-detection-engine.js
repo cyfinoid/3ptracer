@@ -1892,6 +1892,18 @@ class ServiceDetectionEngine {
             }
         }
         
+        // Check for excessive CAA entries (more than 3 means weak certificate authority controls)
+        if (records.CAA && records.CAA.length > 3) {
+            issues.push({
+                type: 'excessive_caa_entries',
+                risk: 'medium',
+                description: `Excessive CAA entries (${records.CAA.length}) - weak certificate authority controls`,
+                recommendation: 'Reduce CAA entries to 3 or fewer. Having too many authorized CAs weakens security controls and increases attack surface. Limit to only essential certificate authorities.',
+                recordCount: records.CAA.length,
+                details: 'CAA (Certificate Authority Authorization) records specify which Certificate Authorities are allowed to issue certificates. Too many authorized CAs means the security gate is wide open, allowing multiple bypasses.'
+            });
+        }
+        
         return issues;
     }
 

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Excessive CAA entries detection** - Security finding when more than 3 CAA (Certificate Authority Authorization) entries are found. Having too many authorized CAs weakens security controls and increases attack surface, effectively leaving the security gate wide open.
+- **IP Geolocation API failure notifications** - User-visible notifications when IP-to-location mapping APIs fail or are rate-limited. Notifications appear in the API Issues section with clear error messages.
+- **429 Rate limit detection** - Proper detection and handling of HTTP 429 (Too Many Requests) errors from IP geolocation APIs. When rate-limited, the tool stops making requests to that provider and switches to fallback providers.
+
+### Fixed
+- **Rate limit handling** - Fixed issue where 429 errors were ignored and requests continued to be sent to rate-limited APIs. Now properly detects 429 status codes and stops retrying rate-limited providers.
+- **API failure visibility** - IP geolocation API failures are now visible to users through the API Issues notification system, instead of silently failing in the background.
+
+### Optimizations
+- **Consolidated API notifications** - API notifications are now consolidated to show only one notification per service/API, prioritizing errors over warnings. This saves space in the UI and prevents duplicate messages for services like crt.sh, SSLMate CT Search, and HackerTarget.
+
 ## [1.0.3] - 2025-11-04
 
 ### Added
