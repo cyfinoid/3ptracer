@@ -343,6 +343,16 @@ class AnalysisController {
             }
         }
 
+        // Check IPs and domains against abuse blocklists
+        this.uiRenderer.updateProgress(88, 'Checking IPs and domains against abuse blocklists...');
+        const blocklistIssues = await this.checkBlocklists(mainDomainResults, subdomainResults);
+        if (blocklistIssues.length > 0) {
+            securityResults.cloudIssues.push(...blocklistIssues);
+            if (window.logger) {
+                window.logger.debugJSON('Blocklist issues:', blocklistIssues);
+            }
+        }
+
         // Process DNS records separately from services
         const dnsRecords = mainDomainResults?.records ? 
             this.serviceDetector.processDNSRecords(mainDomainResults.records) : [];
@@ -465,6 +475,98 @@ class AnalysisController {
         }
         
         return this.serviceDetector.detectInterestingInfrastructureFindings({}, activeSubdomains);
+    }
+
+    // Check IPs and domains against abuse blocklists
+    async checkBlocklists(mainDomainResults, subdomainResults) {
+        const issues = [];
+        const checkedIPs = new Set();
+        const checkedDomains = new Set();
+
+        console.log(`🔍 Checking IPs and domains against abuse blocklists...`);
+
+        // Check main domain against Spamhaus DBL
+        if (mainDomainResults?.domain) {
+            const domain = mainDomainResults.domain;
+            if (!checkedDomains.has(domain)) {
+                checkedDomains.add(domain);
+                try {
+                    const dblResult = await this.dnsAnalyzer.checkDomainAgainstSpamhausDBL(domain);
+                    if (dblResult && dblResult.listed) {
+                        issues.push({
+                            type: 'malicious_domain',
+                            risk: dblResult.severity,
+                            description: `Domain is listed in ${dblResult.blocklist}: ${dblResult.threats}`,
+                            recommendation: 'This domain is flagged in abuse blocklists. Review and investigate the domain reputation. Consider removing or replacing this domain if it is associated with malicious activity.',
+                            domain: domain,
+                            blocklist: dblResult.blocklist,
+                            threats: dblResult.threats,
+                            codes: dblResult.codes.join(', ')
+                        });
+                    }
+                } catch (error) {
+                    console.warn(`Failed to check domain ${domain} against blocklist:`, error.message);
+                }
+            }
+        }
+
+        // Check subdomain IPs against Spamhaus ZEN
+        if (subdomainResults && subdomainResults.length > 0) {
+            for (const subdomain of subdomainResults) {
+                const ipToCheck = subdomain.ip || (subdomain.ipAddresses && subdomain.ipAddresses.length > 0 ? subdomain.ipAddresses[0] : null);
+                
+                if (ipToCheck && !checkedIPs.has(ipToCheck)) {
+                    // Skip private IPs (already handled by internal_ip_exposure)
+                    const privateIPInfo = this.serviceDetector.isPrivateIP(ipToCheck);
+                    if (!privateIPInfo || !privateIPInfo.isPrivate) {
+                        checkedIPs.add(ipToCheck);
+                        try {
+                            const zenResult = await this.dnsAnalyzer.checkIPAgainstSpamhausZEN(ipToCheck);
+                            if (zenResult && zenResult.listed) {
+                                issues.push({
+                                    type: 'abuse_ip',
+                                    risk: zenResult.severity,
+                                    description: `IP address ${ipToCheck} is listed in ${zenResult.blocklist}: ${zenResult.blocklists}`,
+                                    recommendation: 'This IP address is flagged in abuse blocklists. Review the subdomain and IP association. Consider removing or investigating this IP if it is associated with malicious activity.',
+                                    subdomain: subdomain.subdomain,
+                                    ip: ipToCheck,
+                                    blocklist: zenResult.blocklist,
+                                    blocklists: zenResult.blocklists,
+                                    codes: zenResult.codes.join(', ')
+                                });
+                            }
+                        } catch (error) {
+                            console.warn(`Failed to check IP ${ipToCheck} against blocklist:`, error.message);
+                        }
+                    }
+                }
+
+                // Check subdomain against Spamhaus DBL
+                if (subdomain.subdomain && !checkedDomains.has(subdomain.subdomain)) {
+                    checkedDomains.add(subdomain.subdomain);
+                    try {
+                        const dblResult = await this.dnsAnalyzer.checkDomainAgainstSpamhausDBL(subdomain.subdomain);
+                        if (dblResult && dblResult.listed) {
+                            issues.push({
+                                type: 'malicious_domain',
+                                risk: dblResult.severity,
+                                description: `Subdomain is listed in ${dblResult.blocklist}: ${dblResult.threats}`,
+                                recommendation: 'This subdomain is flagged in abuse blocklists. Review and investigate the subdomain reputation. Consider removing or replacing this subdomain if it is associated with malicious activity.',
+                                subdomain: subdomain.subdomain,
+                                blocklist: dblResult.blocklist,
+                                threats: dblResult.threats,
+                                codes: dblResult.codes.join(', ')
+                            });
+                        }
+                    } catch (error) {
+                        console.warn(`Failed to check subdomain ${subdomain.subdomain} against blocklist:`, error.message);
+                    }
+                }
+            }
+        }
+
+        console.log(`✅ Blocklist checking complete: ${issues.length} issues found`);
+        return issues;
     }
 
     // Add API notification

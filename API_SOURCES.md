@@ -480,6 +480,113 @@ This combination provides:
 
 ---
 
+## Threat Intelligence APIs (Tested December 2024)
+
+### DNS-Based Blocklists (✅ Viable - No CORS Issues)
+
+DNS-based blocklists can be queried via DNS over HTTPS (DoH), which we already use. These work client-side without CORS issues:
+
+#### 1. Spamhaus DBL (Domain Block List)
+- **Query Format:** `{domain}.dbl.spamhaus.org` (TXT record)
+- **Category:** Domain Reputation / Spam Detection
+- **Method:** DNS TXT query via DoH
+- **Authentication:** None required
+- **CORS:** ✅ Works via DoH (no CORS issues)
+- **Test Command:**
+```bash
+dig TXT example.com.dbl.spamhaus.org
+# Or via DoH: https://dns.google/resolve?name=example.com.dbl.spamhaus.org&type=TXT
+```
+- **Response Codes:**
+  - `127.0.1.2` = Domain is in blocklist
+  - `127.0.1.4` = Domain is in blocklist (phishing)
+  - `127.0.1.5` = Domain is in blocklist (malware)
+  - `127.0.1.6` = Domain is in blocklist (botnet C&C)
+  - No response = Domain is clean
+- **Status:** ✅ **VIABLE** - Can be integrated via existing DoH infrastructure
+- **Notes:** Returns IP codes in TXT record, not JSON. Requires parsing response.
+
+#### 2. Spamhaus ZEN (IP Block List)
+- **Query Format:** `{reversed-ip}.zen.spamhaus.org` (TXT record)
+- **Category:** IP Reputation / Spam Detection
+- **Method:** DNS TXT query via DoH
+- **Authentication:** None required
+- **CORS:** ✅ Works via DoH (no CORS issues)
+- **Test Command:**
+```bash
+# For IP 8.8.8.8, reverse it: 8.8.8.8 -> 8.8.8.8.zen.spamhaus.org
+dig TXT 8.8.8.8.zen.spamhaus.org
+```
+- **Response Codes:**
+  - `127.0.0.2` = IP is in SBL (Spamhaus Block List)
+  - `127.0.0.3` = IP is in CSS (Spamhaus CSS)
+  - `127.0.0.4` = IP is in XBL (Exploits Block List)
+  - `127.0.0.9` = IP is in PBL (Policy Block List)
+  - No response = IP is clean
+- **Status:** ✅ **VIABLE** - Can be integrated via existing DoH infrastructure
+
+#### 3. SURBL (Spam URI Realtime Blocklist)
+- **Query Format:** `{domain}.multi.surbl.org` (A record)
+- **Category:** Domain Reputation / Spam Detection
+- **Method:** DNS A query via DoH
+- **Authentication:** None required
+- **CORS:** ✅ Works via DoH (no CORS issues)
+- **Test Command:**
+```bash
+dig A example.com.multi.surbl.org
+```
+- **Response:** Returns IP address if domain is listed, NXDOMAIN if clean
+- **Status:** ✅ **VIABLE** - Can be integrated via existing DoH infrastructure
+
+#### 4. URIBL (URI Blacklist)
+- **Query Format:** `{domain}.black.uribl.com` (A record)
+- **Category:** Domain Reputation / Spam Detection
+- **Method:** DNS A query via DoH
+- **Authentication:** None required
+- **CORS:** ✅ Works via DoH (no CORS issues)
+- **Test Command:**
+```bash
+dig A example.com.black.uribl.com
+```
+- **Response:** Returns `127.0.0.2` if domain is blacklisted, NXDOMAIN if clean
+- **Status:** ✅ **VIABLE** - Can be integrated via existing DoH infrastructure
+
+### JSON-Based Threat Intelligence APIs (❌ CORS Blocked)
+
+#### 1. isMalicious API
+- **Endpoint:** `https://ismalicious.com/api/check?term={domain|ip}`
+- **Category:** Threat Intelligence / Malware Detection
+- **Reason for Rejection:** ❌ Requires API key authentication
+- **Test Date:** 2024-12-04
+- **Response:** Requires authentication header
+- **Notes:** Documentation states "Any request that doesn't include an API key will return an error"
+
+#### 2. checkphish.ai API
+- **Endpoint:** `https://checkphish.ai/api/neo/scan`
+- **Category:** Phishing Detection
+- **Reason for Rejection:** ❌ CORS blocked - Redirect not allowed for preflight request
+- **Test Date:** 2024-12-04
+- **Browser Test:** Confirmed CORS blocked from origin 'http://localhost:8000'
+- **Error:** `Access to fetch has been blocked by CORS policy: Response to preflight request doesn't pass access control check: Redirect is not allowed for a preflight request`
+
+#### 3. IPQualityScore
+- **Endpoint:** `https://ipqualityscore.com/api/json/url/test/{domain}`
+- **Category:** URL/Domain Reputation
+- **Reason for Rejection:** ❌ CORS blocked - No 'Access-Control-Allow-Origin' header
+- **Test Date:** 2024-12-04
+- **Browser Test:** Confirmed CORS blocked
+- **Error:** `Access to fetch has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource`
+- **Notes:** May also require API key for full functionality
+
+#### 4. AbuseIPDB API
+- **Endpoint:** `https://api.abuseipdb.com/api/v2/check?ipAddress={ip}&maxAgeInDays=90`
+- **Category:** IP Reputation / Abuse Detection
+- **Reason for Rejection:** ❌ CORS blocked + Requires API key
+- **Test Date:** 2024-12-04
+- **Browser Test:** Confirmed CORS blocked
+- **Error:** `Access to fetch has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present`
+- **Notes:** Free tier available (1,000 requests/day) but requires API key and is CORS-blocked
+
 ## Contributing
 
 When testing new API sources, please document:

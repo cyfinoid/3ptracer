@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Excessive CAA entries detection** - Security finding when more than 3 CAA (Certificate Authority Authorization) entries are found. Having too many authorized CAs weakens security controls and increases attack surface, effectively leaving the security gate wide open.
 - **IP Geolocation API failure notifications** - User-visible notifications when IP-to-location mapping APIs fail or are rate-limited. Notifications appear in the API Issues section with clear error messages.
 - **429 Rate limit detection** - Proper detection and handling of HTTP 429 (Too Many Requests) errors from IP geolocation APIs. When rate-limited, the tool stops making requests to that provider and switches to fallback providers.
+- **Abuse IP and Domain Blocklist Checking** - Automatic checking of IP addresses and domains against Spamhaus blocklists (ZEN for IPs, DBL for domains) via DNS over HTTPS. Detects malicious IPs and domains flagged in abuse blocklists and reports them as security findings with appropriate risk levels.
 
 ### Fixed
 - **Rate limit handling** - Fixed issue where 429 errors were ignored and requests continued to be sent to rate-limited APIs. Now properly detects 429 status codes and stops retrying rate-limited providers.

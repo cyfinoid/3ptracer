@@ -1819,6 +1819,111 @@ class DNSAnalyzer {
         }
     }
 
+    // Check IP against Spamhaus ZEN blocklist
+    async checkIPAgainstSpamhausZEN(ip) {
+        if (!ip || typeof ip !== 'string') {
+            return null;
+        }
+
+        // Validate IP format
+        const ipParts = ip.split('.');
+        if (ipParts.length !== 4) {
+            return null;
+        }
+
+        // Reverse IP for Spamhaus ZEN query (8.8.8.8 -> 8.8.8.8.zen.spamhaus.org)
+        const reversedIP = ipParts.join('.');
+        const queryDomain = `${reversedIP}.zen.spamhaus.org`;
+
+        try {
+            const records = await this.queryDNS(queryDomain, 'TXT');
+            
+            if (!records || records.length === 0) {
+                // No records = IP is clean
+                return { listed: false, blocklist: 'Spamhaus ZEN' };
+            }
+
+            // Parse TXT record to get blocklist codes
+            const txtData = records[0].data || '';
+            const codes = txtData.match(/127\.0\.0\.\d+/g) || [];
+            
+            if (codes.length === 0) {
+                return { listed: false, blocklist: 'Spamhaus ZEN' };
+            }
+
+            // Map codes to blocklist names
+            const blocklistMap = {
+                '127.0.0.2': 'SBL (Spamhaus Block List)',
+                '127.0.0.3': 'CSS (Spamhaus CSS)',
+                '127.0.0.4': 'XBL (Exploits Block List)',
+                '127.0.0.9': 'PBL (Policy Block List)',
+                '127.0.0.10': 'PBL (Policy Block List)',
+                '127.0.0.11': 'PBL (Policy Block List)'
+            };
+
+            const blocklists = codes.map(code => blocklistMap[code] || code).join(', ');
+            
+            return {
+                listed: true,
+                blocklist: 'Spamhaus ZEN',
+                codes: codes,
+                blocklists: blocklists,
+                severity: codes.includes('127.0.0.4') ? 'high' : 'medium' // XBL is more serious
+            };
+        } catch (error) {
+            console.warn(`Failed to check IP ${ip} against Spamhaus ZEN:`, error.message);
+            return null;
+        }
+    }
+
+    // Check domain against Spamhaus DBL blocklist
+    async checkDomainAgainstSpamhausDBL(domain) {
+        if (!domain || typeof domain !== 'string') {
+            return null;
+        }
+
+        // Query format: domain.dbl.spamhaus.org
+        const queryDomain = `${domain}.dbl.spamhaus.org`;
+
+        try {
+            const records = await this.queryDNS(queryDomain, 'TXT');
+            
+            if (!records || records.length === 0) {
+                // No records = domain is clean
+                return { listed: false, blocklist: 'Spamhaus DBL' };
+            }
+
+            // Parse TXT record to get blocklist codes
+            const txtData = records[0].data || '';
+            const codes = txtData.match(/127\.0\.1\.\d+/g) || [];
+            
+            if (codes.length === 0) {
+                return { listed: false, blocklist: 'Spamhaus DBL' };
+            }
+
+            // Map codes to threat types
+            const threatMap = {
+                '127.0.1.2': 'Spam domain',
+                '127.0.1.4': 'Phishing domain',
+                '127.0.1.5': 'Malware domain',
+                '127.0.1.6': 'Botnet C&C domain'
+            };
+
+            const threats = codes.map(code => threatMap[code] || code).join(', ');
+            
+            return {
+                listed: true,
+                blocklist: 'Spamhaus DBL',
+                codes: codes,
+                threats: threats,
+                severity: codes.includes('127.0.1.5') || codes.includes('127.0.1.6') ? 'high' : 'medium'
+            };
+        } catch (error) {
+            console.warn(`Failed to check domain ${domain} against Spamhaus DBL:`, error.message);
+            return null;
+        }
+    }
+
     // Helper method to get full country names from country codes
     getCountryName(countryCode) {
         const countryNames = {
