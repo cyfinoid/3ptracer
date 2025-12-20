@@ -632,6 +632,16 @@ class UIRenderer {
             );
         }
         
+        // M1: Add DNSSEC visualization
+        if (securityResults.dnssec) {
+            emailSecurityHtml += this.renderDNSSECStatus(securityResults.dnssec);
+        }
+        
+        // L10: Add DANE/TLSA visualization
+        if (securityResults.daneTLSA) {
+            emailSecurityHtml += this.renderDANETLSAStatus(securityResults.daneTLSA);
+        }
+        
         container.innerHTML = html + emailSecurityHtml;
     }
 
@@ -887,6 +897,152 @@ class UIRenderer {
         }
         
         html += '</div></div>';
+        return html;
+    }
+
+    // L10: Render DANE/TLSA status
+    renderDANETLSAStatus(dane) {
+        if (!dane) return '';
+        
+        const statusColor = dane.enabled ? '#28a745' : '#6c757d';
+        const statusIcon = dane.enabled ? '✅' : '❌';
+        const statusText = dane.enabled ? 'Enabled' : 'Not Configured';
+        
+        let html = `
+            <div class="dane-status" style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
+                <h4 style="margin-top: 0; color: var(--text-color);">🔐 DANE/TLSA Status</h4>
+                
+                <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 250px; padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-size: 1.2em; font-weight: bold; color: ${statusColor};">${statusIcon} ${statusText}</div>
+                                <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 5px;">
+                                    DNS-based Authentication of Named Entities (RFC 6698)
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+        
+        if (dane.enabled) {
+            // Show which services have DANE
+            html += `
+                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                        <div style="font-size: 0.9em; color: var(--text-secondary);">Protected Services</div>
+                        <div style="margin-top: 5px;">
+                            ${dane.smtpDANE ? '<span style="display: inline-block; padding: 2px 8px; margin: 2px; background: rgba(40, 167, 69, 0.1); border-radius: 3px; color: #28a745;">📧 SMTP</span>' : ''}
+                            ${dane.httpsDANE ? '<span style="display: inline-block; padding: 2px 8px; margin: 2px; background: rgba(40, 167, 69, 0.1); border-radius: 3px; color: #28a745;">🌐 HTTPS</span>' : ''}
+                        </div>
+                    </div>
+                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                        <div style="font-size: 0.9em; color: var(--text-secondary);">TLSA Records</div>
+                        <div style="font-size: 1.2em; font-weight: bold; color: var(--text-color);">${dane.records?.length || 0}</div>
+                    </div>`;
+        }
+        
+        html += '</div>';
+        
+        if (!dane.enabled) {
+            html += `
+                <div style="margin-top: 15px; padding: 10px; background: rgba(108, 117, 125, 0.1); border-radius: 4px; font-size: 0.85em; color: var(--text-secondary);">
+                    💡 <strong>What is DANE?</strong> DANE uses TLSA DNS records to specify which TLS certificates are valid for your services. 
+                    Combined with DNSSEC, it provides strong protection against certificate misissuance and man-in-the-middle attacks.
+                </div>`;
+        }
+        
+        html += '</div>';
+        return html;
+    }
+
+    // M1: Render DNSSEC validation status
+    renderDNSSECStatus(dnssec) {
+        if (!dnssec) return '';
+        
+        const statusColors = {
+            'secure': '#28a745',
+            'insecure': '#ffc107',
+            'unsigned': '#6c757d',
+            'error': '#dc3545',
+            'unknown': '#6c757d'
+        };
+        
+        const statusIcons = {
+            'secure': '✅',
+            'insecure': '⚠️',
+            'unsigned': '❌',
+            'error': '❓',
+            'unknown': '❓'
+        };
+        
+        const statusLabels = {
+            'secure': 'Secure (Validated)',
+            'insecure': 'Insecure (Not Validated)',
+            'unsigned': 'Not Configured',
+            'error': 'Check Failed',
+            'unknown': 'Unknown'
+        };
+        
+        const color = statusColors[dnssec.status] || statusColors['unknown'];
+        const icon = statusIcons[dnssec.status] || statusIcons['unknown'];
+        const label = statusLabels[dnssec.status] || statusLabels['unknown'];
+        
+        let html = `
+            <div class="dnssec-status" style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
+                <h4 style="margin-top: 0; color: var(--text-color);">🔐 DNSSEC Status</h4>
+                
+                <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 250px; padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${color};">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-size: 1.2em; font-weight: bold; color: ${color};">${icon} ${label}</div>
+                                <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 5px;">
+                                    ${dnssec.details || 'No details available'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+        
+        // Show DNSKEY info if present
+        if (dnssec.dnskeyPresent && dnssec.records.dnskey.length > 0) {
+            html += `
+                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                        <div style="font-size: 0.9em; color: var(--text-secondary);">DNSKEY Records</div>
+                        <div style="font-size: 1.2em; font-weight: bold; color: var(--text-color);">${dnssec.records.dnskey.length}</div>
+                        <div style="font-size: 0.8em; color: var(--text-secondary);">`;
+            
+            for (const key of dnssec.records.dnskey) {
+                html += `<span style="display: inline-block; padding: 2px 6px; margin: 2px; background: rgba(40, 167, 69, 0.1); border-radius: 3px;">${key.flags?.type || 'Key'}</span>`;
+            }
+            html += `</div></div>`;
+        }
+        
+        // Show DS info if present
+        if (dnssec.dsPresent && dnssec.records.ds.length > 0) {
+            html += `
+                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                        <div style="font-size: 0.9em; color: var(--text-secondary);">DS Records</div>
+                        <div style="font-size: 1.2em; font-weight: bold; color: var(--text-color);">${dnssec.records.ds.length}</div>
+                        <div style="font-size: 0.8em; color: var(--text-secondary);">`;
+            
+            for (const ds of dnssec.records.ds) {
+                html += `<span style="display: inline-block; padding: 2px 6px; margin: 2px; background: rgba(40, 167, 69, 0.1); border-radius: 3px;">Key: ${ds.keyTag || '?'}</span>`;
+            }
+            html += `</div></div>`;
+        }
+        
+        html += `
+                </div>`;
+        
+        // Add explanation for unsigned domains
+        if (dnssec.status === 'unsigned') {
+            html += `
+                <div style="margin-top: 15px; padding: 10px; background: rgba(108, 117, 125, 0.1); border-radius: 4px; font-size: 0.85em; color: var(--text-secondary);">
+                    💡 <strong>Why DNSSEC matters:</strong> DNSSEC adds cryptographic signatures to DNS responses, protecting against DNS spoofing and cache poisoning attacks. 
+                    Contact your domain registrar to enable DNSSEC for enhanced security.
+                </div>`;
+        }
+        
+        html += '</div>';
         return html;
     }
 

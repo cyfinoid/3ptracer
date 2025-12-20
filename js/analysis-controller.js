@@ -11,6 +11,48 @@ class AnalysisController {
         this.apiNotifications = [];
     }
 
+    // M10: Quick Scan Mode - skip subdomain discovery for faster results
+    async analyzeQuickScan(domain) {
+        try {
+            this.setupDebugMode();
+            console.log(`⚡ Starting QUICK SCAN for domain: ${domain}`);
+            
+            this.clearInternalState(domain);
+            this.setupAPINotifications();
+            this.addAPINotification('Quick Scan', 'Running in Quick Scan mode - subdomain discovery skipped for faster results', 'info');
+            
+            // Phase 1: Analyze main domain only
+            this.uiRenderer.updateProgress(20, 'Analyzing main domain...');
+            const mainDomainResults = await this.analyzeMainDomain(domain);
+            
+            // Phase 2: Security analysis (no subdomains)
+            this.uiRenderer.updateProgress(60, 'Performing security analysis...');
+            const securityResults = await this.performSecurityAnalysis(mainDomainResults, []);
+            
+            // Phase 3: Final processing
+            this.uiRenderer.updateProgress(90, 'Finalizing results...');
+            const processedData = this.processResults(mainDomainResults, [], securityResults);
+            
+            // Phase 4: Display results
+            this.uiRenderer.updateProgress(100, 'Quick scan complete!');
+            this.displayResults(processedData, securityResults);
+            
+            // Enable export
+            if (window.exportManager) {
+                const interestingFindings = this.getInterestingFindings(processedData);
+                const enhancedProcessedData = { ...processedData, dataProcessor: this.dataProcessor };
+                window.exportManager.setAnalysisData(enhancedProcessedData, securityResults, domain, interestingFindings);
+            }
+            
+            console.log(`⚡ Quick scan complete for ${domain}!`);
+            
+        } catch (error) {
+            console.error('Quick scan failed:', error);
+            this.uiRenderer.showError('Quick scan failed: ' + error.message);
+            throw error;
+        }
+    }
+
     // Main analysis method with progressive display
     async analyzeDomain(domain) {
         try {
@@ -294,7 +336,9 @@ class AnalysisController {
             mtaSts: null,            // H2: MTA-STS Detection
             bimi: null,              // H3: BIMI Detection
             smtpTlsReporting: null,  // H7: SMTP TLS Reporting
-            dnssec: null             // M1: DNSSEC Validation
+            dnssec: null,            // M1: DNSSEC Validation
+            danglingNS: null,        // M6: Dangling NS Record Detection
+            daneTLSA: null           // L10: DANE/TLSA Record Checking
         };
 
         // H1: Perform SPF Include Chain Analysis
@@ -400,6 +444,42 @@ class AnalysisController {
                 }
             } catch (error) {
                 console.warn('DNSSEC check failed:', error.message);
+            }
+            
+            // M6: Check for dangling NS records
+            this.uiRenderer.updateProgress(89, 'Checking for dangling NS records...');
+            try {
+                securityResults.danglingNS = await this.dnsAnalyzer.checkDanglingNS(mainDomainResults.domain);
+                if (window.logger) {
+                    window.logger.debugJSON('Dangling NS check:', securityResults.danglingNS);
+                }
+                
+                // Add any dangling NS issues to DNS issues
+                if (securityResults.danglingNS?.issues?.length > 0) {
+                    for (const issue of securityResults.danglingNS.issues) {
+                        securityResults.dnsIssues.push({
+                            type: issue.type,
+                            risk: issue.risk,
+                            description: issue.description,
+                            recommendation: issue.recommendation,
+                            details: `Nameserver: ${issue.nameserver}`
+                        });
+                    }
+                }
+            } catch (error) {
+                console.warn('Dangling NS check failed:', error.message);
+            }
+            
+            // L10: Check for DANE/TLSA records
+            this.uiRenderer.updateProgress(89, 'Checking DANE/TLSA records...');
+            try {
+                securityResults.daneTLSA = await this.dnsAnalyzer.checkDANETLSA(mainDomainResults.domain);
+                if (window.logger) {
+                    window.logger.debugJSON('DANE/TLSA check:', securityResults.daneTLSA);
+                }
+                // DANE is informational - no warning if not configured
+            } catch (error) {
+                console.warn('DANE/TLSA check failed:', error.message);
             }
         }
 
@@ -596,27 +676,30 @@ class AnalysisController {
 
         console.log(`🔍 Checking IPs and domains against abuse blocklists...`);
 
-        // Check main domain against Spamhaus DBL
+        // Check main domain against all blocklists (Spamhaus DBL, SURBL, URIBL)
         if (mainDomainResults?.domain) {
             const domain = mainDomainResults.domain;
             if (!checkedDomains.has(domain)) {
                 checkedDomains.add(domain);
                 try {
-                    const dblResult = await this.dnsAnalyzer.checkDomainAgainstSpamhausDBL(domain);
-                    if (dblResult && dblResult.listed) {
-                        issues.push({
-                            type: 'malicious_domain',
-                            risk: dblResult.severity,
-                            description: `Domain is listed in ${dblResult.blocklist}: ${dblResult.threats}`,
-                            recommendation: 'This domain is flagged in abuse blocklists. Review and investigate the domain reputation. Consider removing or replacing this domain if it is associated with malicious activity.',
-                            domain: domain,
-                            blocklist: dblResult.blocklist,
-                            threats: dblResult.threats,
-                            codes: dblResult.codes.join(', ')
-                        });
+                    // M5: Check against all blocklists
+                    const blocklistResults = await this.dnsAnalyzer.checkDomainAgainstAllBlocklists(domain);
+                    for (const result of blocklistResults) {
+                        if (result.listed) {
+                            issues.push({
+                                type: 'malicious_domain',
+                                risk: result.severity,
+                                description: `Domain is listed in ${result.blocklist}: ${result.threats}`,
+                                recommendation: 'This domain is flagged in abuse blocklists. Review and investigate the domain reputation. Consider removing or replacing this domain if it is associated with malicious activity.',
+                                domain: domain,
+                                blocklist: result.blocklist,
+                                threats: result.threats,
+                                codes: result.codes?.join(', ') || result.lists?.join(', ') || ''
+                            });
+                        }
                     }
                 } catch (error) {
-                    console.warn(`Failed to check domain ${domain} against blocklist:`, error.message);
+                    console.warn(`Failed to check domain ${domain} against blocklists:`, error.message);
                 }
             }
         }
@@ -652,25 +735,27 @@ class AnalysisController {
                     }
                 }
 
-                // Check subdomain against Spamhaus DBL
+                // M5: Check subdomain against all blocklists (Spamhaus DBL, SURBL, URIBL)
                 if (subdomain.subdomain && !checkedDomains.has(subdomain.subdomain)) {
                     checkedDomains.add(subdomain.subdomain);
                     try {
-                        const dblResult = await this.dnsAnalyzer.checkDomainAgainstSpamhausDBL(subdomain.subdomain);
-                        if (dblResult && dblResult.listed) {
-                            issues.push({
-                                type: 'malicious_domain',
-                                risk: dblResult.severity,
-                                description: `Subdomain is listed in ${dblResult.blocklist}: ${dblResult.threats}`,
-                                recommendation: 'This subdomain is flagged in abuse blocklists. Review and investigate the subdomain reputation. Consider removing or replacing this subdomain if it is associated with malicious activity.',
-                                subdomain: subdomain.subdomain,
-                                blocklist: dblResult.blocklist,
-                                threats: dblResult.threats,
-                                codes: dblResult.codes.join(', ')
-                            });
+                        const blocklistResults = await this.dnsAnalyzer.checkDomainAgainstAllBlocklists(subdomain.subdomain);
+                        for (const result of blocklistResults) {
+                            if (result.listed) {
+                                issues.push({
+                                    type: 'malicious_domain',
+                                    risk: result.severity,
+                                    description: `Subdomain is listed in ${result.blocklist}: ${result.threats}`,
+                                    recommendation: 'This subdomain is flagged in abuse blocklists. Review and investigate the subdomain reputation. Consider removing or replacing this subdomain if it is associated with malicious activity.',
+                                    subdomain: subdomain.subdomain,
+                                    blocklist: result.blocklist,
+                                    threats: result.threats,
+                                    codes: result.codes?.join(', ') || result.lists?.join(', ') || ''
+                                });
+                            }
                         }
                     } catch (error) {
-                        console.warn(`Failed to check subdomain ${subdomain.subdomain} against blocklist:`, error.message);
+                        console.warn(`Failed to check subdomain ${subdomain.subdomain} against blocklists:`, error.message);
                     }
                 }
             }

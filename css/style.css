@@ -524,6 +524,45 @@ input[type="checkbox"] {
     background: rgba(243, 156, 18, 0.2);
 }
 
+/* M2: Save and History buttons */
+.export-save:hover {
+    border-color: #28a745;
+    background: rgba(40, 167, 69, 0.2);
+}
+
+.export-history:hover {
+    border-color: #6f42c1;
+    background: rgba(111, 66, 193, 0.2);
+}
+
+/* M3: Copy Link button */
+.export-link:hover {
+    border-color: #17a2b8;
+    background: rgba(23, 162, 184, 0.2);
+}
+
+/* M7: Markdown button */
+.export-markdown:hover {
+    border-color: #6c757d;
+    background: rgba(108, 117, 125, 0.2);
+}
+
+/* M8: CSV button */
+.export-csv:hover {
+    border-color: #20c997;
+    background: rgba(32, 201, 151, 0.2);
+}
+
+/* History modal styling */
+.history-modal {
+    display: none;
+}
+
+.history-modal .snapshot-item:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-blue);
+}
+
 /* Mobile responsiveness for export buttons */
 @media (max-width: 768px) {
     .export-buttons {

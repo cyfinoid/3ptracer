@@ -30,14 +30,25 @@
                     <label for="domain">Enter Domain Name:</label>
                     <input type="text" id="domain" placeholder="example.com" autocomplete="off">
                 </div>
-                <div class="form-group" style="margin-top: 15px;">
-                    <label style="display: inline-flex; align-items: center; cursor: pointer;">
-                        <input type="checkbox" id="debugMode" style="margin-right: 8px;">
-                        Enable Debug Mode
-                    </label>
-                    <small style="display: block; margin-top: 5px; color: #666; font-size: 0.85rem;">
-                        Shows detailed console output for debugging
-                    </small>
+                <div class="form-group" style="margin-top: 15px; display: flex; gap: 30px; flex-wrap: wrap;">
+                    <div>
+                        <label style="display: inline-flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" id="quickScan" style="margin-right: 8px;">
+                            Quick Scan
+                        </label>
+                        <small style="display: block; margin-top: 5px; color: #666; font-size: 0.85rem;">
+                            Skip subdomain discovery for faster results
+                        </small>
+                    </div>
+                    <div>
+                        <label style="display: inline-flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" id="debugMode" style="margin-right: 8px;">
+                            Debug Mode
+                        </label>
+                        <small style="display: block; margin-top: 5px; color: #666; font-size: 0.85rem;">
+                            Show detailed console output
+                        </small>
+                    </div>
                 </div>
                 <button class="analyze-btn" onclick="analyzeDomain()">Analyze Domain</button>
             </div>

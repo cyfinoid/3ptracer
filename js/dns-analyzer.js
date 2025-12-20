@@ -2029,6 +2029,125 @@ class DNSAnalyzer {
             return null;
         }
     }
+    
+    // ==========================================
+    // M5: Additional Blocklist Integration
+    // ==========================================
+    
+    // Check domain against SURBL (Spam URI Realtime Blocklists)
+    async checkDomainAgainstSURBL(domain) {
+        if (!domain || typeof domain !== 'string') {
+            return null;
+        }
+
+        // Query format: domain.multi.surbl.org
+        const queryDomain = `${domain}.multi.surbl.org`;
+
+        try {
+            const records = await this.queryDNS(queryDomain, 'A');
+            
+            if (!records || records.length === 0) {
+                return { listed: false, blocklist: 'SURBL' };
+            }
+
+            // Parse A record to get blocklist codes
+            const ip = records[0].data;
+            if (!ip || !ip.startsWith('127.0.0.')) {
+                return { listed: false, blocklist: 'SURBL' };
+            }
+
+            const lastOctet = parseInt(ip.split('.')[3], 10);
+            
+            // SURBL uses bitmask in last octet
+            const lists = [];
+            if (lastOctet & 1) lists.push('SC (SpamCop)');
+            if (lastOctet & 2) lists.push('WS (sa-blacklist)');
+            if (lastOctet & 4) lists.push('PH (Phishing)');
+            if (lastOctet & 8) lists.push('MW (Malware)');
+            if (lastOctet & 16) lists.push('AB (AbuseButler)');
+            if (lastOctet & 32) lists.push('JP (jwSpamSpy)');
+            if (lastOctet & 64) lists.push('CR (Cracked sites)');
+            
+            const severity = (lastOctet & 4) || (lastOctet & 8) ? 'high' : 'medium';
+            
+            return {
+                listed: true,
+                blocklist: 'SURBL',
+                ip: ip,
+                lists: lists,
+                threats: lists.join(', '),
+                severity: severity
+            };
+        } catch (error) {
+            console.warn(`Failed to check domain ${domain} against SURBL:`, error.message);
+            return null;
+        }
+    }
+    
+    // Check domain against URIBL (URI Blocklist)
+    async checkDomainAgainstURIBL(domain) {
+        if (!domain || typeof domain !== 'string') {
+            return null;
+        }
+
+        // Query format: domain.black.uribl.com
+        const queryDomain = `${domain}.black.uribl.com`;
+
+        try {
+            const records = await this.queryDNS(queryDomain, 'A');
+            
+            if (!records || records.length === 0) {
+                return { listed: false, blocklist: 'URIBL' };
+            }
+
+            // Parse A record
+            const ip = records[0].data;
+            if (!ip || !ip.startsWith('127.0.0.')) {
+                return { listed: false, blocklist: 'URIBL' };
+            }
+
+            const lastOctet = parseInt(ip.split('.')[3], 10);
+            
+            // URIBL uses bitmask in last octet
+            const lists = [];
+            if (lastOctet & 1) lists.push('black');
+            if (lastOctet & 2) lists.push('grey');
+            if (lastOctet & 4) lists.push('red');
+            if (lastOctet & 8) lists.push('multi');
+            
+            const severity = (lastOctet & 4) ? 'high' : (lastOctet & 1) ? 'medium' : 'low';
+            
+            return {
+                listed: true,
+                blocklist: 'URIBL',
+                ip: ip,
+                lists: lists,
+                threats: `Listed in URIBL ${lists.join(', ')}`,
+                severity: severity
+            };
+        } catch (error) {
+            console.warn(`Failed to check domain ${domain} against URIBL:`, error.message);
+            return null;
+        }
+    }
+    
+    // Check domain against multiple blocklists
+    async checkDomainAgainstAllBlocklists(domain) {
+        const results = [];
+        
+        // Run all checks in parallel
+        const [dbl, surbl, uribl] = await Promise.all([
+            this.checkDomainAgainstSpamhausDBL(domain),
+            this.checkDomainAgainstSURBL(domain),
+            this.checkDomainAgainstURIBL(domain)
+        ]);
+        
+        if (dbl?.listed) results.push(dbl);
+        if (surbl?.listed) results.push(surbl);
+        if (uribl?.listed) results.push(uribl);
+        
+        return results;
+    }
 
     // Helper method to get full country names from country codes
     getCountryName(countryCode) {
@@ -2177,6 +2296,97 @@ class DNSAnalyzer {
             'PW': 'Palau'
         };
         return countryNames[countryCode] || countryCode;
+    }
+
+    // ==========================================
+    // M6: Dangling NS Record Detection
+    // ==========================================
+    
+    // Detect nameservers pointing to unregistered or non-responsive domains
+    async checkDanglingNS(domain) {
+        console.log(`🔍 Checking for dangling NS records for ${domain}`);
+        
+        const result = {
+            domain: domain,
+            nameservers: [],
+            danglingNS: [],
+            issues: [],
+            error: null
+        };
+        
+        try {
+            // Query NS records for the domain
+            const nsRecords = await this.queryDNS(domain, 'NS');
+            
+            if (!nsRecords || nsRecords.length === 0) {
+                result.error = 'No NS records found';
+                return result;
+            }
+            
+            // Check each nameserver
+            for (const record of nsRecords) {
+                const nsHostname = (record.data || '').replace(/\.$/, '').toLowerCase();
+                if (!nsHostname) continue;
+                
+                result.nameservers.push(nsHostname);
+                
+                try {
+                    // Try to resolve the nameserver to an IP
+                    const nsIPs = await this.queryDNS(nsHostname, 'A');
+                    
+                    if (!nsIPs || nsIPs.length === 0) {
+                        // Nameserver doesn't resolve - potential takeover risk
+                        result.danglingNS.push({
+                            nameserver: nsHostname,
+                            status: 'nxdomain',
+                            risk: 'high',
+                            description: 'Nameserver hostname does not resolve to any IP address'
+                        });
+                        
+                        result.issues.push({
+                            type: 'Dangling NS Record',
+                            risk: 'high',
+                            nameserver: nsHostname,
+                            description: `Nameserver ${nsHostname} does not resolve. This could indicate an expired or misconfigured nameserver, potentially allowing NS takeover attacks.`,
+                            recommendation: 'Update or remove this NS record. If the nameserver domain is available for registration, an attacker could register it and take control of your DNS.'
+                        });
+                    } else {
+                        // Check if we can actually query the nameserver
+                        // This is a basic check - in a full implementation we'd do a SOA query
+                        result.nameservers.push({
+                            nameserver: nsHostname,
+                            status: 'resolves',
+                            ips: nsIPs.map(r => r.data)
+                        });
+                    }
+                } catch (error) {
+                    // Resolution failed - could be temporary or permanent
+                    result.danglingNS.push({
+                        nameserver: nsHostname,
+                        status: 'error',
+                        risk: 'medium',
+                        error: error.message,
+                        description: 'Failed to resolve nameserver IP'
+                    });
+                    
+                    result.issues.push({
+                        type: 'NS Resolution Error',
+                        risk: 'medium',
+                        nameserver: nsHostname,
+                        description: `Could not resolve nameserver ${nsHostname}: ${error.message}. This could indicate DNS issues or a potentially dangling NS record.`,
+                        recommendation: 'Verify that this nameserver is correctly configured and accessible.'
+                    });
+                }
+            }
+            
+            console.log(`  ✅ NS check complete: ${result.nameservers.length} NS records, ${result.danglingNS.length} dangling`);
+            
+        } catch (error) {
+            result.error = error.message;
+            console.error(`  ❌ NS check failed:`, error);
+        }
+        
+        return result;
     }
 
     // ==========================================
@@ -2443,6 +2653,107 @@ class DNSAnalyzer {
         return result;
     }
     
+    // L10: Check for DANE/TLSA records (RFC 6698, RFC 7671)
+    async checkDANETLSA(domain) {
+        console.log(`🔍 Checking DANE/TLSA for ${domain}`);
+        
+        const result = {
+            domain: domain,
+            enabled: false,
+            records: [],
+            smtpDANE: false,
+            httpsDANE: false,
+            error: null
+        };
+        
+        try {
+            // Check for SMTP DANE (_25._tcp.domain)
+            const smtpTLSA = await this.queryDNS(`_25._tcp.${domain}`, 'TLSA');
+            if (smtpTLSA && smtpTLSA.length > 0) {
+                result.smtpDANE = true;
+                result.enabled = true;
+                for (const record of smtpTLSA) {
+                    result.records.push({
+                        service: 'SMTP (port 25)',
+                        data: record.data,
+                        parsed: this.parseTLSARecord(record.data)
+                    });
+                }
+                console.log(`  ✅ SMTP DANE enabled: ${smtpTLSA.length} TLSA records`);
+            }
+            
+            // Check for SMTP Submission DANE (_587._tcp.domain)
+            const submissionTLSA = await this.queryDNS(`_587._tcp.${domain}`, 'TLSA');
+            if (submissionTLSA && submissionTLSA.length > 0) {
+                result.enabled = true;
+                for (const record of submissionTLSA) {
+                    result.records.push({
+                        service: 'SMTP Submission (port 587)',
+                        data: record.data,
+                        parsed: this.parseTLSARecord(record.data)
+                    });
+                }
+            }
+            
+            // Check for HTTPS DANE (_443._tcp.domain)
+            const httpsTLSA = await this.queryDNS(`_443._tcp.${domain}`, 'TLSA');
+            if (httpsTLSA && httpsTLSA.length > 0) {
+                result.httpsDANE = true;
+                result.enabled = true;
+                for (const record of httpsTLSA) {
+                    result.records.push({
+                        service: 'HTTPS (port 443)',
+                        data: record.data,
+                        parsed: this.parseTLSARecord(record.data)
+                    });
+                }
+                console.log(`  ✅ HTTPS DANE enabled: ${httpsTLSA.length} TLSA records`);
+            }
+            
+            if (!result.enabled) {
+                result.error = 'No DANE/TLSA records found';
+            }
+            
+        } catch (error) {
+            result.error = error.message;
+            console.warn(`  ⚠️ DANE/TLSA check failed: ${error.message}`);
+        }
+        
+        return result;
+    }
+    
+    // Parse TLSA record data
+    parseTLSARecord(data) {
+        // TLSA format: usage selector matchingType certificateData
+        const parts = (data || '').split(/\s+/);
+        if (parts.length < 4) return { raw: data };
+        
+        const usageTypes = {
+            '0': 'PKIX-TA (CA constraint)',
+            '1': 'PKIX-EE (Service certificate constraint)',
+            '2': 'DANE-TA (Trust anchor assertion)',
+            '3': 'DANE-EE (Domain-issued certificate)'
+        };
+        
+        const selectorTypes = {
+            '0': 'Full certificate',
+            '1': 'SubjectPublicKeyInfo'
+        };
+        
+        const matchingTypes = {
+            '0': 'Full (no hash)',
+            '1': 'SHA-256',
+            '2': 'SHA-512'
+        };
+        
+        return {
+            usage: usageTypes[parts[0]] || `Usage ${parts[0]}`,
+            selector: selectorTypes[parts[1]] || `Selector ${parts[1]}`,
+            matchingType: matchingTypes[parts[2]] || `Matching ${parts[2]}`,
+            certificateData: parts.slice(3).join('')
+        };
+    }
+
     // H7: Check for SMTP TLS Reporting (RFC 8460)
     async checkSMTPTLSReporting(domain) {
         console.log(`🔍 Checking SMTP TLS Reporting for ${domain}`);
