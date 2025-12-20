@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **THC ip.thc.org API integration** - Added 4th subdomain discovery source using THC's reverse DNS database. Complements existing CT log sources (crt.sh, SSLMate) and HackerTarget by providing subdomains discovered through reverse DNS data. CORS compliant, no authentication required. Documentation: https://ip.thc.org/docs/API/subdomain-lookup
 - **Excessive CAA entries detection** - Security finding when more than 3 CAA (Certificate Authority Authorization) entries are found. Having too many authorized CAs weakens security controls and increases attack surface, effectively leaving the security gate wide open.
 - **IP Geolocation API failure notifications** - User-visible notifications when IP-to-location mapping APIs fail or are rate-limited. Notifications appear in the API Issues section with clear error messages.
 - **429 Rate limit detection** - Proper detection and handling of HTTP 429 (Too Many Requests) errors from IP geolocation APIs. When rate-limited, the tool stops making requests to that provider and switches to fallback providers.

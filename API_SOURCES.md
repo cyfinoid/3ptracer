@@ -1,6 +1,6 @@
 # Domain/Subdomain Intelligence API Sources
 
-**Last Updated:** October 27, 2025
+**Last Updated:** December 20, 2025
 **Test Domain:** cyfinoid.com
 
 ## Requirements for Integration
@@ -76,7 +76,73 @@ github.cyfinoid.com,76.76.21.98
 
 ## Working APIs (Tested & Approved for Potential Integration) 🟢
 
-### 1. Wayback Machine CDX API
+### 1. THC ip.thc.org API (Reverse DNS / Subdomain Lookup) ⭐ NEW
+- **Endpoint (Subdomains):** `POST https://ip.thc.org/api/v1/lookup/subdomains`
+- **Endpoint (Reverse DNS):** `POST https://ip.thc.org/api/v1/lookup`
+- **Category:** Reverse DNS / Subdomain Discovery
+- **Method:** POST (JSON body)
+- **Response Format:** JSON
+- **Authentication:** None required
+- **CORS:** ✅ Yes - Full CORS headers (`access-control-allow-origin: *`)
+- **Test Date:** December 20, 2025
+- **Browser Test:** ✅ Confirmed CORS compliant from browser
+- **Test Command (Subdomains):**
+```bash
+curl -L 'https://ip.thc.org/api/v1/lookup/subdomains' \
+-H 'Content-Type: application/json' \
+-H 'Accept: application/json' \
+-d '{"domain": "cyfinoid.com", "limit": 50}'
+```
+- **Response Example:**
+```json
+{
+  "comment": "Free Service!, Do not abuse",
+  "processed_domain": "cyfinoid.com",
+  "matching_records": 4,
+  "domains": [
+    {"domain": "cyfinoid.com", "last_seen_on": "2025-12-14"},
+    {"domain": "fedistats.cyfinoid.com", "last_seen_on": "2025-11-18"},
+    {"domain": "links.cyfinoid.com", "last_seen_on": "2025-12-13"},
+    {"domain": "www.cyfinoid.com", "last_seen_on": "2025-12-14"}
+  ],
+  "next_page_state": ""
+}
+```
+- **Test Command (Reverse DNS - IP to Domains):**
+```bash
+curl -L 'https://ip.thc.org/api/v1/lookup' \
+-H 'Content-Type: application/json' \
+-H 'Accept: application/json' \
+-d '{"ip_address": "1.1.1.0/24", "limit": 10}'
+```
+- **Reverse DNS Response Example:**
+```json
+{
+  "comment": "Free Service!, Do not abuse",
+  "processed_ip_address": "1.1.1.0/24",
+  "matching_records": 68479,
+  "domains": [
+    {"apex_domain": "example.com", "domain": "example.com", "country": "US", "asn": "13335", "organization": "CLOUDFLARENET"}
+  ],
+  "next_page_state": "..."
+}
+```
+- **Integration Potential:** 🟢 **HIGH** - Excellent complement to CT log sources
+- **Rate Limit:** ~0.5 requests/sec replenishment (~249 requests pool)
+- **Features:**
+  - Subdomain discovery from reverse DNS data
+  - IP block to domain mapping (reverse DNS)
+  - `last_seen_on` dates for freshness indication
+  - Pagination support via `next_page_state`
+  - Returns country, ASN, and organization data for reverse lookups
+- **Documentation:** https://ip.thc.org/docs/API/subdomain-lookup
+- **Notes:** 
+  - Data source is different from CT logs - provides complementary subdomain intelligence from reverse DNS records
+  - Could find subdomains not visible in certificate transparency logs
+  - Response times ~1-2 seconds
+  - Free service, community supported
+
+### 2. Wayback Machine CDX API (Historical)
 - **Endpoint:** `https://web.archive.org/cdx/search/cdx?url=*.{domain}&output=json&fl=original&collapse=urlkey`
 - **Category:** Historical Domain/URL Data
 - **Method:** GET
@@ -424,7 +490,7 @@ curl -s -I "API_ENDPOINT"
 ## Recommendations for Future Integration
 
 ### High Priority 🟢
-None currently - existing sources provide comprehensive coverage
+1. **THC ip.thc.org API** - CORS compliant, provides reverse DNS subdomain data that complements CT logs. Ready for integration.
 
 ### Medium Priority 🟡
 1. **Wayback Machine CDX** - Excellent for historical subdomains, needs CORS proxy or workaround

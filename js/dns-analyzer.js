@@ -929,10 +929,12 @@ class DNSAnalyzer {
         console.log(`🔍 Starting optimized subdomain discovery for ${domain}`);
         
         // Phase 1: Start ALL sources in parallel (no waiting)
+        // Sources: crt.sh (CT logs), HackerTarget (DNS), SSLMate (CT logs), THC (reverse DNS)
         const discoveryPromises = [
             this.queryCrtSh(domain),
             this.queryHackerTarget(domain),
-            this.queryCertSpotter(domain)
+            this.queryCertSpotter(domain),
+            this.queryTHC(domain)
         ];
         
         // Phase 2: Wait for all sources with timeout
@@ -1189,6 +1191,68 @@ class DNSAnalyzer {
         } catch (error) {
             console.log(`    ❌ HackerTarget failed:`, error.message);
             this.notifyAPIStatus('HackerTarget', 'error', error.message);
+        }
+    }
+
+    // Query THC ip.thc.org API for subdomains (reverse DNS data)
+    // Documentation: https://ip.thc.org/docs/API/subdomain-lookup
+    async queryTHC(domain) {
+        console.log(`  📡 Querying THC ip.thc.org for subdomains...`);
+        this.stats.apiCalls++;
+        
+        try {
+            const response = await fetch('https://ip.thc.org/api/v1/lookup/subdomains', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    domain: domain,
+                    limit: 500 // Get up to 500 subdomains per request
+                })
+            });
+            
+            if (!response.ok) {
+                const errorMsg = `Service unavailable (${response.status})`;
+                this.notifyAPIStatus('THC Reverse DNS', 'error', errorMsg);
+                throw new Error(`THC query failed: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            // Check for API error response
+            if (data.status === 'error') {
+                throw new Error(data.error || 'Unknown API error');
+            }
+            
+            const totalMatching = data.matching_records || 0;
+            const domains = data.domains || [];
+            console.log(`    📊 THC returned ${domains.length} entries (${totalMatching} total matching)`);
+            
+            // Process entries and add to discovery queue
+            let processedCount = 0;
+            let addedCount = 0;
+            for (const entry of domains) {
+                const subdomain = entry.domain;
+                if (subdomain && subdomain.endsWith(`.${domain}`) && subdomain !== domain) {
+                    processedCount++;
+                    // Check if this subdomain was actually added (not a duplicate)
+                    const beforeCount = this.discoveryQueue.discoveredSubdomains.size;
+                    this.discoveryQueue.addDiscovered(subdomain, 'THC Reverse DNS');
+                    const afterCount = this.discoveryQueue.discoveredSubdomains.size;
+                    if (afterCount > beforeCount) {
+                        addedCount++;
+                    }
+                }
+            }
+            
+            console.log(`    ✅ THC: Processed ${processedCount} entries, added ${addedCount} unique subdomains to discovery queue`);
+            this.notifyAPIStatus('THC Reverse DNS', 'success', `Found ${addedCount} unique subdomains from ${processedCount} entries (${totalMatching} total in database)`);
+            
+        } catch (error) {
+            console.log(`    ❌ THC failed:`, error.message);
+            this.notifyAPIStatus('THC Reverse DNS', 'error', error.message);
         }
     }
 
@@ -2071,6 +2135,266 @@ class DNSAnalyzer {
             'PW': 'Palau'
         };
         return countryNames[countryCode] || countryCode;
+    }
+
+    // ==========================================
+    // SPF Include Chain Analysis (H1 Feature)
+    // ==========================================
+    
+    // Analyze SPF record and recursively resolve include chains
+    // RFC 7208 limits SPF to 10 DNS lookups (include, a, mx, ptr, exists, redirect)
+    async analyzeSPFChain(domain) {
+        console.log(`🔍 Starting SPF chain analysis for ${domain}`);
+        
+        const result = {
+            domain: domain,
+            spfRecord: null,
+            lookupCount: 0,
+            maxLookups: 10, // RFC 7208 limit
+            includeChain: [],
+            mechanisms: [],
+            warnings: [],
+            errors: [],
+            isValid: true,
+            exceededLimit: false,
+            voidLookups: 0,
+            flattenedRecord: null
+        };
+        
+        try {
+            // Get the initial SPF record
+            const spfRecords = await this.queryDNS(domain, 'TXT');
+            if (!spfRecords) {
+                result.errors.push(`No TXT records found for ${domain}`);
+                result.isValid = false;
+                return result;
+            }
+            
+            // Find SPF record
+            const spfRecord = spfRecords.find(r => r.data && r.data.toLowerCase().includes('v=spf1'));
+            if (!spfRecord) {
+                result.errors.push(`No SPF record found for ${domain}`);
+                result.isValid = false;
+                return result;
+            }
+            
+            result.spfRecord = spfRecord.data;
+            console.log(`  📋 Found SPF record: ${spfRecord.data.substring(0, 80)}...`);
+            
+            // Parse and analyze the SPF record recursively
+            await this.parseSPFRecord(spfRecord.data, domain, result, 0, [domain]);
+            
+            // Check if lookup limit was exceeded
+            if (result.lookupCount > result.maxLookups) {
+                result.exceededLimit = true;
+                result.warnings.push(`SPF lookup limit exceeded: ${result.lookupCount}/${result.maxLookups} (RFC 7208 violation)`);
+                result.isValid = false;
+            } else if (result.lookupCount > 7) {
+                result.warnings.push(`SPF approaching lookup limit: ${result.lookupCount}/${result.maxLookups} lookups used`);
+            }
+            
+            // Check for void lookups
+            if (result.voidLookups > 2) {
+                result.warnings.push(`Excessive void lookups detected: ${result.voidLookups} (RFC 7208 recommends max 2)`);
+            }
+            
+            // Generate flattened record suggestion if over limit
+            if (result.exceededLimit) {
+                result.flattenedRecord = this.generateFlattenedSPF(result);
+            }
+            
+            console.log(`  ✅ SPF chain analysis complete: ${result.lookupCount} lookups, ${result.includeChain.length} includes`);
+            
+        } catch (error) {
+            console.error(`  ❌ SPF chain analysis failed:`, error);
+            result.errors.push(`Analysis failed: ${error.message}`);
+            result.isValid = false;
+        }
+        
+        return result;
+    }
+    
+    // Parse SPF record and extract mechanisms
+    async parseSPFRecord(spfData, domain, result, depth, visitedDomains) {
+        if (depth > 10) {
+            result.errors.push(`Maximum recursion depth reached at ${domain}`);
+            return;
+        }
+        
+        // Clean SPF data (remove quotes if present)
+        const cleanData = spfData.replace(/^["']|["']$/g, '').replace(/"\s*"/g, '');
+        
+        // Parse mechanisms
+        const parts = cleanData.split(/\s+/);
+        
+        for (const part of parts) {
+            const lowerPart = part.toLowerCase();
+            
+            // Skip version tag
+            if (lowerPart === 'v=spf1') continue;
+            
+            // Handle include mechanism
+            if (lowerPart.startsWith('include:')) {
+                const includeDomain = part.substring(8);
+                result.lookupCount++;
+                
+                const includeEntry = {
+                    type: 'include',
+                    domain: includeDomain,
+                    depth: depth,
+                    parentDomain: domain,
+                    resolved: false,
+                    spfRecord: null,
+                    error: null
+                };
+                
+                // Prevent infinite loops
+                if (visitedDomains.includes(includeDomain.toLowerCase())) {
+                    includeEntry.error = 'Circular reference detected';
+                    result.warnings.push(`Circular SPF reference: ${includeDomain}`);
+                    result.includeChain.push(includeEntry);
+                    continue;
+                }
+                
+                try {
+                    // Resolve the included domain's SPF
+                    const includedRecords = await this.queryDNS(includeDomain, 'TXT');
+                    if (includedRecords) {
+                        const includedSPF = includedRecords.find(r => r.data && r.data.toLowerCase().includes('v=spf1'));
+                        if (includedSPF) {
+                            includeEntry.resolved = true;
+                            includeEntry.spfRecord = includedSPF.data;
+                            result.includeChain.push(includeEntry);
+                            
+                            // Recursively analyze
+                            await this.parseSPFRecord(
+                                includedSPF.data, 
+                                includeDomain, 
+                                result, 
+                                depth + 1, 
+                                [...visitedDomains, includeDomain.toLowerCase()]
+                            );
+                        } else {
+                            includeEntry.error = 'No SPF record found';
+                            result.voidLookups++;
+                            result.includeChain.push(includeEntry);
+                        }
+                    } else {
+                        includeEntry.error = 'Domain does not exist';
+                        result.voidLookups++;
+                        result.includeChain.push(includeEntry);
+                    }
+                } catch (error) {
+                    includeEntry.error = error.message;
+                    result.voidLookups++;
+                    result.includeChain.push(includeEntry);
+                }
+            }
+            // Handle redirect modifier
+            else if (lowerPart.startsWith('redirect=')) {
+                const redirectDomain = part.substring(9);
+                result.lookupCount++;
+                
+                const redirectEntry = {
+                    type: 'redirect',
+                    domain: redirectDomain,
+                    depth: depth,
+                    parentDomain: domain,
+                    resolved: false,
+                    spfRecord: null,
+                    error: null
+                };
+                
+                if (!visitedDomains.includes(redirectDomain.toLowerCase())) {
+                    try {
+                        const redirectRecords = await this.queryDNS(redirectDomain, 'TXT');
+                        if (redirectRecords) {
+                            const redirectSPF = redirectRecords.find(r => r.data && r.data.toLowerCase().includes('v=spf1'));
+                            if (redirectSPF) {
+                                redirectEntry.resolved = true;
+                                redirectEntry.spfRecord = redirectSPF.data;
+                                result.includeChain.push(redirectEntry);
+                                
+                                await this.parseSPFRecord(
+                                    redirectSPF.data, 
+                                    redirectDomain, 
+                                    result, 
+                                    depth + 1, 
+                                    [...visitedDomains, redirectDomain.toLowerCase()]
+                                );
+                            } else {
+                                redirectEntry.error = 'No SPF record found';
+                                result.voidLookups++;
+                            }
+                        }
+                    } catch (error) {
+                        redirectEntry.error = error.message;
+                        result.voidLookups++;
+                    }
+                }
+                result.includeChain.push(redirectEntry);
+            }
+            // Handle 'a' mechanism (counts as lookup)
+            else if (lowerPart === 'a' || lowerPart.startsWith('a:') || lowerPart.startsWith('a/')) {
+                result.lookupCount++;
+                result.mechanisms.push({ type: 'a', value: part, domain: domain });
+            }
+            // Handle 'mx' mechanism (counts as lookup)
+            else if (lowerPart === 'mx' || lowerPart.startsWith('mx:') || lowerPart.startsWith('mx/')) {
+                result.lookupCount++;
+                result.mechanisms.push({ type: 'mx', value: part, domain: domain });
+            }
+            // Handle 'ptr' mechanism (counts as lookup, deprecated)
+            else if (lowerPart === 'ptr' || lowerPart.startsWith('ptr:')) {
+                result.lookupCount++;
+                result.mechanisms.push({ type: 'ptr', value: part, domain: domain });
+                result.warnings.push(`Deprecated 'ptr' mechanism used in ${domain} (RFC 7208 recommends against use)`);
+            }
+            // Handle 'exists' mechanism (counts as lookup)
+            else if (lowerPart.startsWith('exists:')) {
+                result.lookupCount++;
+                result.mechanisms.push({ type: 'exists', value: part, domain: domain });
+            }
+            // Handle ip4/ip6 mechanisms (no lookup)
+            else if (lowerPart.startsWith('ip4:') || lowerPart.startsWith('ip6:')) {
+                result.mechanisms.push({ type: lowerPart.startsWith('ip4') ? 'ip4' : 'ip6', value: part, domain: domain });
+            }
+            // Handle all mechanism
+            else if (lowerPart === 'all' || lowerPart === '+all' || lowerPart === '-all' || lowerPart === '~all' || lowerPart === '?all') {
+                result.mechanisms.push({ type: 'all', value: part, domain: domain });
+            }
+        }
+    }
+    
+    // Generate a flattened SPF record suggestion
+    generateFlattenedSPF(result) {
+        const ip4s = new Set();
+        const ip6s = new Set();
+        
+        // Collect all IP mechanisms from the chain
+        for (const mech of result.mechanisms) {
+            if (mech.type === 'ip4') {
+                const ip = mech.value.replace(/^[+~?-]?ip4:/i, '');
+                ip4s.add(ip);
+            } else if (mech.type === 'ip6') {
+                const ip = mech.value.replace(/^[+~?-]?ip6:/i, '');
+                ip6s.add(ip);
+            }
+        }
+        
+        // Build flattened record
+        let flattened = 'v=spf1';
+        for (const ip of ip4s) {
+            flattened += ` ip4:${ip}`;
+        }
+        for (const ip of ip6s) {
+            flattened += ` ip6:${ip}`;
+        }
+        flattened += ' -all';
+        
+        return flattened.length > 255 ? 
+            'Record too long - consider splitting across multiple domains' : 
+            flattened;
     }
 
     // Detect subdomain takeover
