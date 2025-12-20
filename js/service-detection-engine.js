@@ -2107,17 +2107,20 @@ class ServiceDetectionEngine {
             const subdomainIP = subdomain.ipAddresses && subdomain.ipAddresses.length > 0 ? 
                 subdomain.ipAddresses[0] : null;
             
+            // Get subdomain name safely
+            const subdomainName = subdomain?.subdomain || subdomain?.name || '';
+            
             // Service-related subdomain detection (only for subdomains with IPs)
-            if (subdomainIP) {
+            if (subdomainIP && subdomainName) {
                 for (const service of servicePatterns) {
                     const serviceRegex = new RegExp(`\\b${service}\\b`, 'i');
-                    if (serviceRegex.test(subdomain.subdomain)) {
+                    if (serviceRegex.test(subdomainName)) {
                         findings.push({
                             type: 'service_subdomain',
                             risk: 'info',
                             description: `Service-related subdomain: ${service.toUpperCase()}`,
                             recommendation: `Explore this subdomain for ${service.toUpperCase()} service insights`,
-                            subdomain: subdomain.subdomain,
+                            subdomain: subdomainName,
                             service: service,
                             ip: subdomainIP
                         });
@@ -2126,7 +2129,7 @@ class ServiceDetectionEngine {
             }
 
             for (const pattern of interestingPatterns) {
-                const fullDomain = subdomain.subdomain;
+                const fullDomain = subdomainName;
                 
                 if (fullDomain) {
                     // Extract subdomain part by removing domain.tld (last 2 parts)
@@ -2265,6 +2268,7 @@ class ServiceDetectionEngine {
         for (const subdomain of subdomains) {
             // Check if subdomain has an IP address
             const ipToCheck = subdomain.ip || (subdomain.ipAddresses && subdomain.ipAddresses.length > 0 ? subdomain.ipAddresses[0] : null);
+            const subName = subdomain?.subdomain || subdomain?.name || 'unknown';
             
             if (ipToCheck) {
                 const privateIPInfo = this.isPrivateIP(ipToCheck);
@@ -2274,7 +2278,7 @@ class ServiceDetectionEngine {
                         risk: 'high',
                         description: `Subdomain points to ${privateIPInfo.type}: ${ipToCheck}`,
                         recommendation: 'Internal IP addresses should not be exposed in public DNS. Review network configuration and remove or restrict access to this subdomain.',
-                        subdomain: subdomain.subdomain,
+                        subdomain: subName,
                         ip: ipToCheck,
                         ipRange: privateIPInfo.range,
                         details: `${privateIPInfo.description}. This exposure in public DNS can reveal internal network topology and may indicate misconfiguration.`
@@ -2284,14 +2288,17 @@ class ServiceDetectionEngine {
         }
         
         for (const subdomain of subdomains) {
+            const subdomainName = subdomain?.subdomain || subdomain?.name || '';
+            if (!subdomainName) continue;
+            
             for (const service of cloudServices) {
-                if (subdomain.subdomain.includes(service)) {
+                if (subdomainName.includes(service)) {
                     issues.push({
                         type: 'exposed_cloud_service',
                         risk: 'medium',
                         description: `Potential exposed cloud service: ${service}`,
                         recommendation: `Verify ${service} service security and access controls`,
-                        subdomain: subdomain.subdomain
+                        subdomain: subdomainName
                     });
                 }
             }
@@ -2419,6 +2426,7 @@ class ServiceDetectionEngine {
         for (const subdomain of subdomains) {
             if (subdomain.certificateInfo && subdomain.certificateInfo.issuer) {
                 const issuer = subdomain.certificateInfo.issuer.toLowerCase();
+                const subName = subdomain?.subdomain || subdomain?.name || 'unknown';
                 
                 // Check if issuer matches any authorized CA
                 const isAuthorized = authorizedCAs.some(ca => 
@@ -2435,7 +2443,7 @@ class ServiceDetectionEngine {
                         risk: 'high',
                         description: `Certificate issued by unauthorized CA: ${caName}`,
                         recommendation: `Certificate authority not authorized in CAA records. Update CAA records to authorize ${caName} or use an authorized CA.`,
-                        subdomain: subdomain.subdomain,
+                        subdomain: subName,
                         issuer: caName,
                         authorizedCAs: authorizedCAs.join(', '),
                         category: 'certificate'

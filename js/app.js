@@ -24,35 +24,39 @@ const app = new App();
 
 // Main analysis function (called from HTML)
 async function analyzeDomain() {
-    // L4: Check if batch mode is enabled
-    const batchModeCheckbox = document.getElementById('batchMode');
-    if (batchModeCheckbox && batchModeCheckbox.checked) {
-        await analyzeBatch();
-        return;
-    }
-    
     const domainInput = document.getElementById('domain');
     const analyzeBtn = document.querySelector('.analyze-btn');
-    const quickScanCheckbox = document.getElementById('quickScan');
-    const domain = domainInput.value.trim();
+    const inputValue = domainInput.value.trim();
     
-    if (!domain) {
+    if (!inputValue) {
         alert('Please enter a domain name');
         return;
     }
     
-    // Check analysis mode options
-    const isQuickScan = quickScanCheckbox?.checked || false;
-    const emailModeCheckbox = document.getElementById('emailMode');
-    const deepScanCheckbox = document.getElementById('deepScan');
-    const isEmailMode = emailModeCheckbox?.checked || false;
-    const isDeepScan = deepScanCheckbox?.checked || false;
+    // L4: Auto-detect batch mode from comma-separated input
+    const domains = inputValue.split(/[,\s]+/)
+        .map(d => d.trim())
+        .filter(d => d && d.includes('.'));
     
-    // Determine analysis mode
-    let modeLabel = 'Analyzing';
-    if (isQuickScan) modeLabel = 'Quick Scanning';
-    else if (isEmailMode) modeLabel = 'Email Analyzing';
-    else if (isDeepScan) modeLabel = 'Deep Scanning';
+    if (domains.length > 1) {
+        await analyzeBatchDomains(domains);
+        return;
+    }
+    
+    const domain = domains[0] || inputValue;
+    
+    // Get scan mode from dropdown
+    const scanModeSelect = document.getElementById('scanMode');
+    const scanMode = scanModeSelect?.value || 'standard';
+    
+    // Determine analysis mode label
+    const modeLabels = {
+        'standard': 'Analyzing',
+        'quick': 'Quick Scanning',
+        'email': 'Email Analyzing',
+        'deep': 'Deep Scanning'
+    };
+    const modeLabel = modeLabels[scanMode] || 'Analyzing';
     
     // Disable button and show progress
     analyzeBtn.disabled = true;
@@ -63,17 +67,18 @@ async function analyzeDomain() {
     document.getElementById('results').style.display = 'none';
     
     try {
-        if (isQuickScan) {
-            // M10: Quick Scan Mode - skip subdomain discovery
-            await app.analysisController.analyzeQuickScan(domain);
-        } else if (isEmailMode) {
-            // L6: Email-focused analysis mode
-            await app.analysisController.analyzeEmailMode(domain);
-        } else if (isDeepScan) {
-            // L7: Deep scan mode
-            await app.analysisController.analyzeDeepScan(domain);
-        } else {
-            await app.analyzeDomain(domain);
+        switch (scanMode) {
+            case 'quick':
+                await app.analysisController.analyzeQuickScan(domain);
+                break;
+            case 'email':
+                await app.analysisController.analyzeEmailMode(domain);
+                break;
+            case 'deep':
+                await app.analysisController.analyzeDeepScan(domain);
+                break;
+            default:
+                await app.analyzeDomain(domain);
         }
         app.saveResults();
     } catch (error) {
@@ -333,44 +338,31 @@ function addCopyLinkButton() {
 let batchResults = [];
 let batchInProgress = false;
 
-function setupBatchMode() {
-    const batchToggle = document.getElementById('batchMode');
-    const domainInput = document.getElementById('domain');
-    const batchTextarea = document.getElementById('batchDomains');
+function setupScanModeDropdown() {
+    // Setup scan mode dropdown description updater
+    const scanModeSelect = document.getElementById('scanMode');
+    const scanModeDesc = document.getElementById('scanModeDesc');
     
-    if (batchToggle) {
-        batchToggle.addEventListener('change', function() {
-            const singleInput = document.querySelector('.single-domain-input');
-            const batchInput = document.querySelector('.batch-domain-input');
-            
-            if (this.checked) {
-                if (singleInput) singleInput.style.display = 'none';
-                if (batchInput) batchInput.style.display = 'block';
-                // Copy current domain to batch textarea
-                if (domainInput && batchTextarea && domainInput.value.trim()) {
-                    batchTextarea.value = domainInput.value.trim();
-                }
-            } else {
-                if (singleInput) singleInput.style.display = 'block';
-                if (batchInput) batchInput.style.display = 'none';
-            }
+    const descriptions = {
+        'standard': 'Full analysis with subdomain discovery',
+        'quick': 'Skip subdomain discovery for faster results',
+        'email': 'Focus on MX, SPF, DKIM, DMARC, MTA-STS, BIMI',
+        'deep': 'Extra thorough analysis (slower, no limits)'
+    };
+    
+    if (scanModeSelect && scanModeDesc) {
+        scanModeSelect.addEventListener('change', function() {
+            scanModeDesc.textContent = descriptions[this.value] || descriptions['standard'];
         });
     }
 }
 
-async function analyzeBatch() {
-    const batchTextarea = document.getElementById('batchDomains');
+async function analyzeBatchDomains(domains) {
     const analyzeBtn = document.querySelector('.analyze-btn');
     const batchProgress = document.getElementById('batchProgress');
     
-    if (!batchTextarea) return;
-    
-    // Parse domains (one per line, comma-separated, or space-separated)
-    const text = batchTextarea.value.trim();
-    const domains = text.split(/[\n,\s]+/)
-        .map(d => d.trim())
-        .filter(d => d && d.includes('.'))
-        .slice(0, 10); // Limit to 10 domains
+    // Limit to 10 domains
+    domains = domains.slice(0, 10);
     
     if (domains.length === 0) {
         alert('Please enter at least one valid domain');
@@ -526,8 +518,18 @@ function exportBatchResults() {
 // ==========================================
 // L3: PWA Service Worker Registration
 // ==========================================
+// Note: Service workers only work over HTTPS or localhost.
+// They do NOT work with file:// protocol (opening HTML directly).
+// This is fine - PWA features are optional enhancements.
+// Core functionality works without service worker.
 
 function registerServiceWorker() {
+    // Skip registration for file:// protocol
+    if (window.location.protocol === 'file:') {
+        console.log('ℹ️ PWA features disabled (file:// protocol). Serve over HTTPS for full PWA support.');
+        return;
+    }
+    
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js')
             .then(registration => {
@@ -548,7 +550,8 @@ function registerServiceWorker() {
                 });
             })
             .catch(error => {
-                console.log('ℹ️ Service Worker not registered (local dev):', error.message);
+                // Common reasons: localhost without HTTPS, insecure context
+                console.log('ℹ️ Service Worker not registered:', error.message);
             });
     }
 }
@@ -571,8 +574,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        // L4: Setup batch mode toggle
-        setupBatchMode();
+        // Setup scan mode dropdown
+        setupScanModeDropdown();
         
         // M3: Check URL parameters first
         const urlParams = getURLParams();

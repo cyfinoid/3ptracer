@@ -1,5 +1,12 @@
 // Service Worker for 3rd Party Tracer PWA
 // Provides offline functionality and caching
+//
+// IMPORTANT: Service workers only work over HTTPS or localhost.
+// They do NOT work with file:// protocol (opening index.html directly in browser).
+// This is a browser security requirement, not a bug.
+//
+// For local development, use: python3 -m http.server 8000
+// Then open: http://localhost:8000
 
 const CACHE_NAME = '3pt-cache-v1.0.3';
 const STATIC_ASSETS = [

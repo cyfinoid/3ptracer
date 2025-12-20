@@ -32,68 +32,25 @@
 
         <main class="content" id="main-content" role="main">
             <div class="input-section" role="search" aria-label="Domain analysis input">
-                <!-- L4: Single domain input (default) -->
-                <div class="form-group single-domain-input">
-                    <label for="domain">Enter Domain Name:</label>
-                    <input type="text" id="domain" placeholder="example.com" autocomplete="off">
-                </div>
-                
-                <!-- L4: Batch domain input (hidden by default) -->
-                <div class="form-group batch-domain-input" style="display: none;">
-                    <label for="batchDomains">Enter Multiple Domains (one per line, max 10):</label>
-                    <textarea id="batchDomains" placeholder="example.com&#10;another-domain.org&#10;third-site.net" rows="5" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; resize: vertical; font-family: inherit; background: var(--input-bg); color: var(--text-color);"></textarea>
+                <div class="form-group">
+                    <label for="domain">Enter Domain Name(s):</label>
+                    <input type="text" id="domain" placeholder="example.com or domain1.com, domain2.com" autocomplete="off">
+                    <small style="display: block; margin-top: 5px; color: var(--text-secondary); font-size: 0.85rem;">
+                        Tip: Enter multiple domains separated by commas for batch analysis
+                    </small>
                     <div id="batchProgress" style="display: none; margin-top: 10px;"></div>
                 </div>
                 
-                <div class="form-group" style="margin-top: 15px; display: flex; gap: 30px; flex-wrap: wrap;">
-                    <!-- L4: Batch mode toggle -->
-                    <div>
-                        <label style="display: inline-flex; align-items: center; cursor: pointer;">
-                            <input type="checkbox" id="batchMode" style="margin-right: 8px;">
-                            Batch Mode
-                        </label>
-                        <small style="display: block; margin-top: 5px; color: #666; font-size: 0.85rem;">
-                            Analyze multiple domains
-                        </small>
-                    </div>
-                    <div>
-                        <label style="display: inline-flex; align-items: center; cursor: pointer;">
-                            <input type="checkbox" id="quickScan" style="margin-right: 8px;">
-                            Quick Scan
-                        </label>
-                        <small style="display: block; margin-top: 5px; color: #666; font-size: 0.85rem;">
-                            Skip subdomain discovery for faster results
-                        </small>
-                    </div>
-                    <!-- L6: Email-focused analysis mode -->
-                    <div>
-                        <label style="display: inline-flex; align-items: center; cursor: pointer;">
-                            <input type="checkbox" id="emailMode" style="margin-right: 8px;">
-                            Email Mode
-                        </label>
-                        <small style="display: block; margin-top: 5px; color: #666; font-size: 0.85rem;">
-                            Focus on email security (MX, SPF, DKIM, DMARC)
-                        </small>
-                    </div>
-                    <!-- L7: Deep scan mode -->
-                    <div>
-                        <label style="display: inline-flex; align-items: center; cursor: pointer;">
-                            <input type="checkbox" id="deepScan" style="margin-right: 8px;">
-                            Deep Scan
-                        </label>
-                        <small style="display: block; margin-top: 5px; color: #666; font-size: 0.85rem;">
-                            Extra thorough analysis (slower)
-                        </small>
-                    </div>
-                    <div>
-                        <label style="display: inline-flex; align-items: center; cursor: pointer;">
-                            <input type="checkbox" id="debugMode" style="margin-right: 8px;">
-                            Debug Mode
-                        </label>
-                        <small style="display: block; margin-top: 5px; color: #666; font-size: 0.85rem;">
-                            Show detailed console output
-                        </small>
-                    </div>
+                <div class="form-group" style="margin-top: 15px; text-align: center;">
+                    <select id="scanMode" style="padding: 10px 35px 10px 15px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-color); font-size: 1rem; cursor: pointer;">
+                        <option value="standard">🔍 Standard Scan</option>
+                        <option value="quick">⚡ Quick Scan</option>
+                        <option value="email">📧 Email Focus</option>
+                        <option value="deep">🔬 Deep Scan</option>
+                    </select>
+                    <small id="scanModeDesc" style="display: block; margin-top: 8px; color: var(--text-secondary); font-size: 0.85rem;">
+                        Full analysis with subdomain discovery
+                    </small>
                 </div>
                 <button class="analyze-btn" onclick="analyzeDomain()">Analyze Domain</button>
             </div>
@@ -263,10 +220,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/shim.min.js" integrity="sha512-nPnkC29R0sikt0ieZaAkk28Ib7Y1Dz7IqePgELH30NnSi1DzG4x+envJAOHz8ZSAveLXAHTR3ai2E9DZUsT8pQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     
     <!-- L1: vis.js for Network Graph Visualization -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/dist/vis-network.min.js" integrity="sha512-rOg/0qC8b08P3dQD0T08bZDRR1+St5WkjFUB6a5AKVRfXVLvLj6HYAHFGP/4WPUh4BTJw+1Pho3e5kEsUu6/xQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/dist/dist/vis-network.min.css" integrity="sha512-Mf9tZz0HEV4sBJ/y57aCNrlzWHuKePfL/GBf+aBvHyCNvS54SE2GjCU91C6CHVdrOAYXjxxJqwUFSR/2gWDzBQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- Note: vis-network doesn't require external CSS for basic functionality -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/dist/vis-network.min.js" integrity="sha512-4/EGWWWj7LIr/e+CvsslZkRk0fHDpf04dydJHoHOH32Mpw8jYU28GNI6mruO7fh/1kq15kSvwhKJftMSlgm0FA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     
     <!-- L2: Leaflet.js for Geographic Map -->
+    <!-- SRI hashes from cdnjs.cloudflare.com/libraries/leaflet/1.9.4 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 

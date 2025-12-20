@@ -183,6 +183,7 @@ class UIRenderer {
         if (!this.statsDiv) return;
 
         const totalSecurityIssues = this.calculateTotalSecurityIssues(securityResults);
+        const scanTime = stats.scanTime ? `${stats.scanTime}s` : '-';
 
         this.statsDiv.innerHTML = `
             <div class="stat-card">
@@ -228,6 +229,14 @@ class UIRenderer {
                     Subdomains found in certificate transparency logs but no longer have active DNS records. 
                     These represent historical infrastructure that may have been decommissioned or moved. 
                     Useful for understanding past domain usage.
+                </div>
+            </div>
+            <div class="stat-card stat-card-time">
+                <div class="stat-number">${scanTime}</div>
+                <div class="stat-label">Scan Time</div>
+                <div class="tooltip">
+                    Total time taken to complete the analysis including DNS queries, 
+                    subdomain discovery, and security checks.
                 </div>
             </div>
         `;
@@ -632,6 +641,11 @@ class UIRenderer {
             );
         }
         
+        // L6: Display DKIM selectors found in Email Mode
+        if (securityResults.emailSecurity?.dkimSelectors?.length > 0) {
+            emailSecurityHtml += this.renderDKIMSelectors(securityResults.emailSecurity.dkimSelectors);
+        }
+        
         // M1: Add DNSSEC visualization
         if (securityResults.dnssec) {
             emailSecurityHtml += this.renderDNSSECStatus(securityResults.dnssec);
@@ -643,6 +657,52 @@ class UIRenderer {
         }
         
         container.innerHTML = html + emailSecurityHtml;
+    }
+
+    // L6: Render DKIM Selectors found in Email Mode
+    renderDKIMSelectors(dkimSelectors) {
+        if (!dkimSelectors || dkimSelectors.length === 0) return '';
+        
+        let html = `
+            <div class="dkim-selectors-section" style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
+                <h4 style="margin-top: 0; color: var(--text-color);">🔑 DKIM Selectors Found (${dkimSelectors.length})</h4>
+                <p style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 15px;">
+                    Email mode probed 12 common DKIM selectors and found the following active ones:
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 10px;">`;
+        
+        for (const dkim of dkimSelectors) {
+            // Identify the email provider from selector name
+            const providerMap = {
+                'google': 'Google Workspace',
+                'selector1': 'Microsoft 365',
+                'selector2': 'Microsoft 365',
+                'k1': 'Mailchimp',
+                'mandrill': 'Mandrill',
+                'amazonses': 'Amazon SES',
+                'sendgrid': 'SendGrid',
+                'mailchimp': 'Mailchimp',
+                'default': 'Default',
+                'mail': 'Generic',
+                'dkim': 'Generic',
+                'smtp': 'Generic'
+            };
+            const provider = providerMap[dkim.selector] || 'Unknown';
+            
+            html += `
+                <div style="padding: 12px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid #28a745;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <strong style="color: var(--text-color);">${dkim.selector}._domainkey</strong>
+                        <span style="font-size: 0.85em; color: var(--text-secondary);">${provider}</span>
+                    </div>
+                    <code style="font-size: 0.75em; word-break: break-all; color: var(--text-secondary); display: block; max-height: 60px; overflow: hidden;">
+                        ${dkim.record.substring(0, 150)}${dkim.record.length > 150 ? '...' : ''}
+                    </code>
+                </div>`;
+        }
+        
+        html += `</div></div>`;
+        return html;
     }
 
     // H1: Render SPF Include Chain Analysis visualization

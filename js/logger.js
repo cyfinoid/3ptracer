@@ -1,51 +1,24 @@
-// Logging Utility - Conditional logging based on debug mode
+// Logging Utility
 class Logger {
-    constructor() {
-        this.debugMode = false;
-    }
-
-    // Set debug mode
-    setDebugMode(enabled) {
-        this.debugMode = enabled;
-        if (enabled) {
-            console.log('🔍 DEBUG MODE ENABLED - Detailed output will be shown');
-        }
-    }
-
-    // Debug logs - only shown when debug mode is enabled
+    // Debug logs
     debug(message, ...args) {
-        if (this.debugMode) {
-            console.log(`🔍 DEBUG: ${message}`, ...args);
-        }
+        console.log(`🔍 ${message}`, ...args);
     }
 
     // JSON debug logging
     debugJSON(message, data) {
-        if (this.debugMode) {
-            console.log(`🔍 DEBUG: ${message}`);
-            console.log(JSON.stringify(data, null, 2));
-        }
+        console.log(`🔍 ${message}`, data);
     }
 
-    // Stats logging - respects debug mode for details
+    // Stats logging
     stats(message, stats) {
-        if (this.debugMode) {
-            console.log(`📊 DEBUG: ${message}`);
-            console.log(JSON.stringify(stats, null, 2));
+        if (stats && stats.totalServices !== undefined && stats.totalSubdomains !== undefined) {
+            console.log(`📊 ${message}: ${stats.totalServices} services, ${stats.totalSubdomains} subdomains`);
         } else {
-            // Show simplified stats in non-debug mode
-            if (stats.totalServices !== undefined && stats.totalSubdomains !== undefined) {
-                console.log(`📊 ${message}: ${stats.totalServices} services, ${stats.totalSubdomains} subdomains`);
-            } else {
-                console.log(`📊 ${message}`);
-            }
+            console.log(`📊 ${message}`);
         }
     }
 }
 
 // Create global logger instance
-const logger = new Logger();
-
-// Make it globally accessible
-window.logger = logger;
-
+window.logger = new Logger();

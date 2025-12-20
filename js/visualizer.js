@@ -365,8 +365,29 @@ class Visualizer {
     // Helper: Create visualization containers in UI
     // ==========================================
 
+    // Check if we have enough data to show visualizations
+    hasVisualizableData() {
+        if (!this.analysisData?.processedData) return false;
+        
+        const data = this.analysisData.processedData;
+        const subdomains = data.subdomains ? 
+            (Array.isArray(data.subdomains) ? data.subdomains : Object.values(data.subdomains)) : [];
+        
+        // Need at least 2 subdomains for meaningful visualizations
+        return subdomains.length >= 2;
+    }
+
     // Create and show all visualizations
     showAllVisualizations(targetSection = 'visualizations') {
+        // Don't show visualizations if there's not enough data
+        if (!this.hasVisualizableData()) {
+            console.log('ℹ️ Skipping visualizations - not enough subdomain data');
+            // Remove existing visualization section if present
+            const existingSection = document.getElementById(targetSection);
+            if (existingSection) existingSection.remove();
+            return;
+        }
+        
         // Find or create the visualization section
         let section = document.getElementById(targetSection);
         

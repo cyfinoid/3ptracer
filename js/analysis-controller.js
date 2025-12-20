@@ -13,8 +13,8 @@ class AnalysisController {
 
     // M10: Quick Scan Mode - skip subdomain discovery for faster results
     async analyzeQuickScan(domain) {
+        const startTime = performance.now();
         try {
-            this.setupDebugMode();
             console.log(`⚡ Starting QUICK SCAN for domain: ${domain}`);
             
             this.clearInternalState(domain);
@@ -34,7 +34,10 @@ class AnalysisController {
             const processedData = this.processResults(mainDomainResults, [], securityResults);
             
             // Phase 4: Display results
-            this.uiRenderer.updateProgress(100, 'Quick scan complete!');
+            const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+            this.uiRenderer.updateProgress(100, `Quick scan complete in ${elapsed}s`);
+            processedData.scanTime = elapsed;
+            if (processedData.stats) processedData.stats.scanTime = elapsed;
             this.displayResults(processedData, securityResults);
             
             // Enable export
@@ -44,7 +47,7 @@ class AnalysisController {
                 window.exportManager.setAnalysisData(enhancedProcessedData, securityResults, domain, interestingFindings);
             }
             
-            console.log(`⚡ Quick scan complete for ${domain}!`);
+            console.log(`⚡ Quick scan complete for ${domain} in ${elapsed}s`);
             
         } catch (error) {
             console.error('Quick scan failed:', error);
@@ -55,8 +58,8 @@ class AnalysisController {
     
     // L6: Email-focused analysis mode
     async analyzeEmailMode(domain) {
+        const startTime = performance.now();
         try {
-            this.setupDebugMode();
             console.log(`📧 Starting EMAIL MODE analysis for domain: ${domain}`);
             
             this.clearInternalState(domain);
@@ -98,7 +101,10 @@ class AnalysisController {
             processedData.analysisMode = 'email';
             
             // Phase 5: Display results
-            this.uiRenderer.updateProgress(100, 'Email analysis complete!');
+            const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+            this.uiRenderer.updateProgress(100, `Email analysis complete in ${elapsed}s`);
+            processedData.scanTime = elapsed;
+            if (processedData.stats) processedData.stats.scanTime = elapsed;
             this.displayResults(processedData, securityResults);
             
             // Enable export
@@ -108,7 +114,7 @@ class AnalysisController {
                 window.exportManager.setAnalysisData(enhancedProcessedData, securityResults, domain, interestingFindings);
             }
             
-            console.log(`📧 Email mode analysis complete for ${domain}!`);
+            console.log(`📧 Email mode analysis complete for ${domain} in ${elapsed}s`);
             
         } catch (error) {
             console.error('Email mode analysis failed:', error);
@@ -119,8 +125,8 @@ class AnalysisController {
     
     // L7: Deep scan mode - thorough analysis
     async analyzeDeepScan(domain) {
+        const startTime = performance.now();
         try {
-            this.setupDebugMode();
             console.log(`🔍 Starting DEEP SCAN for domain: ${domain}`);
             
             this.clearInternalState(domain);
@@ -140,7 +146,7 @@ class AnalysisController {
             
             // Phase 3: Analyze all subdomains (no limit in deep scan)
             this.uiRenderer.updateProgress(40, 'Analyzing all discovered subdomains...');
-            const analyzedSubdomains = await this.analyzeSubdomainsWithProgress(domain, subdomains, Infinity);
+            const analyzedSubdomains = await this.analyzeSubdomainsWithProgress(subdomains, mainDomainResults);
             
             // Phase 4: Extended security analysis
             this.uiRenderer.updateProgress(70, 'Performing extended security analysis...');
@@ -161,7 +167,10 @@ class AnalysisController {
             processedData.analysisMode = 'deep';
             
             // Phase 7: Display results
-            this.uiRenderer.updateProgress(100, 'Deep scan complete!');
+            const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+            this.uiRenderer.updateProgress(100, `Deep scan complete in ${elapsed}s`);
+            processedData.scanTime = elapsed;
+            if (processedData.stats) processedData.stats.scanTime = elapsed;
             this.displayResults(processedData, securityResults);
             
             // Enable export
@@ -177,7 +186,7 @@ class AnalysisController {
                 window.visualizer.showAllVisualizations();
             }
             
-            console.log(`🔍 Deep scan complete for ${domain}!`);
+            console.log(`🔍 Deep scan complete for ${domain} in ${elapsed}s`);
             
         } catch (error) {
             console.error('Deep scan failed:', error);
@@ -209,10 +218,8 @@ class AnalysisController {
 
     // Main analysis method with progressive display
     async analyzeDomain(domain) {
+        const startTime = performance.now();
         try {
-            // Setup debug mode
-            this.setupDebugMode();
-            
             console.log(`🚀 Starting analysis for domain: ${domain}`);
             
             // Clear all internal state
@@ -250,7 +257,10 @@ class AnalysisController {
             const processedData = this.processResults(mainDomainResults, subdomainResults, securityResults);
             
             // Phase 7: Show complete results
-            this.uiRenderer.updateProgress(100, 'Analysis complete!');
+            const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+            this.uiRenderer.updateProgress(100, `Analysis complete in ${elapsed}s`);
+            processedData.scanTime = elapsed;
+            if (processedData.stats) processedData.stats.scanTime = elapsed;
             this.displayResults(processedData, securityResults);
             
             // Enable export functionality with enhanced data
@@ -273,7 +283,7 @@ class AnalysisController {
                 console.error('❌ Export manager not available');
             }
             
-            console.log(`🎉 Analysis complete for ${domain}!`);
+            console.log(`🎉 Analysis complete for ${domain} in ${elapsed}s`);
             if (window.logger) {
                 window.logger.stats('Analysis Complete', processedData.stats);
             }
@@ -287,17 +297,6 @@ class AnalysisController {
         } catch (error) {
             console.error('❌ Analysis failed:', error);
             this.uiRenderer.showError('Analysis failed: ' + error.message);
-        }
-    }
-
-    // Setup debug mode
-    setupDebugMode() {
-        const debugCheckbox = document.getElementById('debugMode');
-        const isEnabled = debugCheckbox ? debugCheckbox.checked : false;
-        
-        // Set global logger debug mode
-        if (window.logger) {
-            window.logger.setDebugMode(isEnabled);
         }
     }
 

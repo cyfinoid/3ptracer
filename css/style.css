@@ -587,6 +587,24 @@ input[type="checkbox"] {
     overflow-y: auto;
 }
 
+/* Scan mode dropdown */
+#scanMode {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+}
+
+#scanMode:focus {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+}
+
+[data-theme="dark"] #scanMode {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23aaa' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+}
+
 /* ==========================================
    L8: Mobile UX Improvements
    ========================================== */
@@ -1048,6 +1066,15 @@ a[aria-label] {
 .stat-card:hover .tooltip {
     visibility: visible;
     opacity: 1;
+}
+
+/* Scan time stat card */
+.stat-card-time .stat-number {
+    color: var(--accent-blue);
+}
+
+.stat-card-time .stat-label::before {
+    content: '⏱ ';
 }
 
 @media (max-width: 768px) {
