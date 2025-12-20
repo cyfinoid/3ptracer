@@ -196,6 +196,35 @@ class ServiceDetectionEngine {
                     patterns: ['cloudcontrol.com'],
                     txtPatterns: ['cloudControl-verification:'],
                     description: 'Platform as a Service'
+                },
+                // H6: Additional CI/CD and DevOps services
+                'CircleCI': {
+                    patterns: ['circleci.com'],
+                    txtPatterns: ['circleci-domain-verification'],
+                    cnamePatterns: ['circleci.com'],
+                    description: 'Continuous integration and delivery platform'
+                },
+                'GitLab': {
+                    patterns: ['gitlab.com'],
+                    txtPatterns: ['gitlab-pages-verification-code=', 'gitlab-verification='],
+                    cnamePatterns: ['gitlab.io', 'gitlab.com'],
+                    description: 'DevOps platform with built-in CI/CD'
+                },
+                'Jenkins': {
+                    patterns: ['jenkins.io'],
+                    txtPatterns: ['jenkins-verification'],
+                    description: 'Open source automation server'
+                },
+                'Travis CI': {
+                    patterns: ['travis-ci.com', 'travis-ci.org'],
+                    txtPatterns: ['travis-ci-domain-verification'],
+                    description: 'Continuous integration service'
+                },
+                'Bitbucket Pipelines': {
+                    patterns: ['bitbucket.io', 'bitbucket.org'],
+                    txtPatterns: ['atlassian-domain-verification'],
+                    cnamePatterns: ['bitbucket.io'],
+                    description: 'Git repository hosting with CI/CD'
                 }
             },
             analytics: {
@@ -507,6 +536,27 @@ class ServiceDetectionEngine {
                     txtPatterns: ['square-verification='],
                     description: 'Payment processing and business tools'
                 },
+                // H6: Additional payment services
+                'Adyen': {
+                    patterns: ['adyen.com'],
+                    txtPatterns: ['adyen-verification', 'adyen-domain-verification'],
+                    description: 'Global payment platform'
+                },
+                'Braintree': {
+                    patterns: ['braintree.com', 'braintreegateway.com'],
+                    txtPatterns: ['braintree-verification'],
+                    description: 'Payment gateway (PayPal)'
+                },
+                'Klarna': {
+                    patterns: ['klarna.com'],
+                    txtPatterns: ['klarna-site-verification'],
+                    description: 'Buy now, pay later service'
+                },
+                'Mollie': {
+                    patterns: ['mollie.com'],
+                    txtPatterns: ['mollie-site-verification'],
+                    description: 'European payment service provider'
+                },
                 'Shopify': {
                     patterns: ['shopify.com', 'myshopify.com'],
                     txtPatterns: ['shopify-verification-code='],
@@ -615,6 +665,27 @@ class ServiceDetectionEngine {
                     patterns: ['zapier.com'],
                     txtPatterns: ['zapier-domain-verification-challenge='],
                     description: 'Workflow automation'
+                },
+                // H6: Additional workflow automation services
+                'Make (Integromat)': {
+                    patterns: ['make.com', 'integromat.com'],
+                    txtPatterns: ['make-domain-verification', 'integromat-domain-verification'],
+                    description: 'Workflow automation and integration platform'
+                },
+                'Tray.io': {
+                    patterns: ['tray.io'],
+                    txtPatterns: ['tray-domain-verification'],
+                    description: 'Enterprise automation platform'
+                },
+                'n8n': {
+                    patterns: ['n8n.io', 'n8n.cloud'],
+                    txtPatterns: ['n8n-domain-verification'],
+                    description: 'Workflow automation tool'
+                },
+                'Workato': {
+                    patterns: ['workato.com'],
+                    txtPatterns: ['workato-domain-verification'],
+                    description: 'Enterprise automation platform'
                 },
                 'Twilio': {
                     patterns: ['twilio.com'],
@@ -764,12 +835,38 @@ class ServiceDetectionEngine {
                 'DataDog': {
                     patterns: ['datadoghq.com'],
                     txtPatterns: ['datadog-domain-verification'],
+                    cnamePatterns: ['datadoghq.com', 'datadoghq.eu'],
                     description: 'Infrastructure monitoring and analytics'
                 },
                 'Site24x7/Zoho': {
                     patterns: ['site24x7.com', 'zoho.com'],
                     txtPatterns: ['site24x7-domain-verification=', 'zoho-verification='],
                     description: 'Website and server monitoring'
+                },
+                // H4: Additional Observability/Monitoring Services
+                'Splunk': {
+                    patterns: ['splunk.com', 'splunkcloud.com'],
+                    txtPatterns: ['splunk-domain-verification', 'splunk-site-verification'],
+                    cnamePatterns: ['splunkcloud.com', 'splunk.com'],
+                    description: 'Data platform for security and observability'
+                },
+                'PagerDuty': {
+                    patterns: ['pagerduty.com'],
+                    txtPatterns: ['pagerduty-domain-verification', 'pagerduty-site-verification'],
+                    cnamePatterns: ['pagerduty.com'],
+                    description: 'Incident management and response platform'
+                },
+                'Grafana Cloud': {
+                    patterns: ['grafana.net', 'grafana.com'],
+                    txtPatterns: ['grafana-domain-verification'],
+                    cnamePatterns: ['grafana.net', 'grafana.com'],
+                    description: 'Observability platform for metrics, logs, and traces'
+                },
+                'Opsgenie': {
+                    patterns: ['opsgenie.com'],
+                    txtPatterns: ['opsgenie-domain-verification'],
+                    cnamePatterns: ['opsgenie.com'],
+                    description: 'Alert and incident management'
                 }
             },
             productivity: {

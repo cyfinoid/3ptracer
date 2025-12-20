@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **SPF Include Chain Analysis (H1)** - Comprehensive SPF record analysis that recursively resolves all `include:` and `redirect=` mechanisms, counts DNS lookups against RFC 7208 limit (max 10), detects void lookups, and provides visual tree representation of the include chain. Warns when approaching or exceeding lookup limits, and suggests flattened SPF records when over limit.
+- **MTA-STS Detection (H2)** - Checks for Mail Transfer Agent Strict Transport Security (RFC 8461) by querying `_mta-sts.{domain}` TXT record. Displays status, version, and policy ID. Adds informational security finding when not configured.
+- **BIMI Detection (H3)** - Checks for Brand Indicators for Message Identification by querying `default._bimi.{domain}` TXT record. Displays logo URL and VMC (Verified Mark Certificate) status when configured.
+- **SMTP TLS Reporting Detection (H7)** - Checks for TLS Reporting (RFC 8460) by querying `_smtp._tls.{domain}` TXT record. Displays reporting addresses when configured.
+- **Email Security Standards Dashboard** - New visual dashboard in Security Analysis section showing status of MTA-STS, BIMI, and TLS-RPT with color-coded indicators and explanations.
+- **Additional Service Detection Patterns (H4)** - Added detection for Splunk, PagerDuty, Grafana Cloud, Opsgenie monitoring services. Enhanced CNAME detection for Datadog, New Relic, Shopify, DocuSign, OneTrust, and Cookiebot.
+- **JSON Export (H5)** - Machine-readable JSON export for automation pipelines. Includes complete analysis data with metadata, services, security results, and interesting findings.
+- **Additional Service Detection Patterns Batch 2 (H6)** - Added CI/CD platforms: CircleCI, GitLab, Travis CI, Jenkins, Bitbucket Pipelines. Workflow automation: Make/Integromat, Tray.io, n8n, Workato. Payment services: Adyen, Braintree, Klarna, Mollie.
 - **THC ip.thc.org API integration** - Added 4th subdomain discovery source using THC's reverse DNS database. Complements existing CT log sources (crt.sh, SSLMate) and HackerTarget by providing subdomains discovered through reverse DNS data. CORS compliant, no authentication required. Documentation: https://ip.thc.org/docs/API/subdomain-lookup
 - **Excessive CAA entries detection** - Security finding when more than 3 CAA (Certificate Authority Authorization) entries are found. Having too many authorized CAs weakens security controls and increases attack surface, effectively leaving the security gate wide open.
 - **IP Geolocation API failure notifications** - User-visible notifications when IP-to-location mapping APIs fail or are rate-limited. Notifications appear in the API Issues section with clear error messages.

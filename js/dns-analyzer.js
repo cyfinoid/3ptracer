@@ -577,7 +577,49 @@ class DNSAnalyzer {
             { pattern: 'mailchimp.com', name: 'Mailchimp', category: 'marketing', description: 'Email marketing platform' },
             
             // Development Tools
-            { pattern: 'gitpod.io', name: 'Gitpod', category: 'development', description: 'Cloud development environment' }
+            { pattern: 'gitpod.io', name: 'Gitpod', category: 'development', description: 'Cloud development environment' },
+            
+            // H4: Additional Monitoring & Observability Services
+            { pattern: 'datadoghq.com', name: 'Datadog', category: 'monitoring', description: 'Infrastructure monitoring and analytics' },
+            { pattern: 'datadoghq.eu', name: 'Datadog', category: 'monitoring', description: 'Infrastructure monitoring and analytics' },
+            { pattern: 'newrelic.com', name: 'New Relic', category: 'monitoring', description: 'Application performance monitoring' },
+            { pattern: 'splunkcloud.com', name: 'Splunk Cloud', category: 'monitoring', description: 'Data platform for security and observability' },
+            { pattern: 'splunk.com', name: 'Splunk', category: 'monitoring', description: 'Data platform for security and observability' },
+            { pattern: 'pagerduty.com', name: 'PagerDuty', category: 'monitoring', description: 'Incident management and response platform' },
+            { pattern: 'grafana.net', name: 'Grafana Cloud', category: 'monitoring', description: 'Observability platform for metrics, logs, and traces' },
+            { pattern: 'grafana.com', name: 'Grafana', category: 'monitoring', description: 'Observability platform for metrics, logs, and traces' },
+            { pattern: 'opsgenie.com', name: 'Opsgenie', category: 'monitoring', description: 'Alert and incident management' },
+            
+            // E-commerce Platforms
+            { pattern: 'myshopify.com', name: 'Shopify', category: 'ecommerce', description: 'E-commerce platform' },
+            { pattern: 'shopify.com', name: 'Shopify', category: 'ecommerce', description: 'E-commerce platform' },
+            
+            // Legal & Compliance
+            { pattern: 'docusign.com', name: 'DocuSign', category: 'legal', description: 'Electronic signature platform' },
+            { pattern: 'onetrust.com', name: 'OneTrust', category: 'compliance', description: 'Privacy and data governance platform' },
+            { pattern: 'cookiebot.com', name: 'Cookiebot', category: 'compliance', description: 'Cookie consent management' },
+            
+            // H6: CI/CD Platforms
+            { pattern: 'circleci.com', name: 'CircleCI', category: 'cicd', description: 'Continuous integration and delivery platform' },
+            { pattern: 'gitlab.io', name: 'GitLab Pages', category: 'cicd', description: 'Static site hosting from GitLab' },
+            { pattern: 'gitlab.com', name: 'GitLab', category: 'cicd', description: 'DevOps platform with built-in CI/CD' },
+            { pattern: 'travis-ci.com', name: 'Travis CI', category: 'cicd', description: 'Continuous integration service' },
+            { pattern: 'bitbucket.io', name: 'Bitbucket', category: 'cicd', description: 'Git repository with CI/CD pipelines' },
+            
+            // Workflow Automation
+            { pattern: 'zapier.com', name: 'Zapier', category: 'automation', description: 'Workflow automation platform' },
+            { pattern: 'make.com', name: 'Make (Integromat)', category: 'automation', description: 'Workflow automation and integration' },
+            { pattern: 'integromat.com', name: 'Make (Integromat)', category: 'automation', description: 'Workflow automation and integration' },
+            { pattern: 'tray.io', name: 'Tray.io', category: 'automation', description: 'Enterprise automation platform' },
+            { pattern: 'workato.com', name: 'Workato', category: 'automation', description: 'Enterprise automation platform' },
+            
+            // Payment Services
+            { pattern: 'adyen.com', name: 'Adyen', category: 'payment', description: 'Global payment platform' },
+            { pattern: 'braintree.com', name: 'Braintree', category: 'payment', description: 'Payment gateway' },
+            { pattern: 'braintreegateway.com', name: 'Braintree', category: 'payment', description: 'Payment gateway' },
+            { pattern: 'klarna.com', name: 'Klarna', category: 'payment', description: 'Buy now, pay later service' },
+            { pattern: 'mollie.com', name: 'Mollie', category: 'payment', description: 'European payment service provider' },
+            { pattern: 'squareup.com', name: 'Square', category: 'payment', description: 'Payment processing platform' }
         ];
         
         for (const service of servicePatterns) {
@@ -2137,6 +2179,323 @@ class DNSAnalyzer {
         return countryNames[countryCode] || countryCode;
     }
 
+    // ==========================================
+    // DNSSEC Validation (M1 Feature)
+    // ==========================================
+    
+    // Check DNSSEC status for a domain
+    async checkDNSSEC(domain) {
+        console.log(`🔐 Checking DNSSEC for ${domain}`);
+        
+        const result = {
+            domain: domain,
+            enabled: false,
+            validated: false,
+            dnskeyPresent: false,
+            dsPresent: false,
+            status: 'unknown',
+            records: {
+                dnskey: [],
+                ds: []
+            },
+            errors: [],
+            details: null
+        };
+        
+        try {
+            // Query DNSKEY records (indicates DNSSEC is configured)
+            const dnskeyRecords = await this.queryDNS(domain, 'DNSKEY');
+            if (dnskeyRecords && dnskeyRecords.length > 0) {
+                result.dnskeyPresent = true;
+                result.records.dnskey = dnskeyRecords.map(r => ({
+                    flags: this.parseDNSKEYFlags(r.data),
+                    algorithm: this.parseDNSKEYAlgorithm(r.data),
+                    data: r.data
+                }));
+                console.log(`  ✅ DNSKEY records found: ${dnskeyRecords.length}`);
+            }
+            
+            // Query DS records at parent zone (validates DNSSEC chain)
+            // For this, we need to query the parent zone's NS
+            // Since we're client-side, we'll check if DS records exist
+            const dsRecords = await this.queryDNS(domain, 'DS');
+            if (dsRecords && dsRecords.length > 0) {
+                result.dsPresent = true;
+                result.records.ds = dsRecords.map(r => ({
+                    keyTag: this.parseDSKeyTag(r.data),
+                    algorithm: this.parseDSAlgorithm(r.data),
+                    digestType: this.parseDSDigestType(r.data),
+                    data: r.data
+                }));
+                console.log(`  ✅ DS records found: ${dsRecords.length}`);
+            }
+            
+            // Determine DNSSEC status
+            if (result.dnskeyPresent && result.dsPresent) {
+                result.enabled = true;
+                result.validated = true;
+                result.status = 'secure';
+                result.details = 'DNSSEC is fully configured and validated through DS records';
+            } else if (result.dnskeyPresent) {
+                result.enabled = true;
+                result.validated = false;
+                result.status = 'insecure';
+                result.details = 'DNSSEC keys are present but DS records are missing at parent zone (chain not validated)';
+            } else {
+                result.enabled = false;
+                result.validated = false;
+                result.status = 'unsigned';
+                result.details = 'DNSSEC is not configured for this domain';
+            }
+            
+            // Check for AD flag in DNS response (authenticated data)
+            // This would require special DoH support, so we note it as a limitation
+            result.adFlagNote = 'Client-side DNSSEC validation has limitations; for full validation, use a DNSSEC-validating resolver';
+            
+            console.log(`  📊 DNSSEC status: ${result.status}`);
+            
+        } catch (error) {
+            console.error(`  ❌ DNSSEC check failed:`, error);
+            result.errors.push(`DNSSEC check failed: ${error.message}`);
+            result.status = 'error';
+        }
+        
+        return result;
+    }
+    
+    // Parse DNSKEY flags from record data
+    parseDNSKEYFlags(data) {
+        // DNSKEY format: flags protocol algorithm public-key
+        // Common flags: 256 (ZSK), 257 (KSK)
+        const parts = data.split(/\s+/);
+        const flags = parseInt(parts[0], 10);
+        if (flags === 257) return { value: 257, type: 'KSK', description: 'Key Signing Key' };
+        if (flags === 256) return { value: 256, type: 'ZSK', description: 'Zone Signing Key' };
+        return { value: flags, type: 'Unknown', description: 'Unknown key type' };
+    }
+    
+    // Parse DNSKEY algorithm from record data
+    parseDNSKEYAlgorithm(data) {
+        const parts = data.split(/\s+/);
+        const algo = parseInt(parts[2], 10);
+        const algorithms = {
+            5: 'RSA/SHA-1',
+            7: 'RSASHA1-NSEC3-SHA1',
+            8: 'RSA/SHA-256',
+            10: 'RSA/SHA-512',
+            13: 'ECDSA/P-256/SHA-256',
+            14: 'ECDSA/P-384/SHA-384',
+            15: 'Ed25519',
+            16: 'Ed448'
+        };
+        return algorithms[algo] || `Algorithm ${algo}`;
+    }
+    
+    // Parse DS key tag from record data
+    parseDSKeyTag(data) {
+        const parts = data.split(/\s+/);
+        return parseInt(parts[0], 10);
+    }
+    
+    // Parse DS algorithm from record data  
+    parseDSAlgorithm(data) {
+        const parts = data.split(/\s+/);
+        const algo = parseInt(parts[1], 10);
+        const algorithms = {
+            5: 'RSA/SHA-1',
+            7: 'RSASHA1-NSEC3-SHA1',
+            8: 'RSA/SHA-256',
+            10: 'RSA/SHA-512',
+            13: 'ECDSA/P-256/SHA-256',
+            14: 'ECDSA/P-384/SHA-384',
+            15: 'Ed25519',
+            16: 'Ed448'
+        };
+        return algorithms[algo] || `Algorithm ${algo}`;
+    }
+    
+    // Parse DS digest type from record data
+    parseDSDigestType(data) {
+        const parts = data.split(/\s+/);
+        const digestType = parseInt(parts[2], 10);
+        const digestTypes = {
+            1: 'SHA-1',
+            2: 'SHA-256',
+            3: 'GOST R 34.11-94',
+            4: 'SHA-384'
+        };
+        return digestTypes[digestType] || `Digest Type ${digestType}`;
+    }
+
+    // ==========================================
+    // Email Security Analysis Features (H1-H3, H7)
+    // ==========================================
+    
+    // H2: Check for MTA-STS (Mail Transfer Agent Strict Transport Security)
+    // RFC 8461 - https://tools.ietf.org/html/rfc8461
+    async checkMTASTS(domain) {
+        console.log(`🔍 Checking MTA-STS for ${domain}`);
+        
+        const result = {
+            domain: domain,
+            enabled: false,
+            record: null,
+            version: null,
+            id: null,
+            error: null
+        };
+        
+        try {
+            // Query _mta-sts.{domain} TXT record
+            const records = await this.queryDNS(`_mta-sts.${domain}`, 'TXT');
+            
+            if (records && records.length > 0) {
+                // Look for v=STSv1 record
+                for (const record of records) {
+                    const data = record.data.replace(/^["']|["']$/g, '');
+                    if (data.toLowerCase().includes('v=stsv1')) {
+                        result.enabled = true;
+                        result.record = data;
+                        
+                        // Parse version
+                        const versionMatch = data.match(/v=([^;]+)/i);
+                        if (versionMatch) result.version = versionMatch[1];
+                        
+                        // Parse ID (changes when policy is updated)
+                        const idMatch = data.match(/id=([^;]+)/i);
+                        if (idMatch) result.id = idMatch[1];
+                        
+                        console.log(`  ✅ MTA-STS enabled: ${data}`);
+                        break;
+                    }
+                }
+                
+                if (!result.enabled) {
+                    result.error = 'TXT record found but no valid MTA-STS policy';
+                }
+            } else {
+                result.error = 'No MTA-STS TXT record found';
+            }
+        } catch (error) {
+            result.error = error.message;
+            console.warn(`  ⚠️ MTA-STS check failed: ${error.message}`);
+        }
+        
+        return result;
+    }
+    
+    // H3: Check for BIMI (Brand Indicators for Message Identification)
+    // RFC draft - https://datatracker.ietf.org/doc/html/draft-blank-ietf-bimi
+    async checkBIMI(domain) {
+        console.log(`🔍 Checking BIMI for ${domain}`);
+        
+        const result = {
+            domain: domain,
+            enabled: false,
+            record: null,
+            version: null,
+            logoUrl: null,
+            certificateUrl: null,
+            selector: 'default',
+            error: null
+        };
+        
+        try {
+            // Query default._bimi.{domain} TXT record
+            const records = await this.queryDNS(`default._bimi.${domain}`, 'TXT');
+            
+            if (records && records.length > 0) {
+                // Look for v=BIMI1 record
+                for (const record of records) {
+                    const data = record.data.replace(/^["']|["']$/g, '');
+                    if (data.toLowerCase().includes('v=bimi1')) {
+                        result.enabled = true;
+                        result.record = data;
+                        
+                        // Parse version
+                        const versionMatch = data.match(/v=([^;]+)/i);
+                        if (versionMatch) result.version = versionMatch[1];
+                        
+                        // Parse logo URL (l= tag)
+                        const logoMatch = data.match(/l=([^;]+)/i);
+                        if (logoMatch) result.logoUrl = logoMatch[1].trim();
+                        
+                        // Parse authority/certificate URL (a= tag)
+                        const authMatch = data.match(/a=([^;]+)/i);
+                        if (authMatch) result.certificateUrl = authMatch[1].trim();
+                        
+                        console.log(`  ✅ BIMI enabled: Logo=${result.logoUrl || 'not set'}`);
+                        break;
+                    }
+                }
+                
+                if (!result.enabled) {
+                    result.error = 'TXT record found but no valid BIMI policy';
+                }
+            } else {
+                result.error = 'No BIMI TXT record found';
+            }
+        } catch (error) {
+            result.error = error.message;
+            console.warn(`  ⚠️ BIMI check failed: ${error.message}`);
+        }
+        
+        return result;
+    }
+    
+    // H7: Check for SMTP TLS Reporting (RFC 8460)
+    async checkSMTPTLSReporting(domain) {
+        console.log(`🔍 Checking SMTP TLS Reporting for ${domain}`);
+        
+        const result = {
+            domain: domain,
+            enabled: false,
+            record: null,
+            version: null,
+            reportingAddresses: [],
+            error: null
+        };
+        
+        try {
+            // Query _smtp._tls.{domain} TXT record
+            const records = await this.queryDNS(`_smtp._tls.${domain}`, 'TXT');
+            
+            if (records && records.length > 0) {
+                for (const record of records) {
+                    const data = record.data.replace(/^["']|["']$/g, '');
+                    if (data.toLowerCase().includes('v=tlsrptv1')) {
+                        result.enabled = true;
+                        result.record = data;
+                        
+                        // Parse version
+                        const versionMatch = data.match(/v=([^;]+)/i);
+                        if (versionMatch) result.version = versionMatch[1];
+                        
+                        // Parse reporting URIs (rua= tag)
+                        const ruaMatch = data.match(/rua=([^;]+)/i);
+                        if (ruaMatch) {
+                            result.reportingAddresses = ruaMatch[1].split(',').map(addr => addr.trim());
+                        }
+                        
+                        console.log(`  ✅ SMTP TLS Reporting enabled: ${result.reportingAddresses.length} reporting addresses`);
+                        break;
+                    }
+                }
+                
+                if (!result.enabled) {
+                    result.error = 'TXT record found but no valid TLS-RPT policy';
+                }
+            } else {
+                result.error = 'No SMTP TLS Reporting TXT record found';
+            }
+        } catch (error) {
+            result.error = error.message;
+            console.warn(`  ⚠️ SMTP TLS Reporting check failed: ${error.message}`);
+        }
+        
+        return result;
+    }
+    
     // ==========================================
     // SPF Include Chain Analysis (H1 Feature)
     // ==========================================

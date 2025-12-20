@@ -617,7 +617,277 @@ class UIRenderer {
             html += '</div>';
         }
         
-        container.innerHTML = html;
+        // H1: Add SPF Chain Analysis visualization if available
+        let emailSecurityHtml = '';
+        if (securityResults.spfChainAnalysis) {
+            emailSecurityHtml += this.renderSPFChainAnalysis(securityResults.spfChainAnalysis);
+        }
+        
+        // H2, H3, H7: Add Email Security Standards visualization
+        if (securityResults.mtaSts || securityResults.bimi || securityResults.smtpTlsReporting) {
+            emailSecurityHtml += this.renderEmailSecurityStandards(
+                securityResults.mtaSts,
+                securityResults.bimi,
+                securityResults.smtpTlsReporting
+            );
+        }
+        
+        container.innerHTML = html + emailSecurityHtml;
+    }
+
+    // H1: Render SPF Include Chain Analysis visualization
+    renderSPFChainAnalysis(spfAnalysis) {
+        if (!spfAnalysis || !spfAnalysis.spfRecord) {
+            return '';
+        }
+        
+        const statusColor = spfAnalysis.exceededLimit ? '#dc3545' : 
+                           spfAnalysis.lookupCount > 7 ? '#ffc107' : '#28a745';
+        const statusIcon = spfAnalysis.exceededLimit ? '🚨' : 
+                          spfAnalysis.lookupCount > 7 ? '⚠️' : '✅';
+        const statusText = spfAnalysis.exceededLimit ? 'LIMIT EXCEEDED' : 
+                          spfAnalysis.lookupCount > 7 ? 'APPROACHING LIMIT' : 'OK';
+        
+        let html = `
+            <div class="spf-chain-analysis" style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
+                <h4 style="margin-top: 0; color: var(--text-color);">📧 SPF Include Chain Analysis</h4>
+                
+                <div style="display: flex; gap: 20px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                        <div style="font-size: 0.9em; color: var(--text-secondary);">DNS Lookups</div>
+                        <div style="font-size: 1.5em; font-weight: bold; color: ${statusColor};">
+                            ${spfAnalysis.lookupCount} / ${spfAnalysis.maxLookups}
+                        </div>
+                        <div style="font-size: 0.8em; color: ${statusColor};">${statusIcon} ${statusText}</div>
+                    </div>
+                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                        <div style="font-size: 0.9em; color: var(--text-secondary);">Include Depth</div>
+                        <div style="font-size: 1.5em; font-weight: bold; color: var(--text-color);">
+                            ${spfAnalysis.includeChain.length}
+                        </div>
+                        <div style="font-size: 0.8em; color: var(--text-secondary);">include/redirect mechanisms</div>
+                    </div>
+                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                        <div style="font-size: 0.9em; color: var(--text-secondary);">Void Lookups</div>
+                        <div style="font-size: 1.5em; font-weight: bold; color: ${spfAnalysis.voidLookups > 2 ? '#ffc107' : 'var(--text-color)'};">
+                            ${spfAnalysis.voidLookups}
+                        </div>
+                        <div style="font-size: 0.8em; color: var(--text-secondary);">RFC 7208 recommends max 2</div>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <strong style="color: var(--text-color);">SPF Record:</strong>
+                    <div style="font-family: monospace; font-size: 0.85em; padding: 10px; background: var(--card-bg); border-radius: 4px; word-break: break-all; color: var(--text-color); margin-top: 5px;">
+                        ${this.escapeHtml(spfAnalysis.spfRecord)}
+                    </div>
+                </div>`;
+        
+        // Display include chain as a tree
+        if (spfAnalysis.includeChain.length > 0) {
+            html += `
+                <div style="margin-bottom: 15px;">
+                    <strong style="color: var(--text-color);">Include Chain:</strong>
+                    <div style="margin-top: 10px; padding: 10px; background: var(--card-bg); border-radius: 4px;">
+                        ${this.renderSPFIncludeTree(spfAnalysis.includeChain, spfAnalysis.domain)}
+                    </div>
+                </div>`;
+        }
+        
+        // Display warnings
+        if (spfAnalysis.warnings.length > 0) {
+            html += `
+                <div style="margin-bottom: 15px;">
+                    <strong style="color: #ffc107;">⚠️ Warnings:</strong>
+                    <ul style="margin: 5px 0; padding-left: 20px; color: var(--text-color);">
+                        ${spfAnalysis.warnings.map(w => `<li>${this.escapeHtml(w)}</li>`).join('')}
+                    </ul>
+                </div>`;
+        }
+        
+        // Display errors
+        if (spfAnalysis.errors.length > 0) {
+            html += `
+                <div style="margin-bottom: 15px;">
+                    <strong style="color: #dc3545;">❌ Errors:</strong>
+                    <ul style="margin: 5px 0; padding-left: 20px; color: var(--text-color);">
+                        ${spfAnalysis.errors.map(e => `<li>${this.escapeHtml(e)}</li>`).join('')}
+                    </ul>
+                </div>`;
+        }
+        
+        // Flattened record suggestion if over limit
+        if (spfAnalysis.flattenedRecord) {
+            html += `
+                <div style="padding: 10px; background: rgba(40, 167, 69, 0.1); border-radius: 4px; border: 1px solid #28a745;">
+                    <strong style="color: #28a745;">💡 Suggestion: Flattened SPF Record</strong>
+                    <div style="font-family: monospace; font-size: 0.85em; padding: 10px; background: var(--card-bg); border-radius: 4px; word-break: break-all; color: var(--text-color); margin-top: 5px;">
+                        ${this.escapeHtml(spfAnalysis.flattenedRecord)}
+                    </div>
+                    <div style="font-size: 0.8em; color: var(--text-secondary); margin-top: 5px;">
+                        Note: This is a simplified suggestion. A complete flattened record would need to resolve all A/MX records.
+                    </div>
+                </div>`;
+        }
+        
+        html += '</div>';
+        return html;
+    }
+    
+    // Render SPF include chain as a tree visualization
+    renderSPFIncludeTree(includeChain, rootDomain) {
+        let html = '<div style="font-family: monospace; font-size: 0.85em; line-height: 1.8;">';
+        
+        // Group by depth
+        const byDepth = {};
+        for (const entry of includeChain) {
+            const depth = entry.depth || 0;
+            if (!byDepth[depth]) byDepth[depth] = [];
+            byDepth[depth].push(entry);
+        }
+        
+        // Render root
+        html += `<div style="color: var(--accent-blue);">📌 ${rootDomain}</div>`;
+        
+        // Render each level
+        for (const entry of includeChain) {
+            const indent = '&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(entry.depth + 1);
+            const icon = entry.type === 'redirect' ? '➡️' : '📦';
+            const statusIcon = entry.resolved ? '✅' : '❌';
+            const statusColor = entry.resolved ? 'var(--text-color)' : '#dc3545';
+            
+            html += `<div style="color: ${statusColor};">`;
+            html += `${indent}├─ ${icon} ${entry.type}: <strong>${entry.domain}</strong> ${statusIcon}`;
+            
+            if (entry.error) {
+                html += ` <span style="color: #dc3545; font-size: 0.9em;">(${entry.error})</span>`;
+            }
+            
+            html += '</div>';
+        }
+        
+        html += '</div>';
+        return html;
+    }
+    
+    // Escape HTML to prevent XSS
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // H2, H3, H7: Render Email Security Standards (MTA-STS, BIMI, SMTP TLS Reporting)
+    renderEmailSecurityStandards(mtaSts, bimi, smtpTlsReporting) {
+        let html = `
+            <div class="email-security-standards" style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
+                <h4 style="margin-top: 0; color: var(--text-color);">📧 Email Security Standards</h4>
+                
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">`;
+        
+        // MTA-STS Card (H2)
+        if (mtaSts) {
+            const statusColor = mtaSts.enabled ? '#28a745' : '#6c757d';
+            const statusIcon = mtaSts.enabled ? '✅' : '❌';
+            const statusText = mtaSts.enabled ? 'Enabled' : 'Not Configured';
+            
+            html += `
+                <div style="flex: 1; min-width: 250px; padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <strong style="color: var(--text-color);">MTA-STS</strong>
+                        <span style="color: ${statusColor}; font-size: 0.9em;">${statusIcon} ${statusText}</span>
+                    </div>
+                    <div style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 8px;">
+                        Mail Transfer Agent Strict Transport Security (RFC 8461)
+                    </div>`;
+            
+            if (mtaSts.enabled) {
+                html += `
+                    <div style="font-size: 0.85em; color: var(--text-color);">
+                        <strong>Version:</strong> ${mtaSts.version || 'Unknown'}<br>
+                        ${mtaSts.id ? `<strong>Policy ID:</strong> ${mtaSts.id}<br>` : ''}
+                    </div>`;
+            } else {
+                html += `
+                    <div style="font-size: 0.8em; color: var(--text-secondary); margin-top: 8px; padding: 8px; background: rgba(108, 117, 125, 0.1); border-radius: 4px;">
+                        💡 MTA-STS prevents SMTP downgrade attacks and man-in-the-middle attacks on email delivery.
+                    </div>`;
+            }
+            
+            html += '</div>';
+        }
+        
+        // BIMI Card (H3)
+        if (bimi) {
+            const statusColor = bimi.enabled ? '#28a745' : '#6c757d';
+            const statusIcon = bimi.enabled ? '✅' : '❌';
+            const statusText = bimi.enabled ? 'Enabled' : 'Not Configured';
+            
+            html += `
+                <div style="flex: 1; min-width: 250px; padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <strong style="color: var(--text-color);">BIMI</strong>
+                        <span style="color: ${statusColor}; font-size: 0.9em;">${statusIcon} ${statusText}</span>
+                    </div>
+                    <div style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 8px;">
+                        Brand Indicators for Message Identification
+                    </div>`;
+            
+            if (bimi.enabled) {
+                html += `
+                    <div style="font-size: 0.85em; color: var(--text-color);">
+                        <strong>Version:</strong> ${bimi.version || 'Unknown'}<br>
+                        ${bimi.logoUrl ? `<strong>Logo:</strong> <a href="${this.escapeHtml(bimi.logoUrl)}" target="_blank" rel="noopener" style="color: var(--accent-blue);">${bimi.logoUrl.substring(0, 40)}...</a><br>` : '<strong>Logo:</strong> Not set<br>'}
+                        ${bimi.certificateUrl ? `<strong>VMC:</strong> Configured<br>` : ''}
+                    </div>`;
+            } else {
+                html += `
+                    <div style="font-size: 0.8em; color: var(--text-secondary); margin-top: 8px; padding: 8px; background: rgba(108, 117, 125, 0.1); border-radius: 4px;">
+                        💡 BIMI displays your brand logo in supported email clients, improving brand recognition and trust.
+                    </div>`;
+            }
+            
+            html += '</div>';
+        }
+        
+        // SMTP TLS Reporting Card (H7)
+        if (smtpTlsReporting) {
+            const statusColor = smtpTlsReporting.enabled ? '#28a745' : '#6c757d';
+            const statusIcon = smtpTlsReporting.enabled ? '✅' : '❌';
+            const statusText = smtpTlsReporting.enabled ? 'Enabled' : 'Not Configured';
+            
+            html += `
+                <div style="flex: 1; min-width: 250px; padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <strong style="color: var(--text-color);">TLS-RPT</strong>
+                        <span style="color: ${statusColor}; font-size: 0.9em;">${statusIcon} ${statusText}</span>
+                    </div>
+                    <div style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 8px;">
+                        SMTP TLS Reporting (RFC 8460)
+                    </div>`;
+            
+            if (smtpTlsReporting.enabled) {
+                html += `
+                    <div style="font-size: 0.85em; color: var(--text-color);">
+                        <strong>Version:</strong> ${smtpTlsReporting.version || 'Unknown'}<br>
+                        <strong>Reports sent to:</strong> ${smtpTlsReporting.reportingAddresses?.length || 0} address(es)
+                    </div>`;
+                if (smtpTlsReporting.reportingAddresses?.length > 0) {
+                    html += `<div style="font-size: 0.8em; color: var(--text-secondary); margin-top: 5px;">${smtpTlsReporting.reportingAddresses.join(', ')}</div>`;
+                }
+            } else {
+                html += `
+                    <div style="font-size: 0.8em; color: var(--text-secondary); margin-top: 8px; padding: 8px; background: rgba(108, 117, 125, 0.1); border-radius: 4px;">
+                        💡 TLS-RPT provides reports about TLS connectivity issues with your mail servers.
+                    </div>`;
+            }
+            
+            html += '</div>';
+        }
+        
+        html += '</div></div>';
+        return html;
     }
 
     // Group security issues by type and subtype

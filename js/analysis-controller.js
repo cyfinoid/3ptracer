@@ -289,8 +289,119 @@ class AnalysisController {
             dnsIssues: [],
             emailIssues: [],
             cloudIssues: [],
-            wildcardCertificates: []
+            wildcardCertificates: [],
+            spfChainAnalysis: null,  // H1: SPF Include Chain Analysis
+            mtaSts: null,            // H2: MTA-STS Detection
+            bimi: null,              // H3: BIMI Detection
+            smtpTlsReporting: null,  // H7: SMTP TLS Reporting
+            dnssec: null             // M1: DNSSEC Validation
         };
+
+        // H1: Perform SPF Include Chain Analysis
+        if (mainDomainResults?.domain) {
+            this.uiRenderer.updateProgress(86, 'Analyzing SPF include chain...');
+            try {
+                securityResults.spfChainAnalysis = await this.dnsAnalyzer.analyzeSPFChain(mainDomainResults.domain);
+                if (window.logger) {
+                    window.logger.debugJSON('SPF chain analysis:', securityResults.spfChainAnalysis);
+                }
+                
+                // Add warnings/errors to email issues if limit exceeded
+                if (securityResults.spfChainAnalysis?.exceededLimit) {
+                    securityResults.emailIssues.push({
+                        type: 'SPF Lookup Limit Exceeded',
+                        risk: 'high',
+                        description: `SPF record exceeds RFC 7208 lookup limit: ${securityResults.spfChainAnalysis.lookupCount}/${securityResults.spfChainAnalysis.maxLookups} lookups. This may cause email delivery failures.`,
+                        recommendation: 'Flatten SPF record by replacing include mechanisms with direct IP addresses, or use SPF macros strategically.'
+                    });
+                }
+                
+                // Add void lookup warnings
+                if (securityResults.spfChainAnalysis?.voidLookups > 2) {
+                    securityResults.emailIssues.push({
+                        type: 'Excessive SPF Void Lookups',
+                        risk: 'medium',
+                        description: `SPF record has ${securityResults.spfChainAnalysis.voidLookups} void lookups (domains that don't exist or have no SPF). RFC 7208 recommends max 2.`,
+                        recommendation: 'Remove invalid include mechanisms from SPF record.'
+                    });
+                }
+            } catch (error) {
+                console.warn('SPF chain analysis failed:', error.message);
+            }
+            
+            // H2: Check MTA-STS
+            this.uiRenderer.updateProgress(87, 'Checking MTA-STS configuration...');
+            try {
+                securityResults.mtaSts = await this.dnsAnalyzer.checkMTASTS(mainDomainResults.domain);
+                if (window.logger) {
+                    window.logger.debugJSON('MTA-STS check:', securityResults.mtaSts);
+                }
+                
+                // Add informational finding if MTA-STS is not enabled
+                if (!securityResults.mtaSts?.enabled) {
+                    securityResults.emailIssues.push({
+                        type: 'MTA-STS Not Configured',
+                        risk: 'low',
+                        description: 'MTA-STS (Mail Transfer Agent Strict Transport Security) is not configured. This email security standard helps prevent man-in-the-middle attacks on email delivery.',
+                        recommendation: 'Consider implementing MTA-STS by creating _mta-sts TXT record and hosting policy file at mta-sts.domain/.well-known/mta-sts.txt'
+                    });
+                }
+            } catch (error) {
+                console.warn('MTA-STS check failed:', error.message);
+            }
+            
+            // H3: Check BIMI
+            this.uiRenderer.updateProgress(87, 'Checking BIMI configuration...');
+            try {
+                securityResults.bimi = await this.dnsAnalyzer.checkBIMI(mainDomainResults.domain);
+                if (window.logger) {
+                    window.logger.debugJSON('BIMI check:', securityResults.bimi);
+                }
+                // BIMI is optional, no warning if not configured
+            } catch (error) {
+                console.warn('BIMI check failed:', error.message);
+            }
+            
+            // H7: Check SMTP TLS Reporting
+            this.uiRenderer.updateProgress(87, 'Checking SMTP TLS Reporting...');
+            try {
+                securityResults.smtpTlsReporting = await this.dnsAnalyzer.checkSMTPTLSReporting(mainDomainResults.domain);
+                if (window.logger) {
+                    window.logger.debugJSON('SMTP TLS Reporting check:', securityResults.smtpTlsReporting);
+                }
+                // TLS-RPT is optional, no warning if not configured
+            } catch (error) {
+                console.warn('SMTP TLS Reporting check failed:', error.message);
+            }
+            
+            // M1: Check DNSSEC
+            this.uiRenderer.updateProgress(88, 'Checking DNSSEC configuration...');
+            try {
+                securityResults.dnssec = await this.dnsAnalyzer.checkDNSSEC(mainDomainResults.domain);
+                if (window.logger) {
+                    window.logger.debugJSON('DNSSEC check:', securityResults.dnssec);
+                }
+                
+                // Add security finding if DNSSEC is not configured
+                if (securityResults.dnssec?.status === 'unsigned') {
+                    securityResults.dnsIssues.push({
+                        type: 'DNSSEC Not Configured',
+                        risk: 'low',
+                        description: 'DNSSEC is not configured for this domain. DNSSEC provides authentication of DNS responses and protection against DNS spoofing.',
+                        recommendation: 'Consider enabling DNSSEC with your domain registrar and DNS provider to enhance DNS security.'
+                    });
+                } else if (securityResults.dnssec?.status === 'insecure') {
+                    securityResults.dnsIssues.push({
+                        type: 'DNSSEC Partially Configured',
+                        risk: 'medium',
+                        description: 'DNSSEC keys are present but the chain of trust is not complete. DS records may be missing at the parent zone.',
+                        recommendation: 'Verify that DS records are published at your domain registrar to complete the DNSSEC chain of trust.'
+                    });
+                }
+            } catch (error) {
+                console.warn('DNSSEC check failed:', error.message);
+            }
+        }
 
         if (mainDomainResults?.records) {
             // DNS security issues
