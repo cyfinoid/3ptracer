@@ -1988,6 +1988,35 @@ a[aria-label] {
     color: var(--text-heading);
 }
 
+.dns-record-count {
+    font-size: 0.65em;
+    font-weight: 400;
+    color: var(--text-secondary);
+    margin-left: 5px;
+}
+
+.collapse-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    justify-content: flex-end;
+}
+
+.collapse-control-btn {
+    padding: 6px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    color: var(--text-color);
+    transition: background 0.2s ease;
+}
+
+.collapse-control-btn:hover {
+    background: var(--hover-bg);
+}
+
 .toggle-icon {
     font-size: 14px;
     color: var(--accent-blue);

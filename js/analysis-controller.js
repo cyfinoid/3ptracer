@@ -10,6 +10,156 @@ class AnalysisController {
         // API notifications
         this.apiNotifications = [];
     }
+    
+    // Extract email addresses from DNS records and categorize them
+    extractEmailAddresses(domain, dmarcRecords, txtRecords, tlsRptRecord) {
+        const emails = {
+            internal: [],  // Emails belonging to the analyzed domain
+            external: []   // Emails belonging to third-party services
+        };
+        
+        // DNS proxy/service emails to exclude
+        const excludePatterns = [
+            /^dns@/i, /^hostmaster@/i, /^postmaster@/i, /^abuse@/i,
+            /^noc@/i, /^admin@/i, /^webmaster@/i, /^root@/i
+        ];
+        
+        const emailRegex = /mailto:([^\s,;>"']+)|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
+        const seenEmails = new Set();
+        
+        const processEmail = (email) => {
+            if (!email) return;
+            
+            // Clean up the email
+            email = email.replace(/^mailto:/i, '').trim().toLowerCase();
+            if (!email || !email.includes('@')) return;
+            
+            // Skip if already seen
+            if (seenEmails.has(email)) return;
+            seenEmails.add(email);
+            
+            // Skip DNS proxy/service emails
+            if (excludePatterns.some(pattern => pattern.test(email))) return;
+            
+            // Extract domain from email
+            const emailDomain = email.split('@')[1];
+            const baseDomain = domain.toLowerCase();
+            
+            // Check if internal (same domain or subdomain of analyzed domain)
+            const isInternal = emailDomain === baseDomain || 
+                              emailDomain.endsWith('.' + baseDomain);
+            
+            const emailInfo = {
+                email: email,
+                domain: emailDomain,
+                source: 'Unknown'
+            };
+            
+            if (isInternal) {
+                emails.internal.push(emailInfo);
+            } else {
+                emails.external.push(emailInfo);
+            }
+        };
+        
+        // Extract from DMARC records (rua and ruf)
+        if (dmarcRecords && dmarcRecords.length > 0) {
+            for (const record of dmarcRecords) {
+                const recordStr = typeof record === 'string' ? record : record.data || '';
+                
+                // Extract rua (aggregate reports)
+                const ruaMatch = recordStr.match(/rua=([^;]+)/i);
+                if (ruaMatch) {
+                    const ruaEmails = ruaMatch[1].split(',');
+                    for (const e of ruaEmails) {
+                        const email = e.replace(/^mailto:/i, '').trim();
+                        if (email.includes('@')) {
+                            const info = { email: email.toLowerCase(), domain: email.split('@')[1], source: 'DMARC (rua)' };
+                            if (!seenEmails.has(info.email)) {
+                                seenEmails.add(info.email);
+                                if (!excludePatterns.some(p => p.test(info.email))) {
+                                    if (info.domain === domain.toLowerCase() || info.domain.endsWith('.' + domain.toLowerCase())) {
+                                        emails.internal.push(info);
+                                    } else {
+                                        emails.external.push(info);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Extract ruf (forensic reports)
+                const rufMatch = recordStr.match(/ruf=([^;]+)/i);
+                if (rufMatch) {
+                    const rufEmails = rufMatch[1].split(',');
+                    for (const e of rufEmails) {
+                        const email = e.replace(/^mailto:/i, '').trim();
+                        if (email.includes('@')) {
+                            const info = { email: email.toLowerCase(), domain: email.split('@')[1], source: 'DMARC (ruf)' };
+                            if (!seenEmails.has(info.email)) {
+                                seenEmails.add(info.email);
+                                if (!excludePatterns.some(p => p.test(info.email))) {
+                                    if (info.domain === domain.toLowerCase() || info.domain.endsWith('.' + domain.toLowerCase())) {
+                                        emails.internal.push(info);
+                                    } else {
+                                        emails.external.push(info);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Extract from TLS-RPT record
+        if (tlsRptRecord && tlsRptRecord.reportingAddresses) {
+            for (const addr of tlsRptRecord.reportingAddresses) {
+                const email = addr.replace(/^mailto:/i, '').trim().toLowerCase();
+                if (email.includes('@') && !seenEmails.has(email)) {
+                    seenEmails.add(email);
+                    if (!excludePatterns.some(p => p.test(email))) {
+                        const info = { email, domain: email.split('@')[1], source: 'TLS-RPT' };
+                        if (info.domain === domain.toLowerCase() || info.domain.endsWith('.' + domain.toLowerCase())) {
+                            emails.internal.push(info);
+                        } else {
+                            emails.external.push(info);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Extract from TXT records (look for email patterns)
+        if (txtRecords && txtRecords.length > 0) {
+            for (const record of txtRecords) {
+                const recordStr = typeof record === 'string' ? record : record.data || '';
+                
+                // Skip SPF records (they don't contain emails we want)
+                if (recordStr.startsWith('v=spf1')) continue;
+                
+                // Find all email patterns
+                let match;
+                while ((match = emailRegex.exec(recordStr)) !== null) {
+                    const email = (match[1] || match[2]).toLowerCase();
+                    if (email && !seenEmails.has(email)) {
+                        seenEmails.add(email);
+                        if (!excludePatterns.some(p => p.test(email))) {
+                            const info = { email, domain: email.split('@')[1], source: 'TXT Record' };
+                            if (info.domain === domain.toLowerCase() || info.domain.endsWith('.' + domain.toLowerCase())) {
+                                emails.internal.push(info);
+                            } else {
+                                emails.external.push(info);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        return emails;
+    }
 
     // M10: Quick Scan Mode - skip subdomain discovery for faster results
     async analyzeQuickScan(domain) {
@@ -32,6 +182,8 @@ class AnalysisController {
             // Phase 3: Final processing
             this.uiRenderer.updateProgress(90, 'Finalizing results...');
             const processedData = this.processResults(mainDomainResults, [], securityResults);
+            processedData.analysisMode = 'quick';
+            if (processedData.stats) processedData.stats.analysisMode = 'quick';
             
             // Phase 4: Display results
             const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
@@ -57,166 +209,178 @@ class AnalysisController {
     }
     
     // L6: Email-focused analysis mode
+    // Email Scan - ONLY email-specific records (MX, SPF, DKIM, DMARC, MTA-STS, BIMI, TLSRPT)
     async analyzeEmailMode(domain) {
         const startTime = performance.now();
         try {
-            console.log(`📧 Starting EMAIL MODE analysis for domain: ${domain}`);
+            console.log(`📧 Starting EMAIL SCAN for domain: ${domain}`);
             
             this.clearInternalState(domain);
             this.setupAPINotifications();
-            this.addAPINotification('Email Mode', 'Running email-focused analysis - checking MX, SPF, DKIM, DMARC, MTA-STS, BIMI, TLSRPT', 'info');
+            this.addAPINotification('Email Scan', 'Querying email records only: MX, SPF, DKIM, DMARC, MTA-STS, BIMI, TLSRPT', 'info');
             
-            // Phase 1: Analyze main domain (for email records)
-            this.uiRenderer.updateProgress(10, 'Querying email-related DNS records...');
-            const mainDomainResults = await this.analyzeMainDomain(domain);
+            // Phase 1: Query MX records
+            this.uiRenderer.updateProgress(10, 'Querying MX records...');
+            const mxRecords = await this.dnsAnalyzer.queryDNS(domain, 'MX') || [];
+            console.log(`📬 MX Records found: ${mxRecords.length}`, mxRecords);
             
-            // Phase 2: Additional DKIM selector checks
-            this.uiRenderer.updateProgress(40, 'Checking common DKIM selectors...');
+            // Phase 2: Query TXT records (SPF, DMARC)
+            this.uiRenderer.updateProgress(20, 'Querying SPF and TXT records...');
+            const txtRecords = await this.dnsAnalyzer.queryDNS(domain, 'TXT') || [];
+            const dmarcRecords = await this.dnsAnalyzer.queryDNS(`_dmarc.${domain}`, 'TXT') || [];
+            
+            // Phase 3: SPF Chain Analysis (recursive)
+            this.uiRenderer.updateProgress(30, 'Analyzing SPF include chain...');
+            const spfChainResult = await this.dnsAnalyzer.analyzeSPFChain(domain);
+            
+            // Phase 4: Check DKIM selectors (12 common ones)
+            this.uiRenderer.updateProgress(45, 'Checking common DKIM selectors...');
             const dkimSelectors = ['google', 'selector1', 'selector2', 'k1', 'default', 'mail', 'dkim', 'smtp', 'mandrill', 'amazonses', 'sendgrid', 'mailchimp'];
             const dkimResults = [];
             
             for (const selector of dkimSelectors) {
                 try {
-                    const dkimRecord = await this.dnsAnalyzer.resolveDNS(`${selector}._domainkey.${domain}`, 'TXT');
+                    const dkimRecord = await this.dnsAnalyzer.queryDNS(`${selector}._domainkey.${domain}`, 'TXT');
                     if (dkimRecord && dkimRecord.length > 0) {
-                        dkimResults.push({ selector, record: dkimRecord[0] });
+                        // Extract actual record data from DNS response object
+                        const recordData = dkimRecord[0];
+                        const recordStr = typeof recordData === 'string' ? recordData : (recordData.data || String(recordData));
+                        dkimResults.push({ selector, record: recordStr });
+                        console.log(`  ✅ Found DKIM selector: ${selector}`);
                     }
                 } catch (e) {
                     // DKIM selector not found, continue
                 }
             }
+            console.log(`📧 DKIM scan complete: ${dkimResults.length} selectors found`);
             
-            // Phase 3: Security analysis focused on email
-            this.uiRenderer.updateProgress(70, 'Analyzing email security posture...');
-            const securityResults = await this.performSecurityAnalysis(mainDomainResults, []);
+            // Phase 5: MTA-STS
+            this.uiRenderer.updateProgress(65, 'Checking MTA-STS...');
+            const mtaStsRecord = await this.dnsAnalyzer.checkMTASTS(domain);
             
-            // Add DKIM selector results
-            securityResults.emailSecurity = securityResults.emailSecurity || {};
-            securityResults.emailSecurity.dkimSelectors = dkimResults;
-            securityResults.emailSecurity.isEmailFocused = true;
+            // Phase 6: BIMI
+            this.uiRenderer.updateProgress(75, 'Checking BIMI...');
+            const bimiRecord = await this.dnsAnalyzer.checkBIMI(domain);
             
-            // Phase 4: Final processing
-            this.uiRenderer.updateProgress(90, 'Finalizing email analysis...');
-            const processedData = this.processResults(mainDomainResults, [], securityResults);
-            processedData.analysisMode = 'email';
+            // Phase 7: SMTP TLS Reporting
+            this.uiRenderer.updateProgress(85, 'Checking SMTP TLS Reporting...');
+            const tlsRptRecord = await this.dnsAnalyzer.checkSMTPTLSReporting(domain);
             
-            // Phase 5: Display results
+            // Extract SPF record from TXT records
+            const spfRecords = txtRecords.filter(r => {
+                const data = typeof r === 'string' ? r : (r.data || '');
+                return data.toLowerCase().startsWith('v=spf1');
+            });
+            console.log(`📧 SPF Records found:`, spfRecords);
+            
+            // Build email-only results
+            const emailResults = {
+                domain: domain,
+                records: {
+                    MX: mxRecords,
+                    TXT: txtRecords,
+                    SPF: spfRecords,
+                    DMARC: dmarcRecords
+                },
+                dkimSelectors: dkimResults,
+                spfChain: spfChainResult,
+                mtaSts: mtaStsRecord,
+                bimi: bimiRecord,
+                tlsRpt: tlsRptRecord
+            };
+            
+            // Phase 8: Analyze email security
+            this.uiRenderer.updateProgress(95, 'Analyzing email security posture...');
+            
+            // Extract email addresses from DNS records
+            const extractedEmails = this.extractEmailAddresses(domain, dmarcRecords, txtRecords, tlsRptRecord);
+            
+            const securityResults = {
+                emailSecurity: {
+                    isEmailFocused: true,
+                    dkimSelectors: dkimResults,
+                    mxRecords: mxRecords,
+                    dmarcRecords: dmarcRecords,
+                    txtRecords: txtRecords,
+                    extractedEmails: extractedEmails
+                },
+                spfChainAnalysis: spfChainResult,
+                mtaSts: mtaStsRecord,
+                bimi: bimiRecord,
+                smtpTlsReporting: tlsRptRecord,
+                emailIssues: this.serviceDetector.detectEmailSecurityIssues(emailResults.records)
+            };
+            
+            // Detect services from email records
+            const allDetectedServices = this.serviceDetector.detectServices(emailResults.records, domain);
+            // Filter to only email-related services
+            const emailServiceCategories = ['email', 'email-security'];
+            const emailServiceKeywords = ['mail', 'smtp', 'mx', 'dkim', 'spf', 'dmarc', 'email', 'sendgrid', 'mailgun', 'ses', 'postmark', 'mandrill', 'mailchimp', 'proofpoint', 'mimecast', 'barracuda', 'sophos', 'outlook', 'workspace', 'zoho'];
+            // Note: Don't include generic terms like 'google' or 'microsoft' as they match non-email services
+            
+            const emailServices = new Map();
+            
+            // Handle Array return from detectServices (returns array of service objects)
+            const servicesArray = Array.isArray(allDetectedServices) ? allDetectedServices : [];
+            
+            for (const service of servicesArray) {
+                const category = (service.category || '').toLowerCase();
+                const name = (service.name || '').toLowerCase();
+                const description = (service.description || '').toLowerCase();
+                
+                const isEmailCategory = emailServiceCategories.some(cat => category.includes(cat));
+                const isEmailService = emailServiceKeywords.some(kw => 
+                    name.includes(kw) || description.includes(kw)
+                );
+                
+                if (isEmailCategory || isEmailService) {
+                    emailServices.set(service.name, service);
+                }
+            }
+            
+            // Build minimal processed data for email-only results
+            const processedData = {
+                analysisMode: 'email',
+                stats: {
+                    analysisMode: 'email',
+                    domain: domain,
+                    totalServices: emailServices.size,
+                    mxRecords: mxRecords.length,
+                    dkimSelectors: dkimResults.length,
+                    spfLookups: spfChainResult?.lookupCount || 0
+                },
+                services: emailServices,
+                subdomains: [],
+                dnsRecords: [], // Email scan shows records in security section instead
+                emailResults: emailResults
+            };
+            
+            // Phase 9: Display results
             const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
-            this.uiRenderer.updateProgress(100, `Email analysis complete in ${elapsed}s`);
+            this.uiRenderer.updateProgress(100, `Email scan complete in ${elapsed}s`);
             processedData.scanTime = elapsed;
-            if (processedData.stats) processedData.stats.scanTime = elapsed;
+            processedData.stats.scanTime = elapsed;
+            
             this.displayResults(processedData, securityResults);
             
             // Enable export
             if (window.exportManager) {
-                const interestingFindings = this.getInterestingFindings(processedData);
+                const interestingFindings = [];
                 const enhancedProcessedData = { ...processedData, dataProcessor: this.dataProcessor };
                 window.exportManager.setAnalysisData(enhancedProcessedData, securityResults, domain, interestingFindings);
             }
             
-            console.log(`📧 Email mode analysis complete for ${domain} in ${elapsed}s`);
+            console.log(`📧 Email scan complete for ${domain} in ${elapsed}s`);
             
         } catch (error) {
-            console.error('Email mode analysis failed:', error);
-            this.uiRenderer.showError('Email analysis failed: ' + error.message);
+            console.error('Email scan failed:', error);
+            this.uiRenderer.showError('Email scan failed: ' + error.message);
             throw error;
         }
     }
     
     // L7: Deep scan mode - thorough analysis
-    async analyzeDeepScan(domain) {
-        const startTime = performance.now();
-        try {
-            console.log(`🔍 Starting DEEP SCAN for domain: ${domain}`);
-            
-            this.clearInternalState(domain);
-            this.setupAPINotifications();
-            this.addAPINotification('Deep Scan', 'Running thorough analysis - this may take longer', 'info');
-            
-            // Phase 1: Analyze main domain
-            this.uiRenderer.updateProgress(5, 'Analyzing main domain...');
-            const mainDomainResults = await this.analyzeMainDomain(domain);
-            
-            // Display progressive results
-            await this.displayProgressiveResults(mainDomainResults, [], [], {});
-            
-            // Phase 2: Extended subdomain discovery
-            this.uiRenderer.updateProgress(15, 'Discovering subdomains (extended sources)...');
-            const subdomains = await this.discoverSubdomainsWithProgress(domain);
-            
-            // Phase 3: Analyze all subdomains (no limit in deep scan)
-            this.uiRenderer.updateProgress(40, 'Analyzing all discovered subdomains...');
-            const analyzedSubdomains = await this.analyzeSubdomainsWithProgress(subdomains, mainDomainResults);
-            
-            // Phase 4: Extended security analysis
-            this.uiRenderer.updateProgress(70, 'Performing extended security analysis...');
-            const securityResults = await this.performSecurityAnalysis(mainDomainResults, analyzedSubdomains);
-            
-            // Phase 5: Additional checks
-            this.uiRenderer.updateProgress(85, 'Running additional security checks...');
-            
-            // Check for common misconfigurations
-            securityResults.deepScanFindings = {
-                wildcardDNS: await this.checkWildcardDNS(domain),
-                zoneTranfer: await this.checkZoneTransfer(domain, mainDomainResults.records?.NS || [])
-            };
-            
-            // Phase 6: Final processing
-            this.uiRenderer.updateProgress(95, 'Finalizing deep scan results...');
-            const processedData = this.processResults(mainDomainResults, analyzedSubdomains, securityResults);
-            processedData.analysisMode = 'deep';
-            
-            // Phase 7: Display results
-            const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
-            this.uiRenderer.updateProgress(100, `Deep scan complete in ${elapsed}s`);
-            processedData.scanTime = elapsed;
-            if (processedData.stats) processedData.stats.scanTime = elapsed;
-            this.displayResults(processedData, securityResults);
-            
-            // Enable export
-            if (window.exportManager) {
-                const interestingFindings = this.getInterestingFindings(processedData);
-                const enhancedProcessedData = { ...processedData, dataProcessor: this.dataProcessor };
-                window.exportManager.setAnalysisData(enhancedProcessedData, securityResults, domain, interestingFindings);
-            }
-            
-            // Setup visualizations
-            if (window.visualizer) {
-                window.visualizer.setData(processedData, securityResults);
-                window.visualizer.showAllVisualizations();
-            }
-            
-            console.log(`🔍 Deep scan complete for ${domain} in ${elapsed}s`);
-            
-        } catch (error) {
-            console.error('Deep scan failed:', error);
-            this.uiRenderer.showError('Deep scan failed: ' + error.message);
-            throw error;
-        }
-    }
-    
-    // Helper: Check for wildcard DNS
-    async checkWildcardDNS(domain) {
-        try {
-            const randomSub = `random-nonexistent-${Date.now()}.${domain}`;
-            const result = await this.dnsAnalyzer.resolveDNS(randomSub, 'A');
-            return result && result.length > 0 ? { detected: true, ip: result[0] } : { detected: false };
-        } catch (e) {
-            return { detected: false };
-        }
-    }
-    
-    // Helper: Check zone transfer (AXFR) - usually blocked but worth checking
-    async checkZoneTransfer(domain, nsRecords) {
-        // Zone transfer check is typically blocked - we just note if NS records are configured
-        return {
-            nsCount: nsRecords.length,
-            nsRecords: nsRecords.slice(0, 5),
-            note: 'Zone transfer (AXFR) checks require specialized tools'
-        };
-    }
-
-    // Main analysis method with progressive display
+    // Main analysis method with progressive display (Standard Scan)
     async analyzeDomain(domain) {
         const startTime = performance.now();
         try {
@@ -255,6 +419,8 @@ class AnalysisController {
             // Phase 6: Final processing and display
             this.uiRenderer.updateProgress(95, 'Finalizing results...');
             const processedData = this.processResults(mainDomainResults, subdomainResults, securityResults);
+            processedData.analysisMode = 'standard';
+            if (processedData.stats) processedData.stats.analysisMode = 'standard';
             
             // Phase 7: Show complete results
             const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
@@ -712,7 +878,9 @@ class AnalysisController {
         
         securityResults.dnsRecords = dnsRecords;
 
-        const totalIssues = Object.values(securityResults).reduce((sum, issues) => sum + issues.length, 0);
+        // Only count arrays that represent security issues (not analysis results like spfChainAnalysis, mtaSts, etc.)
+        const issueArrays = ['takeovers', 'dnsIssues', 'emailIssues', 'cloudIssues', 'wildcardCertificates'];
+        const totalIssues = issueArrays.reduce((sum, key) => sum + (securityResults[key]?.length || 0), 0);
         console.log(`✅ Security analysis complete: ${totalIssues} issues found`);
         
         return securityResults;
@@ -943,6 +1111,9 @@ class AnalysisController {
         const serviceDetector = new ServiceDetectionEngine();
         const dataProcessor = new DataProcessor();
         const uiRenderer = new UIRenderer();
+
+        // Expose uiRenderer globally for collapse/expand button onclick handlers
+        window.uiRenderer = uiRenderer;
 
         return new AnalysisController({
             dnsAnalyzer,

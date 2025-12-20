@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Simplified Scan Modes** - Reduced from 5 scan modes to 3: Standard Scan (full analysis with subdomain discovery from all 4 sources), Quick Scan (domain-only checks, no subdomain discovery), and Email Scan (email records only: MX, SPF, DKIM, DMARC, MTA-STS, BIMI, TLSRPT).
+- **Streamlined Export Options** - Removed CSV, Save Analysis, History, and Compare exports. Kept JSON, PDF, Excel (XLSX), Markdown, and Copy Link for essential export needs.
+- **Collapse/Expand All Controls** - Added "Collapse All" and "Expand All" buttons at the top of results to quickly manage all collapsible sections.
+- **DNS Record Counts in Headers** - Section headers now show the count of DNS records that contributed to findings (e.g., "Third-Party Services (15) from 42 DNS records").
+
+### Removed
+- **Deep Scan Mode** - Merged functionality into Standard Scan which now performs full analysis including subdomain discovery from all sources.
+- **CSV Export** - Removed in favor of more comprehensive export options (JSON, XLSX, Markdown).
+- **Analysis Snapshots** - Removed Save Analysis and History features to simplify the UI.
+- **Comparison View** - Removed analysis comparison feature.
+
 ### Added
 - **SPF Include Chain Analysis (H1)** - Comprehensive SPF record analysis that recursively resolves all `include:` and `redirect=` mechanisms, counts DNS lookups against RFC 7208 limit (max 10), detects void lookups, and provides visual tree representation of the include chain. Warns when approaching or exceeding lookup limits, and suggests flattened SPF records when over limit.
 - **MTA-STS Detection (H2)** - Checks for Mail Transfer Agent Strict Transport Security (RFC 8461) by querying `_mta-sts.{domain}` TXT record. Displays status, version, and policy ID. Adds informational security finding when not configured.
@@ -17,23 +29,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **JSON Export (H5)** - Machine-readable JSON export for automation pipelines. Includes complete analysis data with metadata, services, security results, and interesting findings.
 - **Additional Service Detection Patterns Batch 2 (H6)** - Added CI/CD platforms: CircleCI, GitLab, Travis CI, Jenkins, Bitbucket Pipelines. Workflow automation: Make/Integromat, Tray.io, n8n, Workato. Payment services: Adyen, Braintree, Klarna, Mollie.
 - **DNSSEC Validation (M1)** - Checks DNSSEC configuration by querying DNSKEY and DS records. Reports status as Secure (fully validated), Insecure (keys present but not validated), or Unsigned (not configured). Shows key types (KSK/ZSK), algorithms, and DS key tags.
-- **Analysis Snapshots (M2)** - Save and load analysis results to browser localStorage. Includes "Save Analysis" and "History" buttons in export section. Stores up to 20 snapshots with auto-cleanup when approaching storage limits. Load historical analyses, export them to JSON, or delete them individually.
 - **Shareable URL Links (M3)** - Share domain analysis with URL parameters. Use `?d=domain.com` to pre-fill domain or `?d=domain.com&auto=1` to auto-start analysis. "Copy Link" button generates shareable URLs for quick sharing.
-- **Keyboard Shortcuts (M4)** - Power user keyboard shortcuts: Ctrl+Enter (analyze), Ctrl+E (export PDF), Ctrl+J (export JSON), Ctrl+S (save), Ctrl+D (toggle theme), Ctrl+H (history), / (focus input), ? (show help).
+- **Keyboard Shortcuts (M4)** - Power user keyboard shortcuts: Ctrl+Enter (analyze), Ctrl+E (export PDF), Ctrl+J (export JSON), Ctrl+D (toggle theme), / (focus input), ? (show help).
 - **SURBL and URIBL Blocklist Integration (M5)** - Added SURBL (multi.surbl.org) and URIBL (black.uribl.com) blocklist checking alongside existing Spamhaus DBL. Checks domains and subdomains against all three blocklists in parallel for comprehensive threat detection.
 - **Dangling NS Record Detection (M6)** - Detects nameservers that point to unregistered or non-responsive domains. Identifies potential NS takeover vulnerabilities where attackers could register the nameserver domain to hijack DNS.
 - **Markdown Export (M7)** - Export analysis as GitHub/GitLab-ready Markdown report. Includes summary statistics, services, security issues, and subdomains in a clean, readable format.
-- **CSV Export (M8)** - Export subdomains list as CSV file for spreadsheet analysis. Includes subdomain, IP, provider, ASN, country, CNAME, and source columns.
-- **Analysis Comparison View (M9)** - Compare two saved analyses side-by-side. Shows new/removed subdomains and services between snapshots. Useful for tracking infrastructure changes over time.
-- **Quick Scan Mode (M10)** - Fast analysis mode that skips subdomain discovery. Analyzes only the main domain DNS records for quick security checks. Toggle via checkbox in the UI.
+- **Quick Scan Mode (M10)** - Fast analysis mode that skips subdomain discovery. Analyzes only the main domain DNS records for quick security checks. Select from scan mode dropdown.
 - **DANE/TLSA Record Checking (L10)** - Checks for DANE (DNS-based Authentication of Named Entities) by querying TLSA records for SMTP (port 25, 587) and HTTPS (port 443). Shows which services are protected by DANE and parses TLSA record parameters.
 - **Interactive Network Graph (L1)** - Visual network graph showing subdomain relationships and CNAME chains using vis.js. Nodes are color-coded by provider (AWS, Google, Cloudflare, etc.) with interactive zoom, pan, and hover tooltips.
 - **Geographic Distribution Map (L2)** - Interactive Leaflet.js map showing geographic distribution of infrastructure. Markers sized by subdomain count per country with popup details.
 - **Certificate Timeline (L5)** - Timeline visualization of certificate observations from CT logs. Shows when subdomains were first seen in certificate transparency data.
 - **PWA Support (L3)** - Progressive Web App support with manifest.json and service worker for offline functionality. Install to home screen on mobile devices. Caches static assets for faster loading.
-- **Batch Analysis Mode (L4)** - Analyze up to 10 domains at once. Enter multiple domains (one per line or comma-separated). Uses Quick Scan for each domain. Export all results as combined JSON.
-- **Email-Focused Analysis Mode (L6)** - Specialized mode for email security analysis. Checks common DKIM selectors (google, selector1, selector2, k1, default, mail, etc.). Comprehensive MX, SPF, DKIM, DMARC, MTA-STS, BIMI, and TLSRPT analysis.
-- **Deep Scan Mode (L7)** - Thorough analysis mode with no subdomain limits. Includes wildcard DNS detection and extended security checks. Slower but more comprehensive.
+- **Batch Analysis Mode (L4)** - Analyze up to 10 domains at once. Enter multiple domains (comma-separated in main input). Uses Quick Scan for each domain. Export all results as combined JSON.
+- **Email Scan Mode (L6)** - Specialized mode for email security analysis. Checks common DKIM selectors (google, selector1, selector2, k1, default, mail, etc.). Only queries email records: MX, SPF, DKIM, DMARC, MTA-STS, BIMI, and TLSRPT - skips A/AAAA/NS/CNAME records.
 - **Mobile UX Improvements (L8)** - Touch-friendly targets (44px minimum), responsive layout, collapsible sections on mobile, swipe-friendly tables, improved modal sizing, and better form layout on small screens.
 - **Accessibility Enhancements (L9)** - Skip to main content link, ARIA roles and labels, keyboard focus indicators, high contrast mode support, reduced motion preference support, screen reader friendly content, and accessible tooltips.
 - **Visual Analytics Dashboard** - New tabbed visualization section with Network Graph, Geographic Map, and Certificate Timeline views. Switch between visualizations with tab buttons.
@@ -44,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Abuse IP and Domain Blocklist Checking** - Automatic checking of IP addresses and domains against Spamhaus blocklists (ZEN for IPs, DBL for domains) via DNS over HTTPS. Detects malicious IPs and domains flagged in abuse blocklists and reports them as security findings with appropriate risk levels.
 
 ### Fixed
+- **Security analysis NaN issue** - Fixed bug where security analysis reported "NaN issues found" instead of the actual count. The issue occurred because `securityResults` object contains both issue arrays and analysis result objects (like `dnsRecords`, `spfChainAnalysis`, `mtaSts`, etc.), and the calculation was trying to sum `.length` on non-array properties. Now explicitly sums only the issue array properties: `takeovers`, `dnsIssues`, `emailIssues`, `cloudIssues`, and `wildcardCertificates`.
 - **Rate limit handling** - Fixed issue where 429 errors were ignored and requests continued to be sent to rate-limited APIs. Now properly detects 429 status codes and stops retrying rate-limited providers.
 - **API failure visibility** - IP geolocation API failures are now visible to users through the API Issues notification system, instead of silently failing in the background.
 

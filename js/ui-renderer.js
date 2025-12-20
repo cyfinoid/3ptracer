@@ -6,6 +6,7 @@ class UIRenderer {
         this.progressText = document.getElementById('progressText');
         this.resultsDiv = document.getElementById('results');
         this.statsDiv = document.getElementById('stats');
+        this.dynamicContainer = document.getElementById('dynamicResultsContainer');
         this.sectionCounter = 0; // For unique section IDs
     }
 
@@ -29,9 +30,18 @@ class UIRenderer {
     }
 
     // Create a collapsible section
-    createCollapsibleSection(title, content, isExpanded = true, itemCount = null) {
+    // itemCount: number of items in section, dnsRecordCount: number of DNS records contributing to this section
+    createCollapsibleSection(title, content, isExpanded = true, itemCount = null, dnsRecordCount = null) {
         const sectionId = `section-${++this.sectionCounter}`;
-        const itemCountText = itemCount ? ` (${itemCount})` : '';
+        let countText = '';
+        if (itemCount !== null && itemCount > 0) {
+            countText = ` (${itemCount})`;
+            if (dnsRecordCount !== null && dnsRecordCount > 0) {
+                countText += ` <span class="dns-record-count">from ${dnsRecordCount} DNS records</span>`;
+            }
+        } else if (itemCount === 0) {
+            countText = ' (0)';
+        }
         const expandedClass = isExpanded ? 'expanded' : '';
         const displayStyle = isExpanded ? 'block' : 'none';
         
@@ -40,7 +50,7 @@ class UIRenderer {
                 <div class="section-header" onclick="toggleSection('${sectionId}')">
                     <div class="section-title">
                         <span class="toggle-icon">${isExpanded ? '▼' : '▶'}</span>
-                        <h2>${title}${itemCountText}</h2>
+                        <h2>${title}${countText}</h2>
                     </div>
                 </div>
                 <div id="${sectionId}" class="section-content" style="display: ${displayStyle};">
@@ -50,28 +60,70 @@ class UIRenderer {
         `;
     }
 
+    // Add Collapse/Expand All controls
+    addCollapseControls() {
+        const controlsHTML = `
+            <div class="collapse-controls" style="display: flex; gap: 10px; margin-bottom: 15px; justify-content: flex-end;">
+                <button onclick="window.uiRenderer.collapseAll()" class="collapse-control-btn" style="padding: 6px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; font-size: 0.85em; color: var(--text-color);">
+                    Collapse All
+                </button>
+                <button onclick="window.uiRenderer.expandAll()" class="collapse-control-btn" style="padding: 6px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; font-size: 0.85em; color: var(--text-color);">
+                    Expand All
+                </button>
+            </div>
+        `;
+        if (this.dynamicContainer) {
+            this.dynamicContainer.innerHTML += controlsHTML;
+        }
+    }
+    
+    // Collapse all sections
+    collapseAll() {
+        const sections = document.querySelectorAll('.collapsible-section');
+        sections.forEach(section => {
+            section.classList.remove('expanded');
+            const content = section.querySelector('.section-content');
+            const icon = section.querySelector('.toggle-icon');
+            if (content) content.style.display = 'none';
+            if (icon) icon.textContent = '▶';
+        });
+    }
+    
+    // Expand all sections
+    expandAll() {
+        const sections = document.querySelectorAll('.collapsible-section');
+        sections.forEach(section => {
+            section.classList.add('expanded');
+            const content = section.querySelector('.section-content');
+            const icon = section.querySelector('.toggle-icon');
+            if (content) content.style.display = 'block';
+            if (icon) icon.textContent = '▼';
+        });
+    }
+
     // Display a major section wrapped in collapsible container
-    displayCollapsibleSection(title, renderFunction, isExpanded = true, itemCount = null) {
+    // dnsRecordCount: optional count of DNS records that contributed to this section's findings
+    displayCollapsibleSection(title, renderFunction, isExpanded = true, itemCount = null, dnsRecordCount = null) {
         // Create a temporary container to capture the output
         const tempDiv = document.createElement('div');
         
         // Temporarily redirect the display method's output to our temp container
-        const originalDiv = this.resultsDiv;
-        this.resultsDiv = tempDiv;
+        const originalContainer = this.dynamicContainer;
+        this.dynamicContainer = tempDiv;
         
         // Call the render function to generate content
         renderFunction();
         
-        // Restore original results div
-        this.resultsDiv = originalDiv;
+        // Restore original container
+        this.dynamicContainer = originalContainer;
         
         // Get the generated content
         const content = tempDiv.innerHTML;
         
         // Only create the section if there's actual content
-        if (content.trim()) {
-            const collapsibleHTML = this.createCollapsibleSection(title, content, isExpanded, itemCount);
-            this.resultsDiv.innerHTML += collapsibleHTML;
+        if (content.trim() && this.dynamicContainer) {
+            const collapsibleHTML = this.createCollapsibleSection(title, content, isExpanded, itemCount, dnsRecordCount);
+            this.dynamicContainer.innerHTML += collapsibleHTML;
         }
     }
 
@@ -123,6 +175,11 @@ class UIRenderer {
         // Initialize toggle function
         UIRenderer.initializeToggleFunction();
 
+        // Clear dynamic content container for new results
+        if (this.dynamicContainer) {
+            this.dynamicContainer.innerHTML = '';
+        }
+
         // Add progressive status message if this is a progressive update
         if (isProgressive) {
             this.showProgressiveStatus(processedData.stats);
@@ -137,10 +194,16 @@ class UIRenderer {
             this.displayRawDNSInExportSection(rawRecords);
         }
         
+        // Add Collapse/Expand All controls
+        this.addCollapseControls();
+        
+        // Calculate DNS record count for services
+        const dnsRecordCount = processedData.dnsRecords?.length || 0;
+        
         // Wrap major sections in collapsible containers
         this.displayCollapsibleSection('Third-Party Services', () => {
             this.displayServicesByVendor(processedData.services);
-        }, true, processedData.stats.totalServices || 0);
+        }, true, processedData.stats.totalServices || 0, dnsRecordCount);
         
         // NEW: Display Data Sovereignty Analysis (only for complete analysis)
         if (!isProgressive && processedData.sovereigntyAnalysis) {
@@ -178,68 +241,135 @@ class UIRenderer {
         }, false, processedData.historicalRecords?.length || 0);
     }
 
-    // Display statistics
+    // Display statistics based on analysis mode
     displayStats(stats, securityResults) {
         if (!this.statsDiv) return;
 
         const totalSecurityIssues = this.calculateTotalSecurityIssues(securityResults);
         const scanTime = stats.scanTime ? `${stats.scanTime}s` : '-';
-
-        this.statsDiv.innerHTML = `
-            <div class="stat-card">
-                <div class="stat-number">${stats.totalServices}</div>
-                <div class="stat-label">Services Found</div>
-                <div class="tooltip">
-                    Third-party services detected from DNS records including email providers (Gmail, Outlook), 
-                    cloud platforms (AWS, Cloudflare), analytics tools (Google Analytics), and security services. 
-                    Found via MX, CNAME, TXT, and SPF record analysis.
+        const analysisMode = stats.analysisMode || 'standard';
+        
+        let statsHTML = '';
+        
+        if (analysisMode === 'email') {
+            // Email Scan: Services, MX Records, DKIM Selectors, SPF Lookups, Scan Time
+            statsHTML = `
+                <div class="stat-card">
+                    <div class="stat-number">${stats.totalServices || 0}</div>
+                    <div class="stat-label">Email Services</div>
+                    <div class="tooltip">
+                        Email services detected from MX, SPF, and TXT records including 
+                        Gmail, Microsoft 365, Proofpoint, Mimecast, and other providers.
+                    </div>
                 </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">${stats.totalSubdomains}</div>
-                <div class="stat-label">Subdomains</div>
-                <div class="tooltip">
-                    Active subdomains discovered from certificate transparency logs and DNS analysis. 
-                    Only includes subdomains that currently resolve to IP addresses. 
-                    Excludes historical/obsolete subdomains and redirects to main domain.
+                <div class="stat-card">
+                    <div class="stat-number">${stats.mxRecords || 0}</div>
+                    <div class="stat-label">MX Records</div>
+                    <div class="tooltip">
+                        Mail exchanger records that specify which mail servers accept 
+                        email for this domain.
+                    </div>
                 </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">${stats.totalProviders || 0}</div>
-                <div class="stat-label">Hosting Providers</div>
-                <div class="tooltip">
-                    Unique hosting and infrastructure providers identified through service detection and 
-                    ASN (Autonomous System Number) lookups. Includes cloud providers, CDNs, email services, 
-                    and DNS providers used by this domain.
+                <div class="stat-card">
+                    <div class="stat-number">${stats.dkimSelectors || 0}</div>
+                    <div class="stat-label">DKIM Selectors</div>
+                    <div class="tooltip">
+                        DKIM selectors found from 12 common selectors tested 
+                        (google, selector1, selector2, k1, default, mail, etc.).
+                    </div>
                 </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">${totalSecurityIssues}</div>
-                <div class="stat-label">Security Issues</div>
-                <div class="tooltip">
-                    Potential security concerns including missing SPF/DMARC records, weak email policies, 
-                    possible subdomain takeover vulnerabilities, and exposed cloud services. 
-                    Requires manual verification - automated detection only.
+                <div class="stat-card">
+                    <div class="stat-number">${stats.spfLookups || 0}</div>
+                    <div class="stat-label">SPF Lookups</div>
+                    <div class="tooltip">
+                        Total DNS lookups in SPF include chain. RFC 7208 limits this to 10. 
+                        Exceeding this limit causes SPF failures.
+                    </div>
                 </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">${stats.totalHistoricalRecords || 0}</div>
-                <div class="stat-label">Historical Records</div>
-                <div class="tooltip">
-                    Subdomains found in certificate transparency logs but no longer have active DNS records. 
-                    These represent historical infrastructure that may have been decommissioned or moved. 
-                    Useful for understanding past domain usage.
+                <div class="stat-card stat-card-time">
+                    <div class="stat-number">${scanTime}</div>
+                    <div class="stat-label">Scan Time</div>
+                    <div class="tooltip">
+                        Total time taken to complete the email security analysis.
+                    </div>
                 </div>
-            </div>
-            <div class="stat-card stat-card-time">
-                <div class="stat-number">${scanTime}</div>
-                <div class="stat-label">Scan Time</div>
-                <div class="tooltip">
-                    Total time taken to complete the analysis including DNS queries, 
-                    subdomain discovery, and security checks.
+            `;
+        } else if (analysisMode === 'quick') {
+            // Quick Scan: Services, Security Issues, DNS Records, Scan Time
+            statsHTML = `
+                <div class="stat-card">
+                    <div class="stat-number">${stats.totalServices || 0}</div>
+                    <div class="stat-label">Services Found</div>
+                    <div class="tooltip">
+                        Third-party services detected from DNS records of the main domain.
+                    </div>
                 </div>
-            </div>
-        `;
+                <div class="stat-card">
+                    <div class="stat-number">${totalSecurityIssues}</div>
+                    <div class="stat-label">Security Issues</div>
+                    <div class="tooltip">
+                        Potential security concerns found in DNS configuration.
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.totalProviders || 0}</div>
+                    <div class="stat-label">Providers</div>
+                    <div class="tooltip">
+                        Unique hosting and infrastructure providers identified.
+                    </div>
+                </div>
+                <div class="stat-card stat-card-time">
+                    <div class="stat-number">${scanTime}</div>
+                    <div class="stat-label">Scan Time</div>
+                    <div class="tooltip">
+                        Total time taken for quick domain analysis.
+                    </div>
+                </div>
+            `;
+        } else {
+            // Standard Scan: Services, Subdomains, Providers, Security Issues, Scan Time (5 cards)
+            statsHTML = `
+                <div class="stat-card">
+                    <div class="stat-number">${stats.totalServices || 0}</div>
+                    <div class="stat-label">Services Found</div>
+                    <div class="tooltip">
+                        Third-party services detected from DNS records including email providers, 
+                        cloud platforms, analytics tools, and security services.
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.totalSubdomains || 0}</div>
+                    <div class="stat-label">Subdomains</div>
+                    <div class="tooltip">
+                        Active subdomains discovered from certificate transparency logs and DNS analysis.
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.totalProviders || 0}</div>
+                    <div class="stat-label">Providers</div>
+                    <div class="tooltip">
+                        Unique hosting and infrastructure providers identified through ASN lookups.
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${totalSecurityIssues}</div>
+                    <div class="stat-label">Security Issues</div>
+                    <div class="tooltip">
+                        Potential security concerns including missing SPF/DMARC, weak policies, 
+                        and possible subdomain takeover vulnerabilities.
+                    </div>
+                </div>
+                <div class="stat-card stat-card-time">
+                    <div class="stat-number">${scanTime}</div>
+                    <div class="stat-label">Scan Time</div>
+                    <div class="tooltip">
+                        Total time taken to complete the full analysis.
+                    </div>
+                </div>
+            `;
+        }
+        
+        this.statsDiv.innerHTML = statsHTML;
     }
 
     // Calculate total security issues
@@ -641,6 +771,21 @@ class UIRenderer {
             );
         }
         
+        // Email Mode: Display MX Records
+        if (securityResults.emailSecurity?.mxRecords?.length > 0) {
+            emailSecurityHtml += this.renderMXRecords(securityResults.emailSecurity.mxRecords);
+        }
+        
+        // Email Mode: Display DMARC Record
+        if (securityResults.emailSecurity?.dmarcRecords?.length > 0) {
+            emailSecurityHtml += this.renderDMARCRecord(securityResults.emailSecurity.dmarcRecords);
+        }
+        
+        // Email Mode: Display extracted email addresses
+        if (securityResults.emailSecurity?.extractedEmails) {
+            emailSecurityHtml += this.renderExtractedEmails(securityResults.emailSecurity.extractedEmails);
+        }
+        
         // L6: Display DKIM selectors found in Email Mode
         if (securityResults.emailSecurity?.dkimSelectors?.length > 0) {
             emailSecurityHtml += this.renderDKIMSelectors(securityResults.emailSecurity.dkimSelectors);
@@ -659,6 +804,218 @@ class UIRenderer {
         container.innerHTML = html + emailSecurityHtml;
     }
 
+    // Email Mode: Render extracted email addresses
+    renderExtractedEmails(extractedEmails) {
+        if (!extractedEmails) return '';
+        
+        const { internal, external } = extractedEmails;
+        const totalEmails = (internal?.length || 0) + (external?.length || 0);
+        
+        if (totalEmails === 0) return '';
+        
+        let html = `
+            <div class="extracted-emails-section" style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
+                <h4 style="margin-top: 0; color: var(--text-color);">📧 Email Addresses Found (${totalEmails})</h4>
+                <p style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 15px;">
+                    Email addresses discovered in DMARC, TLS-RPT, and TXT records:
+                </p>`;
+        
+        // Internal emails
+        if (internal && internal.length > 0) {
+            html += `
+                <div style="margin-bottom: 15px;">
+                    <h5 style="color: #28a745; margin-bottom: 10px; font-size: 0.95em;">
+                        🏠 Internal Emails (${internal.length})
+                    </h5>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">`;
+            
+            for (const emailInfo of internal) {
+                html += `
+                    <div style="padding: 8px 12px; background: var(--card-bg); border-radius: 4px; border-left: 3px solid #28a745; display: flex; justify-content: space-between; align-items: center;">
+                        <code style="font-size: 0.9em; color: var(--text-color);">${emailInfo.email}</code>
+                        <span style="font-size: 0.75em; color: var(--text-secondary);">${emailInfo.source}</span>
+                    </div>`;
+            }
+            
+            html += `</div></div>`;
+        }
+        
+        // External emails
+        if (external && external.length > 0) {
+            html += `
+                <div>
+                    <h5 style="color: #17a2b8; margin-bottom: 10px; font-size: 0.95em;">
+                        🌐 External Emails (${external.length})
+                    </h5>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">`;
+            
+            for (const emailInfo of external) {
+                // Identify common external services
+                let serviceTag = '';
+                const domain = emailInfo.domain.toLowerCase();
+                if (domain.includes('agari') || domain.includes('dmarcian')) serviceTag = 'DMARC Service';
+                else if (domain.includes('google') || domain.includes('gmail')) serviceTag = 'Google';
+                else if (domain.includes('microsoft') || domain.includes('outlook')) serviceTag = 'Microsoft';
+                else if (domain.includes('proofpoint')) serviceTag = 'Proofpoint';
+                else if (domain.includes('mimecast')) serviceTag = 'Mimecast';
+                else if (domain.includes('cloudflare')) serviceTag = 'Cloudflare';
+                else if (domain.includes('valimail')) serviceTag = 'Valimail';
+                else if (domain.includes('fraudmarc')) serviceTag = 'Fraudmarc';
+                else if (domain.includes('ondmarc')) serviceTag = 'OnDMARC';
+                else if (domain.includes('emailauth') || domain.includes('easydmarc')) serviceTag = 'DMARC Service';
+                
+                html += `
+                    <div style="padding: 8px 12px; background: var(--card-bg); border-radius: 4px; border-left: 3px solid #17a2b8; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 5px;">
+                        <code style="font-size: 0.9em; color: var(--text-color);">${emailInfo.email}</code>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            ${serviceTag ? `<span style="font-size: 0.75em; padding: 2px 6px; background: var(--accent-blue); color: white; border-radius: 3px;">${serviceTag}</span>` : ''}
+                            <span style="font-size: 0.75em; color: var(--text-secondary);">${emailInfo.source}</span>
+                        </div>
+                    </div>`;
+            }
+            
+            html += `</div></div>`;
+        }
+        
+        html += `</div>`;
+        return html;
+    }
+    
+    // Email Mode: Render MX Records
+    renderMXRecords(mxRecords) {
+        if (!mxRecords || mxRecords.length === 0) return '';
+        
+        let html = `
+            <div class="mx-records-section" style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
+                <h4 style="margin-top: 0; color: var(--text-color);">📬 MX Records (${mxRecords.length})</h4>
+                <p style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 15px;">
+                    Mail exchangers that handle email for this domain:
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 8px;">`;
+        
+        // Extract MX data - handle different formats
+        const mxData = mxRecords.map(mx => {
+            // DNS response objects have a 'data' field with format "priority server"
+            if (mx && typeof mx === 'object' && mx.data) {
+                return mx.data;
+            }
+            // Already a string
+            if (typeof mx === 'string') {
+                return mx;
+            }
+            // Object with priority/exchange
+            if (mx && mx.exchange) {
+                return `${mx.priority || 10} ${mx.exchange}`;
+            }
+            return String(mx);
+        });
+        
+        // Sort by priority
+        const sortedMX = [...mxData].sort((a, b) => {
+            const prioA = parseInt(a.split(' ')[0]) || 0;
+            const prioB = parseInt(b.split(' ')[0]) || 0;
+            return prioA - prioB;
+        });
+        
+        for (const mxStr of sortedMX) {
+            const parts = mxStr.split(' ');
+            const priority = parts[0] || '10';
+            const server = parts.slice(1).join(' ').replace(/\.$/, '') || mxStr;
+            
+            // Identify email provider from MX server
+            let provider = 'Unknown';
+            const serverLower = server.toLowerCase();
+            if (serverLower.includes('google') || serverLower.includes('gmail') || serverLower.includes('aspmx')) provider = 'Google Workspace';
+            else if (serverLower.includes('outlook') || serverLower.includes('microsoft') || serverLower.includes('protection.outlook')) provider = 'Microsoft 365';
+            else if (serverLower.includes('proofpoint') || serverLower.includes('pphosted')) provider = 'Proofpoint';
+            else if (serverLower.includes('mimecast')) provider = 'Mimecast';
+            else if (serverLower.includes('barracuda')) provider = 'Barracuda';
+            else if (serverLower.includes('zoho')) provider = 'Zoho Mail';
+            else if (serverLower.includes('icloud') || serverLower.includes('apple')) provider = 'iCloud Mail';
+            else if (serverLower.includes('secureserver') || serverLower.includes('godaddy')) provider = 'GoDaddy';
+            else if (serverLower.includes('hostinger')) provider = 'Hostinger';
+            else if (serverLower.includes('namecheap')) provider = 'Namecheap';
+            else if (serverLower.includes('titan')) provider = 'Titan Email';
+            else if (serverLower.includes('yandex')) provider = 'Yandex Mail';
+            else if (serverLower.includes('mailgun')) provider = 'Mailgun';
+            else if (serverLower.includes('sendgrid')) provider = 'SendGrid';
+            
+            html += `
+                <div style="padding: 10px 12px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid #17a2b8; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <code style="font-size: 0.9em; color: var(--text-color);">${server}</code>
+                        <span style="font-size: 0.8em; color: var(--text-secondary); margin-left: 10px;">Priority: ${priority}</span>
+                    </div>
+                    <span style="font-size: 0.85em; color: var(--accent-blue);">${provider}</span>
+                </div>`;
+        }
+        
+        html += `</div></div>`;
+        return html;
+    }
+    
+    // Email Mode: Render DMARC Record
+    renderDMARCRecord(dmarcRecords) {
+        if (!dmarcRecords || dmarcRecords.length === 0) return '';
+        
+        // Extract DMARC record string from DNS response object
+        const rawRecord = dmarcRecords[0];
+        const dmarcRecord = typeof rawRecord === 'string' ? rawRecord : (rawRecord?.data || String(rawRecord));
+        
+        // Parse DMARC record
+        const policy = dmarcRecord.match(/p=(\w+)/)?.[1] || 'none';
+        const subPolicy = dmarcRecord.match(/sp=(\w+)/)?.[1] || policy;
+        const pct = dmarcRecord.match(/pct=(\d+)/)?.[1] || '100';
+        const rua = dmarcRecord.match(/rua=([^;]+)/)?.[1] || '';
+        const ruf = dmarcRecord.match(/ruf=([^;]+)/)?.[1] || '';
+        
+        const policyColor = policy === 'reject' ? '#28a745' : policy === 'quarantine' ? '#ffc107' : '#dc3545';
+        const policyIcon = policy === 'reject' ? '✅' : policy === 'quarantine' ? '⚠️' : '❌';
+        
+        let html = `
+            <div class="dmarc-record-section" style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
+                <h4 style="margin-top: 0; color: var(--text-color);">🛡️ DMARC Policy</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 15px 0;">
+                    <div style="padding: 12px; background: var(--card-bg); border-radius: 6px; text-align: center; border-left: 4px solid ${policyColor};">
+                        <div style="font-size: 1.2em; font-weight: bold; color: ${policyColor};">${policyIcon} ${policy.toUpperCase()}</div>
+                        <div style="font-size: 0.8em; color: var(--text-secondary);">Policy</div>
+                    </div>
+                    <div style="padding: 12px; background: var(--card-bg); border-radius: 6px; text-align: center;">
+                        <div style="font-size: 1.2em; font-weight: bold; color: var(--text-color);">${pct}%</div>
+                        <div style="font-size: 0.8em; color: var(--text-secondary);">Percentage</div>
+                    </div>
+                    <div style="padding: 12px; background: var(--card-bg); border-radius: 6px; text-align: center;">
+                        <div style="font-size: 1.2em; font-weight: bold; color: var(--text-color);">${subPolicy.toUpperCase()}</div>
+                        <div style="font-size: 0.8em; color: var(--text-secondary);">Subdomain Policy</div>
+                    </div>
+                </div>`;
+        
+        if (rua || ruf) {
+            // Clean up mailto: prefixes from reporting addresses
+            const cleanRua = rua ? rua.split(',').map(e => e.replace(/^mailto:/i, '').trim()).join(', ') : '';
+            const cleanRuf = ruf ? ruf.split(',').map(e => e.replace(/^mailto:/i, '').trim()).join(', ') : '';
+            
+            html += `<div style="margin-top: 10px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                <div style="font-size: 0.85em; color: var(--text-secondary);">Reporting:</div>`;
+            if (cleanRua) html += `<div style="font-size: 0.85em; color: var(--text-color);">Aggregate (rua): <code>${cleanRua}</code></div>`;
+            if (cleanRuf) html += `<div style="font-size: 0.85em; color: var(--text-color);">Forensic (ruf): <code>${cleanRuf}</code></div>`;
+            html += `</div>`;
+        }
+        
+        html += `
+                <div style="margin-top: 10px;">
+                    <details>
+                        <summary style="cursor: pointer; font-size: 0.85em; color: var(--text-secondary);">View raw record</summary>
+                        <code style="font-size: 0.75em; word-break: break-all; display: block; margin-top: 8px; padding: 8px; background: var(--card-bg); border-radius: 4px;">
+                            ${dmarcRecord}
+                        </code>
+                    </details>
+                </div>
+            </div>`;
+        
+        return html;
+    }
+    
     // L6: Render DKIM Selectors found in Email Mode
     renderDKIMSelectors(dkimSelectors) {
         if (!dkimSelectors || dkimSelectors.length === 0) return '';
@@ -1748,10 +2105,10 @@ class UIRenderer {
 
     // Display raw DNS records in zone file format
     displayRawDNSRecords(rawRecords) {
-        if (!this.resultsDiv) return;
+        if (!this.dynamicContainer) return;
         
         if (!rawRecords || rawRecords.length === 0) {
-            this.resultsDiv.innerHTML += '<p>No DNS records available.</p>';
+            this.dynamicContainer.innerHTML += '<p>No DNS records available.</p>';
             return;
         }
         
@@ -1781,7 +2138,7 @@ class UIRenderer {
         });
         
         html += '</tbody></table></div>';
-        this.resultsDiv.innerHTML += html;
+        this.dynamicContainer.innerHTML += html;
     }
 
     // Display Raw DNS Records right after the Export Section

@@ -53,8 +53,7 @@ async function analyzeDomain() {
     const modeLabels = {
         'standard': 'Analyzing',
         'quick': 'Quick Scanning',
-        'email': 'Email Analyzing',
-        'deep': 'Deep Scanning'
+        'email': 'Email Scanning'
     };
     const modeLabel = modeLabels[scanMode] || 'Analyzing';
     
@@ -73,9 +72,6 @@ async function analyzeDomain() {
                 break;
             case 'email':
                 await app.analysisController.analyzeEmailMode(domain);
-                break;
-            case 'deep':
-                await app.analysisController.analyzeDeepScan(domain);
                 break;
             default:
                 await app.analyzeDomain(domain);
@@ -344,10 +340,9 @@ function setupScanModeDropdown() {
     const scanModeDesc = document.getElementById('scanModeDesc');
     
     const descriptions = {
-        'standard': 'Full analysis with subdomain discovery',
-        'quick': 'Skip subdomain discovery for faster results',
-        'email': 'Focus on MX, SPF, DKIM, DMARC, MTA-STS, BIMI',
-        'deep': 'Extra thorough analysis (slower, no limits)'
+        'standard': 'Full analysis with subdomain discovery from all sources',
+        'quick': 'Domain-only checks, no subdomain discovery',
+        'email': 'Email records only: MX, SPF, DKIM, DMARC, MTA-STS, BIMI'
     };
     
     if (scanModeSelect && scanModeDesc) {
