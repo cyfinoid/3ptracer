@@ -52,6 +52,160 @@ class AnalysisController {
             throw error;
         }
     }
+    
+    // L6: Email-focused analysis mode
+    async analyzeEmailMode(domain) {
+        try {
+            this.setupDebugMode();
+            console.log(`📧 Starting EMAIL MODE analysis for domain: ${domain}`);
+            
+            this.clearInternalState(domain);
+            this.setupAPINotifications();
+            this.addAPINotification('Email Mode', 'Running email-focused analysis - checking MX, SPF, DKIM, DMARC, MTA-STS, BIMI, TLSRPT', 'info');
+            
+            // Phase 1: Analyze main domain (for email records)
+            this.uiRenderer.updateProgress(10, 'Querying email-related DNS records...');
+            const mainDomainResults = await this.analyzeMainDomain(domain);
+            
+            // Phase 2: Additional DKIM selector checks
+            this.uiRenderer.updateProgress(40, 'Checking common DKIM selectors...');
+            const dkimSelectors = ['google', 'selector1', 'selector2', 'k1', 'default', 'mail', 'dkim', 'smtp', 'mandrill', 'amazonses', 'sendgrid', 'mailchimp'];
+            const dkimResults = [];
+            
+            for (const selector of dkimSelectors) {
+                try {
+                    const dkimRecord = await this.dnsAnalyzer.resolveDNS(`${selector}._domainkey.${domain}`, 'TXT');
+                    if (dkimRecord && dkimRecord.length > 0) {
+                        dkimResults.push({ selector, record: dkimRecord[0] });
+                    }
+                } catch (e) {
+                    // DKIM selector not found, continue
+                }
+            }
+            
+            // Phase 3: Security analysis focused on email
+            this.uiRenderer.updateProgress(70, 'Analyzing email security posture...');
+            const securityResults = await this.performSecurityAnalysis(mainDomainResults, []);
+            
+            // Add DKIM selector results
+            securityResults.emailSecurity = securityResults.emailSecurity || {};
+            securityResults.emailSecurity.dkimSelectors = dkimResults;
+            securityResults.emailSecurity.isEmailFocused = true;
+            
+            // Phase 4: Final processing
+            this.uiRenderer.updateProgress(90, 'Finalizing email analysis...');
+            const processedData = this.processResults(mainDomainResults, [], securityResults);
+            processedData.analysisMode = 'email';
+            
+            // Phase 5: Display results
+            this.uiRenderer.updateProgress(100, 'Email analysis complete!');
+            this.displayResults(processedData, securityResults);
+            
+            // Enable export
+            if (window.exportManager) {
+                const interestingFindings = this.getInterestingFindings(processedData);
+                const enhancedProcessedData = { ...processedData, dataProcessor: this.dataProcessor };
+                window.exportManager.setAnalysisData(enhancedProcessedData, securityResults, domain, interestingFindings);
+            }
+            
+            console.log(`📧 Email mode analysis complete for ${domain}!`);
+            
+        } catch (error) {
+            console.error('Email mode analysis failed:', error);
+            this.uiRenderer.showError('Email analysis failed: ' + error.message);
+            throw error;
+        }
+    }
+    
+    // L7: Deep scan mode - thorough analysis
+    async analyzeDeepScan(domain) {
+        try {
+            this.setupDebugMode();
+            console.log(`🔍 Starting DEEP SCAN for domain: ${domain}`);
+            
+            this.clearInternalState(domain);
+            this.setupAPINotifications();
+            this.addAPINotification('Deep Scan', 'Running thorough analysis - this may take longer', 'info');
+            
+            // Phase 1: Analyze main domain
+            this.uiRenderer.updateProgress(5, 'Analyzing main domain...');
+            const mainDomainResults = await this.analyzeMainDomain(domain);
+            
+            // Display progressive results
+            await this.displayProgressiveResults(mainDomainResults, [], [], {});
+            
+            // Phase 2: Extended subdomain discovery
+            this.uiRenderer.updateProgress(15, 'Discovering subdomains (extended sources)...');
+            const subdomains = await this.discoverSubdomainsWithProgress(domain);
+            
+            // Phase 3: Analyze all subdomains (no limit in deep scan)
+            this.uiRenderer.updateProgress(40, 'Analyzing all discovered subdomains...');
+            const analyzedSubdomains = await this.analyzeSubdomainsWithProgress(domain, subdomains, Infinity);
+            
+            // Phase 4: Extended security analysis
+            this.uiRenderer.updateProgress(70, 'Performing extended security analysis...');
+            const securityResults = await this.performSecurityAnalysis(mainDomainResults, analyzedSubdomains);
+            
+            // Phase 5: Additional checks
+            this.uiRenderer.updateProgress(85, 'Running additional security checks...');
+            
+            // Check for common misconfigurations
+            securityResults.deepScanFindings = {
+                wildcardDNS: await this.checkWildcardDNS(domain),
+                zoneTranfer: await this.checkZoneTransfer(domain, mainDomainResults.records?.NS || [])
+            };
+            
+            // Phase 6: Final processing
+            this.uiRenderer.updateProgress(95, 'Finalizing deep scan results...');
+            const processedData = this.processResults(mainDomainResults, analyzedSubdomains, securityResults);
+            processedData.analysisMode = 'deep';
+            
+            // Phase 7: Display results
+            this.uiRenderer.updateProgress(100, 'Deep scan complete!');
+            this.displayResults(processedData, securityResults);
+            
+            // Enable export
+            if (window.exportManager) {
+                const interestingFindings = this.getInterestingFindings(processedData);
+                const enhancedProcessedData = { ...processedData, dataProcessor: this.dataProcessor };
+                window.exportManager.setAnalysisData(enhancedProcessedData, securityResults, domain, interestingFindings);
+            }
+            
+            // Setup visualizations
+            if (window.visualizer) {
+                window.visualizer.setData(processedData, securityResults);
+                window.visualizer.showAllVisualizations();
+            }
+            
+            console.log(`🔍 Deep scan complete for ${domain}!`);
+            
+        } catch (error) {
+            console.error('Deep scan failed:', error);
+            this.uiRenderer.showError('Deep scan failed: ' + error.message);
+            throw error;
+        }
+    }
+    
+    // Helper: Check for wildcard DNS
+    async checkWildcardDNS(domain) {
+        try {
+            const randomSub = `random-nonexistent-${Date.now()}.${domain}`;
+            const result = await this.dnsAnalyzer.resolveDNS(randomSub, 'A');
+            return result && result.length > 0 ? { detected: true, ip: result[0] } : { detected: false };
+        } catch (e) {
+            return { detected: false };
+        }
+    }
+    
+    // Helper: Check zone transfer (AXFR) - usually blocked but worth checking
+    async checkZoneTransfer(domain, nsRecords) {
+        // Zone transfer check is typically blocked - we just note if NS records are configured
+        return {
+            nsCount: nsRecords.length,
+            nsRecords: nsRecords.slice(0, 5),
+            note: 'Zone transfer (AXFR) checks require specialized tools'
+        };
+    }
 
     // Main analysis method with progressive display
     async analyzeDomain(domain) {
@@ -122,6 +276,12 @@ class AnalysisController {
             console.log(`🎉 Analysis complete for ${domain}!`);
             if (window.logger) {
                 window.logger.stats('Analysis Complete', processedData.stats);
+            }
+            
+            // L1, L2, L5: Setup visualizations
+            if (window.visualizer) {
+                window.visualizer.setData(processedData, securityResults);
+                window.visualizer.showAllVisualizations();
             }
             
         } catch (error) {

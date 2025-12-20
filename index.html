@@ -4,14 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3rd Party Tracer - Third Party Service Identifier</title>
+    <!-- L3: PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#667eea">
     <link rel="stylesheet" href="css/style.css?v=1.0.3">
     <script defer data-domain="cyfinoid.github.io" src="https://plausible.io/js/script.outbound-links.js"></script>
     <script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
     
 </head>
 <body>
+    <!-- L9: Skip to main content link for accessibility -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
     <!-- Theme Toggle Button -->
-    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme" id="themeToggle">
         <span class="theme-toggle-icon" id="themeIcon">🌙</span>
         <span id="themeText">Light Mode</span>
     </button>
@@ -24,13 +30,32 @@
             </div>
         </div>
 
-        <div class="content">
-            <div class="input-section">
-                <div class="form-group">
+        <main class="content" id="main-content" role="main">
+            <div class="input-section" role="search" aria-label="Domain analysis input">
+                <!-- L4: Single domain input (default) -->
+                <div class="form-group single-domain-input">
                     <label for="domain">Enter Domain Name:</label>
                     <input type="text" id="domain" placeholder="example.com" autocomplete="off">
                 </div>
+                
+                <!-- L4: Batch domain input (hidden by default) -->
+                <div class="form-group batch-domain-input" style="display: none;">
+                    <label for="batchDomains">Enter Multiple Domains (one per line, max 10):</label>
+                    <textarea id="batchDomains" placeholder="example.com&#10;another-domain.org&#10;third-site.net" rows="5" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; resize: vertical; font-family: inherit; background: var(--input-bg); color: var(--text-color);"></textarea>
+                    <div id="batchProgress" style="display: none; margin-top: 10px;"></div>
+                </div>
+                
                 <div class="form-group" style="margin-top: 15px; display: flex; gap: 30px; flex-wrap: wrap;">
+                    <!-- L4: Batch mode toggle -->
+                    <div>
+                        <label style="display: inline-flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" id="batchMode" style="margin-right: 8px;">
+                            Batch Mode
+                        </label>
+                        <small style="display: block; margin-top: 5px; color: #666; font-size: 0.85rem;">
+                            Analyze multiple domains
+                        </small>
+                    </div>
                     <div>
                         <label style="display: inline-flex; align-items: center; cursor: pointer;">
                             <input type="checkbox" id="quickScan" style="margin-right: 8px;">
@@ -38,6 +63,26 @@
                         </label>
                         <small style="display: block; margin-top: 5px; color: #666; font-size: 0.85rem;">
                             Skip subdomain discovery for faster results
+                        </small>
+                    </div>
+                    <!-- L6: Email-focused analysis mode -->
+                    <div>
+                        <label style="display: inline-flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" id="emailMode" style="margin-right: 8px;">
+                            Email Mode
+                        </label>
+                        <small style="display: block; margin-top: 5px; color: #666; font-size: 0.85rem;">
+                            Focus on email security (MX, SPF, DKIM, DMARC)
+                        </small>
+                    </div>
+                    <!-- L7: Deep scan mode -->
+                    <div>
+                        <label style="display: inline-flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" id="deepScan" style="margin-right: 8px;">
+                            Deep Scan
+                        </label>
+                        <small style="display: block; margin-top: 5px; color: #666; font-size: 0.85rem;">
+                            Extra thorough analysis (slower)
                         </small>
                     </div>
                     <div>
@@ -171,9 +216,9 @@
                     <div class="service-list" id="historicalRecords"></div>
                 </div>
             </div>
-        </div>
+        </main>
         
-        <footer class="footer">
+        <footer class="footer" role="contentinfo">
             <div class="footer-content">
                 <div class="footer-section">
                     <h3>🔬 Cyfinoid Research</h3>
@@ -216,6 +261,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/3.0.3/jspdf.umd.min.js" integrity="sha512-+EeCylkt9WHJk5tGJxYdecHOcXFRME7qnbsfeMsdQL6NUPYm2+uGFmyleEqsmVoap/f3dN/sc3BX9t9kHXkHHg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/5.0.2/jspdf.plugin.autotable.min.js" integrity="sha512-JizZOUNesiGhMcp9fsA/9W31FOat6QysBM8hSj6ir8iIANIUJ2mhko7Lo1+j0ErftmJ8SebMZLm9iielKjeIEQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/shim.min.js" integrity="sha512-nPnkC29R0sikt0ieZaAkk28Ib7Y1Dz7IqePgELH30NnSi1DzG4x+envJAOHz8ZSAveLXAHTR3ai2E9DZUsT8pQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    
+    <!-- L1: vis.js for Network Graph Visualization -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/dist/vis-network.min.js" integrity="sha512-rOg/0qC8b08P3dQD0T08bZDRR1+St5WkjFUB6a5AKVRfXVLvLj6HYAHFGP/4WPUh4BTJw+1Pho3e5kEsUu6/xQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/dist/dist/vis-network.min.css" integrity="sha512-Mf9tZz0HEV4sBJ/y57aCNrlzWHuKePfL/GBf+aBvHyCNvS54SE2GjCU91C6CHVdrOAYXjxxJqwUFSR/2gWDzBQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    
+    <!-- L2: Leaflet.js for Geographic Map -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
     <script src="js/logger.js?v=1.0.3"></script>
     <script src="js/export-manager.js?v=1.0.3"></script>
@@ -224,6 +277,7 @@
     <script src="js/data-processor.js?v=1.0.3"></script>
     <script src="js/ui-renderer.js?v=1.0.3"></script>
     <script src="js/analysis-controller.js?v=1.0.3"></script>
+    <script src="js/visualizer.js?v=1.0.3"></script>
     <script src="js/app.js?v=1.0.3"></script>
     <script src="js/theme-toggle.js?v=1.0.3"></script>
 </body>

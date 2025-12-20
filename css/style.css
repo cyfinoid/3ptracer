@@ -553,6 +553,320 @@ input[type="checkbox"] {
     background: rgba(32, 201, 151, 0.2);
 }
 
+/* L1, L2, L5: Visualization tabs */
+.viz-tab {
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    color: var(--text-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.9em;
+}
+
+.viz-tab:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-blue);
+}
+
+.viz-tab.active {
+    background: var(--accent-blue);
+    color: white;
+    border-color: var(--accent-blue);
+}
+
+.viz-content {
+    min-height: 400px;
+    margin-top: 10px;
+}
+
+/* Certificate timeline */
+.cert-timeline {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+/* ==========================================
+   L8: Mobile UX Improvements
+   ========================================== */
+
+/* Touch-friendly targets */
+@media (pointer: coarse) {
+    .analyze-btn,
+    .export-btn,
+    .viz-tab,
+    input[type="checkbox"] + label {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    
+    /* Larger checkboxes for touch */
+    input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+    }
+    
+    /* Better tap targets for links */
+    .subdomain-link,
+    .link-btn {
+        padding: 8px 4px;
+    }
+}
+
+/* Mobile-specific layout */
+@media (max-width: 768px) {
+    .content {
+        padding: 10px;
+    }
+    
+    .input-section {
+        padding: 15px;
+    }
+    
+    /* Stack options vertically on mobile */
+    .form-group[style*="flex"] {
+        flex-direction: column !important;
+        gap: 15px !important;
+    }
+    
+    /* Full-width buttons on mobile */
+    .analyze-btn,
+    .export-btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    /* Collapsible sections on mobile */
+    .service-category {
+        padding: 12px;
+    }
+    
+    .service-category h2 {
+        font-size: 1.1em;
+        cursor: pointer;
+        position: relative;
+    }
+    
+    .service-category h2::after {
+        content: '▼';
+        position: absolute;
+        right: 0;
+        font-size: 0.8em;
+        transition: transform 0.3s;
+    }
+    
+    .service-category.collapsed h2::after {
+        transform: rotate(-90deg);
+    }
+    
+    /* Responsive tables */
+    table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Better visualization on mobile */
+    .viz-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 5px;
+    }
+    
+    .viz-content {
+        min-height: 300px !important;
+    }
+    
+    /* Export buttons wrap nicely */
+    .export-buttons {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+    
+    /* Modal improvements */
+    .modal-content,
+    #shortcutsModal > div {
+        width: 95% !important;
+        max-width: none !important;
+        margin: 10px;
+    }
+    
+    /* Batch mode textarea */
+    #batchDomains {
+        min-height: 120px;
+    }
+}
+
+/* Small phone adjustments */
+@media (max-width: 480px) {
+    h1 {
+        font-size: 1.5em;
+    }
+    
+    .tagline {
+        font-size: 0.9em;
+    }
+    
+    .export-buttons {
+        grid-template-columns: 1fr;
+    }
+    
+    /* Stack analysis options */
+    .form-group > div {
+        width: 100%;
+    }
+}
+
+/* ==========================================
+   L9: Accessibility Enhancements
+   ========================================== */
+
+/* Focus indicators */
+*:focus {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+}
+
+*:focus:not(:focus-visible) {
+    outline: none;
+}
+
+*:focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+}
+
+/* Skip to main content link */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--accent-blue);
+    color: white;
+    padding: 8px 16px;
+    z-index: 9999;
+    transition: top 0.3s;
+}
+
+.skip-link:focus {
+    top: 0;
+}
+
+/* Screen reader only text */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    :root {
+        --border-color: #000;
+    }
+    
+    [data-theme="dark"] {
+        --border-color: #fff;
+    }
+    
+    .analyze-btn,
+    .export-btn,
+    .viz-tab {
+        border-width: 2px;
+    }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* Better color contrast for text */
+.text-muted,
+small,
+.form-group small {
+    color: var(--text-secondary);
+}
+
+[data-theme="light"] .text-muted,
+[data-theme="light"] small,
+[data-theme="light"] .form-group small {
+    color: #495057;
+}
+
+/* ARIA live region for screen readers */
+[aria-live] {
+    position: relative;
+}
+
+/* Keyboard navigation indicators */
+.keyboard-nav-active *:focus {
+    outline: 3px solid var(--accent-blue) !important;
+    outline-offset: 3px !important;
+}
+
+/* Better form labels */
+label {
+    cursor: pointer;
+}
+
+/* Accessible error messages */
+.error-message {
+    color: var(--danger-color);
+    font-weight: bold;
+}
+
+.error-message::before {
+    content: '⚠ ';
+}
+
+/* Progress bar accessibility */
+.progress-bar {
+    role: progressbar;
+}
+
+/* Accessible icon buttons */
+button[aria-label],
+a[aria-label] {
+    position: relative;
+}
+
+/* Tooltip accessibility */
+[data-tooltip] {
+    position: relative;
+}
+
+[data-tooltip]:hover::after,
+[data-tooltip]:focus::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 8px;
+    background: var(--bg-tertiary);
+    color: var(--text-color);
+    border-radius: 4px;
+    font-size: 0.8em;
+    white-space: nowrap;
+    z-index: 1000;
+}
+
 /* History modal styling */
 .history-modal {
     display: none;

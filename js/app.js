@@ -24,6 +24,13 @@ const app = new App();
 
 // Main analysis function (called from HTML)
 async function analyzeDomain() {
+    // L4: Check if batch mode is enabled
+    const batchModeCheckbox = document.getElementById('batchMode');
+    if (batchModeCheckbox && batchModeCheckbox.checked) {
+        await analyzeBatch();
+        return;
+    }
+    
     const domainInput = document.getElementById('domain');
     const analyzeBtn = document.querySelector('.analyze-btn');
     const quickScanCheckbox = document.getElementById('quickScan');
@@ -34,12 +41,22 @@ async function analyzeDomain() {
         return;
     }
     
-    // Check if quick scan mode is enabled
+    // Check analysis mode options
     const isQuickScan = quickScanCheckbox?.checked || false;
+    const emailModeCheckbox = document.getElementById('emailMode');
+    const deepScanCheckbox = document.getElementById('deepScan');
+    const isEmailMode = emailModeCheckbox?.checked || false;
+    const isDeepScan = deepScanCheckbox?.checked || false;
+    
+    // Determine analysis mode
+    let modeLabel = 'Analyzing';
+    if (isQuickScan) modeLabel = 'Quick Scanning';
+    else if (isEmailMode) modeLabel = 'Email Analyzing';
+    else if (isDeepScan) modeLabel = 'Deep Scanning';
     
     // Disable button and show progress
     analyzeBtn.disabled = true;
-    analyzeBtn.textContent = isQuickScan ? 'Quick Scanning...' : 'Analyzing...';
+    analyzeBtn.textContent = `${modeLabel}...`;
     analysisInProgress = true;
     
     // Hide previous results
@@ -49,6 +66,12 @@ async function analyzeDomain() {
         if (isQuickScan) {
             // M10: Quick Scan Mode - skip subdomain discovery
             await app.analysisController.analyzeQuickScan(domain);
+        } else if (isEmailMode) {
+            // L6: Email-focused analysis mode
+            await app.analysisController.analyzeEmailMode(domain);
+        } else if (isDeepScan) {
+            // L7: Deep scan mode
+            await app.analysisController.analyzeDeepScan(domain);
         } else {
             await app.analyzeDomain(domain);
         }
@@ -303,8 +326,238 @@ function addCopyLinkButton() {
     }
 }
 
+// ==========================================
+// L4: Batch Analysis Mode
+// ==========================================
+
+let batchResults = [];
+let batchInProgress = false;
+
+function setupBatchMode() {
+    const batchToggle = document.getElementById('batchMode');
+    const domainInput = document.getElementById('domain');
+    const batchTextarea = document.getElementById('batchDomains');
+    
+    if (batchToggle) {
+        batchToggle.addEventListener('change', function() {
+            const singleInput = document.querySelector('.single-domain-input');
+            const batchInput = document.querySelector('.batch-domain-input');
+            
+            if (this.checked) {
+                if (singleInput) singleInput.style.display = 'none';
+                if (batchInput) batchInput.style.display = 'block';
+                // Copy current domain to batch textarea
+                if (domainInput && batchTextarea && domainInput.value.trim()) {
+                    batchTextarea.value = domainInput.value.trim();
+                }
+            } else {
+                if (singleInput) singleInput.style.display = 'block';
+                if (batchInput) batchInput.style.display = 'none';
+            }
+        });
+    }
+}
+
+async function analyzeBatch() {
+    const batchTextarea = document.getElementById('batchDomains');
+    const analyzeBtn = document.querySelector('.analyze-btn');
+    const batchProgress = document.getElementById('batchProgress');
+    
+    if (!batchTextarea) return;
+    
+    // Parse domains (one per line, comma-separated, or space-separated)
+    const text = batchTextarea.value.trim();
+    const domains = text.split(/[\n,\s]+/)
+        .map(d => d.trim())
+        .filter(d => d && d.includes('.'))
+        .slice(0, 10); // Limit to 10 domains
+    
+    if (domains.length === 0) {
+        alert('Please enter at least one valid domain');
+        return;
+    }
+    
+    batchInProgress = true;
+    batchResults = [];
+    
+    // Disable inputs
+    analyzeBtn.disabled = true;
+    analyzeBtn.textContent = `Batch Analyzing (0/${domains.length})...`;
+    
+    // Show progress
+    if (batchProgress) {
+        batchProgress.style.display = 'block';
+        batchProgress.innerHTML = '<div class="batch-status">Starting batch analysis...</div>';
+    }
+    
+    const results = [];
+    
+    for (let i = 0; i < domains.length; i++) {
+        const domain = domains[i];
+        analyzeBtn.textContent = `Batch Analyzing (${i + 1}/${domains.length})...`;
+        
+        if (batchProgress) {
+            batchProgress.innerHTML = `
+                <div class="batch-status">
+                    <strong>Processing ${i + 1}/${domains.length}:</strong> ${domain}
+                    <div class="batch-progress-bar" style="margin-top: 5px; background: var(--bg-tertiary); height: 10px; border-radius: 5px; overflow: hidden;">
+                        <div style="width: ${((i + 1) / domains.length) * 100}%; height: 100%; background: var(--accent-blue); transition: width 0.3s;"></div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        try {
+            // Use quick scan for batch mode to save time
+            await app.analysisController.analyzeQuickScan(domain);
+            
+            // Get the analysis data
+            if (window.exportManager && window.exportManager.analysisData) {
+                results.push({
+                    domain: domain,
+                    status: 'success',
+                    data: JSON.parse(JSON.stringify(window.exportManager.analysisData))
+                });
+            }
+        } catch (error) {
+            console.error(`Batch analysis failed for ${domain}:`, error);
+            results.push({
+                domain: domain,
+                status: 'error',
+                error: error.message
+            });
+        }
+        
+        // Small delay between domains to avoid rate limiting
+        if (i < domains.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    }
+    
+    batchResults = results;
+    batchInProgress = false;
+    
+    // Re-enable inputs
+    analyzeBtn.disabled = false;
+    analyzeBtn.textContent = 'Analyze Domain';
+    
+    // Show batch results summary
+    showBatchResults(results);
+}
+
+function showBatchResults(results) {
+    const batchProgress = document.getElementById('batchProgress');
+    if (!batchProgress) return;
+    
+    const successful = results.filter(r => r.status === 'success').length;
+    const failed = results.filter(r => r.status === 'error').length;
+    
+    let html = `
+        <div class="batch-summary" style="margin-top: 15px; padding: 15px; background: var(--bg-secondary); border-radius: 8px;">
+            <h4 style="margin-top: 0;">📊 Batch Analysis Complete</h4>
+            <p><strong>${successful}</strong> successful, <strong>${failed}</strong> failed</p>
+            <div class="batch-results-list" style="max-height: 200px; overflow-y: auto;">
+    `;
+    
+    for (const result of results) {
+        const icon = result.status === 'success' ? '✅' : '❌';
+        html += `
+            <div class="batch-result-item" style="padding: 8px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                <span>${icon} ${result.domain}</span>
+                ${result.status === 'success' ? `
+                    <button class="batch-view-btn" onclick="viewBatchResult('${result.domain}')" style="padding: 4px 8px; font-size: 0.85em; cursor: pointer;">View</button>
+                ` : `
+                    <span style="color: var(--danger-color); font-size: 0.85em;">${result.error || 'Failed'}</span>
+                `}
+            </div>
+        `;
+    }
+    
+    html += `
+            </div>
+            <button onclick="exportBatchResults()" style="margin-top: 10px; padding: 8px 16px; cursor: pointer;">Export All as JSON</button>
+        </div>
+    `;
+    
+    batchProgress.innerHTML = html;
+}
+
+function viewBatchResult(domain) {
+    const result = batchResults.find(r => r.domain === domain);
+    if (result && result.data && window.exportManager) {
+        // Reload this result's data
+        const data = result.data;
+        window.exportManager.setAnalysisData(
+            data.processedData,
+            data.securityResults,
+            domain,
+            data.interestingFindings || []
+        );
+        // Trigger re-render
+        if (window.visualizer) {
+            window.visualizer.setData(data.processedData, data.securityResults);
+        }
+        alert(`Viewing results for ${domain}. Check the results section.`);
+    }
+}
+
+function exportBatchResults() {
+    if (batchResults.length === 0) {
+        alert('No batch results to export');
+        return;
+    }
+    
+    const exportData = {
+        timestamp: new Date().toISOString(),
+        totalDomains: batchResults.length,
+        successful: batchResults.filter(r => r.status === 'success').length,
+        results: batchResults
+    };
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `3pt-batch-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ==========================================
+// L3: PWA Service Worker Registration
+// ==========================================
+
+function registerServiceWorker() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+                console.log('✅ Service Worker registered:', registration.scope);
+                
+                // Check for updates
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            // New content available, show update prompt
+                            if (confirm('New version available! Reload to update?')) {
+                                newWorker.postMessage('skipWaiting');
+                                window.location.reload();
+                            }
+                        }
+                    });
+                });
+            })
+            .catch(error => {
+                console.log('ℹ️ Service Worker not registered (local dev):', error.message);
+            });
+    }
+}
+
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
+    // L3: Register service worker for PWA
+    registerServiceWorker();
+    
     // M4: Setup keyboard shortcuts
     setupKeyboardShortcuts();
     
@@ -317,6 +570,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 analyzeDomain();
             }
         });
+        
+        // L4: Setup batch mode toggle
+        setupBatchMode();
         
         // M3: Check URL parameters first
         const urlParams = getURLParams();
