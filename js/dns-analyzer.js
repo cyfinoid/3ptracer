@@ -1992,37 +1992,67 @@ class DNSAnalyzer {
         const queryDomain = `${domain}.dbl.spamhaus.org`;
 
         try {
-            const records = await this.queryDNS(queryDomain, 'TXT');
+            // DBL uses A records in the 127.0.1.x range (NOT TXT records)
+            const records = await this.queryDNS(queryDomain, 'A');
             
             if (!records || records.length === 0) {
-                // No records = domain is clean
+                // No records (NXDOMAIN) = domain is not listed
                 return { listed: false, blocklist: 'Spamhaus DBL' };
             }
 
-            // Parse TXT record to get blocklist codes
-            const txtData = records[0].data || '';
-            const codes = txtData.match(/127\.0\.1\.\d+/g) || [];
-            
-            if (codes.length === 0) {
+            // Parse A record - DBL returns 127.0.1.x codes
+            const ip = records[0].data;
+            if (!ip) {
                 return { listed: false, blocklist: 'Spamhaus DBL' };
             }
 
-            // Map codes to threat types
+            // Check for error codes (should NOT be treated as listings)
+            // 127.255.255.252 = Typing error in DNSBL name
+            // 127.255.255.254 = Anonymous query through public resolver
+            // 127.255.255.255 = Excessive number of queries
+            if (ip.startsWith('127.255.255.')) {
+                console.warn(`Spamhaus DBL returned error code ${ip} for ${domain}`);
+                return { listed: false, blocklist: 'Spamhaus DBL', error: ip };
+            }
+
+            // Valid DBL responses are in 127.0.1.x range
+            if (!ip.startsWith('127.0.1.')) {
+                return { listed: false, blocklist: 'Spamhaus DBL' };
+            }
+
+            // Map return codes to threat types (per Spamhaus documentation)
             const threatMap = {
                 '127.0.1.2': 'Spam domain',
                 '127.0.1.4': 'Phishing domain',
                 '127.0.1.5': 'Malware domain',
-                '127.0.1.6': 'Botnet C&C domain'
+                '127.0.1.6': 'Botnet C&C domain',
+                '127.0.1.102': 'Abused legit spam',
+                '127.0.1.103': 'Abused spammed redirector domain',
+                '127.0.1.104': 'Abused legit phish',
+                '127.0.1.105': 'Abused legit malware',
+                '127.0.1.106': 'Abused legit botnet C&C',
+                '127.0.1.255': 'IP queries prohibited'
             };
 
-            const threats = codes.map(code => threatMap[code] || code).join(', ');
+            // 127.0.1.255 means IP queries are prohibited (error, not a listing)
+            if (ip === '127.0.1.255') {
+                console.warn(`Spamhaus DBL: IP queries prohibited for ${domain}`);
+                return { listed: false, blocklist: 'Spamhaus DBL', error: ip };
+            }
+
+            const threat = threatMap[ip] || `Unknown code: ${ip}`;
+            
+            // High severity for malware, botnet C&C, and their abused variants
+            const highSeverityCodes = ['127.0.1.5', '127.0.1.6', '127.0.1.105', '127.0.1.106'];
+            const severity = highSeverityCodes.includes(ip) ? 'high' : 'medium';
             
             return {
                 listed: true,
                 blocklist: 'Spamhaus DBL',
-                codes: codes,
-                threats: threats,
-                severity: codes.includes('127.0.1.5') || codes.includes('127.0.1.6') ? 'high' : 'medium'
+                ip: ip,
+                codes: [ip],
+                threats: threat,
+                severity: severity
             };
         } catch (error) {
             console.warn(`Failed to check domain ${domain} against Spamhaus DBL:`, error.message);
@@ -2058,20 +2088,21 @@ class DNSAnalyzer {
 
             const lastOctet = parseInt(ip.split('.')[3], 10);
             
-            // SURBL uses bitmask in last octet
+            // SURBL uses bitmask in last octet (per multi.surbl.org documentation)
+            // Bit positions: 4=DM, 8=PH, 16=MW, 32=CT, 64=ABUSE, 128=CR
             const lists = [];
-            if (lastOctet & 1) lists.push('SC (SpamCop)');
-            if (lastOctet & 2) lists.push('WS (sa-blacklist)');
-            if (lastOctet & 4) lists.push('PH (Phishing)');
-            if (lastOctet & 8) lists.push('MW (Malware)');
-            if (lastOctet & 16) lists.push('AB (AbuseButler)');
-            if (lastOctet & 32) lists.push('JP (jwSpamSpy)');
-            if (lastOctet & 64) lists.push('CR (Cracked sites)');
+            if (lastOctet & 4) lists.push('DM (Data/Marketing)');
+            if (lastOctet & 8) lists.push('PH (Phishing)');
+            if (lastOctet & 16) lists.push('MW (Malware)');
+            if (lastOctet & 32) lists.push('CT (Cracked/Test)');
+            if (lastOctet & 64) lists.push('ABUSE (Abused domains)');
+            if (lastOctet & 128) lists.push('CR (Cracked sites)');
             
-            const severity = (lastOctet & 4) || (lastOctet & 8) ? 'high' : 'medium';
+            // High severity for phishing (8), malware (16), and cracked sites (128)
+            const severity = (lastOctet & 8) || (lastOctet & 16) || (lastOctet & 128) ? 'high' : 'medium';
             
             return {
-                listed: true,
+                listed: lists.length > 0,
                 blocklist: 'SURBL',
                 ip: ip,
                 lists: lists,
@@ -2090,8 +2121,8 @@ class DNSAnalyzer {
             return null;
         }
 
-        // Query format: domain.black.uribl.com
-        const queryDomain = `${domain}.black.uribl.com`;
+        // Use multi.uribl.com for proper bitmask checking (per URIBL documentation)
+        const queryDomain = `${domain}.multi.uribl.com`;
 
         try {
             const records = await this.queryDNS(queryDomain, 'A');
@@ -2108,14 +2139,31 @@ class DNSAnalyzer {
 
             const lastOctet = parseInt(ip.split('.')[3], 10);
             
-            // URIBL uses bitmask in last octet
-            const lists = [];
-            if (lastOctet & 1) lists.push('black');
-            if (lastOctet & 2) lists.push('grey');
-            if (lastOctet & 4) lists.push('red');
-            if (lastOctet & 8) lists.push('multi');
+            // URIBL bitmask values (per URIBL documentation):
+            // 1 = Query blocked (NOT a listing!)
+            // 2 = black
+            // 4 = grey
+            // 8 = red
+            // 14 = black,grey,red (testpoints)
             
-            const severity = (lastOctet & 4) ? 'high' : (lastOctet & 1) ? 'medium' : 'low';
+            // Check if query was blocked (bit 1) - this is NOT a positive listing
+            if (lastOctet === 1) {
+                console.warn(`URIBL query blocked for ${domain} (high volume)`);
+                return { listed: false, blocklist: 'URIBL', error: 'Query blocked' };
+            }
+            
+            const lists = [];
+            if (lastOctet & 2) lists.push('black');
+            if (lastOctet & 4) lists.push('grey');
+            if (lastOctet & 8) lists.push('red');
+            
+            // If no actual lists matched (only bit 1 was set), not a true listing
+            if (lists.length === 0) {
+                return { listed: false, blocklist: 'URIBL' };
+            }
+            
+            // Red is highest severity, then black, then grey
+            const severity = (lastOctet & 8) ? 'high' : (lastOctet & 2) ? 'medium' : 'low';
             
             return {
                 listed: true,

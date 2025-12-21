@@ -180,9 +180,12 @@ class UIRenderer {
             this.dynamicContainer.innerHTML = '';
         }
 
-        // Add progressive status message if this is a progressive update
+        // Handle progressive status message
         if (isProgressive) {
             this.showProgressiveStatus(processedData.stats);
+        } else {
+            // Remove progressive status when displaying final results
+            this.hideProgressiveStatus();
         }
 
         this.displayStats(processedData.stats, securityResults);
@@ -2015,12 +2018,20 @@ class UIRenderer {
             </div>
         `;
 
-        // Remove the status message after 10 seconds
+        // Remove the status message after 10 seconds (fallback)
         setTimeout(() => {
             if (statusDiv && statusDiv.parentNode) {
                 statusDiv.remove();
             }
         }, 10000);
+    }
+
+    // Hide progressive status message (called when final results are ready)
+    hideProgressiveStatus() {
+        const statusDiv = document.getElementById('progressive-status');
+        if (statusDiv && statusDiv.parentNode) {
+            statusDiv.remove();
+        }
     }
 
     // Display historical records

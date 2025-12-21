@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Spamhaus DBL Query Type** - Fixed critical bug where DBL was querying TXT records instead of A records. DBL uses A records in the 127.0.1.x range to indicate listings. Also added support for additional codes (127.0.1.102-106 for abused legit domains) and proper error handling for 127.255.255.x error responses.
+- **URIBL Bitmask Logic** - Fixed incorrect bitmask values that caused false positives. Query blocked responses (127.0.0.1, bit 1) were incorrectly treated as "listed in black". Corrected bitmask: 1=blocked, 2=black, 4=grey, 8=red. Changed endpoint to multi.uribl.com for proper bitmask support.
+- **SURBL Bitmask Logic** - Fixed completely incorrect bitmask values. Corrected to match SURBL documentation: 4=DM, 8=PH (Phishing), 16=MW (Malware), 32=CT, 64=ABUSE, 128=CR (Cracked sites). Previous implementation had wrong list names and bit positions.
+
 ### Changed
 - **Simplified Scan Modes** - Reduced from 5 scan modes to 3: Standard Scan (full analysis with subdomain discovery from all 4 sources), Quick Scan (domain-only checks, no subdomain discovery), and Email Scan (email records only: MX, SPF, DKIM, DMARC, MTA-STS, BIMI, TLSRPT).
 - **Streamlined Export Options** - Removed CSV, Save Analysis, History, and Compare exports. Kept JSON, PDF, Excel (XLSX), Markdown, and Copy Link for essential export needs.
