@@ -316,27 +316,46 @@ class AnalysisController {
             this.uiRenderer.updateProgress(15, 'Displaying initial results...');
             await this.displayProgressiveResults(mainDomainResults, [], [], {});
             
-            // Phase 2: Discover subdomains (slow - can take 10-30 seconds)
+            // Phase 2: Wildcard DNS detection (before subdomain analysis)
+            this.uiRenderer.updateProgress(18, 'Detecting wildcard DNS...');
+            const wildcardInfo = await this.detectWildcardDNS(domain);
+            if (wildcardInfo && wildcardInfo.isWildcard) {
+                this.addAPINotification('Wildcard DNS', `Wildcard DNS detected: All test subdomains resolve to ${wildcardInfo.wildcardIPs.join(', ')}`, 'warning');
+            }
+            
+            // Phase 3: Discover subdomains (slow - can take 10-30 seconds)
             this.uiRenderer.updateProgress(20, 'Discovering subdomains from multiple sources...');
             const subdomains = await this.discoverSubdomainsWithProgress(domain);
             
-            // Phase 3: Analyze subdomains progressively
+            // Phase 4: Analyze subdomains progressively
             this.uiRenderer.updateProgress(40, 'Analyzing discovered subdomains...');
             const subdomainResults = await this.analyzeSubdomainsWithProgress(subdomains, mainDomainResults);
             
-            // Phase 4: Get ASN information
+            // Phase 5: Get ASN information
             this.uiRenderer.updateProgress(70, 'Getting network information...');
             await this.enrichWithASNInfo(subdomainResults);
             
-            // Phase 5: Security analysis
+            // Phase 6: Test HTTP connections
+            this.uiRenderer.updateProgress(75, 'Testing HTTP connections...');
+            await this.enrichWithHTTPTesting(subdomainResults);
+            
+            // Phase 7: Security analysis
             this.uiRenderer.updateProgress(85, 'Performing security analysis...');
             const securityResults = await this.performSecurityAnalysis(mainDomainResults, subdomainResults);
             
-            // Phase 6: Final processing and display
+            // Add wildcard DNS info to security results
+            if (wildcardInfo) {
+                securityResults.wildcardDNS = wildcardInfo;
+            }
+            
+            // Phase 8: Final processing and display
             this.uiRenderer.updateProgress(95, 'Finalizing results...');
             const processedData = this.processResults(mainDomainResults, subdomainResults, securityResults);
             processedData.analysisMode = 'standard';
             if (processedData.stats) processedData.stats.analysisMode = 'standard';
+            if (wildcardInfo) {
+                processedData.wildcardDNS = wildcardInfo;
+            }
             
             // Phase 7: Show complete results
             const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
@@ -563,6 +582,47 @@ class AnalysisController {
         console.log(`✅ ASN enrichment complete`);
     }
 
+    // Enrich subdomain results with HTTP connection testing
+    async enrichWithHTTPTesting(subdomainResults) {
+        console.log(`🌐 Testing HTTP connections for subdomains...`);
+        
+        const subdomainsToTest = subdomainResults
+            .filter(s => s.subdomain && !s.isRedirectToMain)
+            .map(s => s.subdomain);
+
+        if (subdomainsToTest.length === 0) {
+            console.log(`ℹ️  No subdomains to test HTTP connections`);
+            return;
+        }
+
+        try {
+            const httpResults = await this.dnsAnalyzer.testHTTPConnections(subdomainsToTest, 5);
+            
+            // Add HTTP results to subdomain data
+            for (const subdomain of subdomainResults) {
+                if (httpResults.has(subdomain.subdomain)) {
+                    subdomain.httpStatus = httpResults.get(subdomain.subdomain);
+                }
+            }
+
+            console.log(`✅ HTTP connection testing complete`);
+        } catch (error) {
+            console.warn(`⚠️ HTTP connection testing failed:`, error.message);
+        }
+    }
+
+    // Detect wildcard DNS for main domain
+    async detectWildcardDNS(domain) {
+        console.log(`🔍 Detecting wildcard DNS for ${domain}...`);
+        try {
+            const wildcardInfo = await this.dnsAnalyzer.detectWildcardDNS(domain);
+            return wildcardInfo;
+        } catch (error) {
+            console.warn(`⚠️ Wildcard DNS detection failed:`, error.message);
+            return { isWildcard: false, error: error.message };
+        }
+    }
+
     // Perform comprehensive security analysis
     async performSecurityAnalysis(mainDomainResults, subdomainResults) {
         console.log(`🔒 Performing security analysis...`);
@@ -758,6 +818,12 @@ class AnalysisController {
             securityResults.wildcardCertificates = this.serviceDetector.detectWildcardCertificateIssues(wildcardCerts);
             if (window.logger) {
                 window.logger.debugJSON('Wildcard certificate issues:', securityResults.wildcardCertificates);
+            }
+            
+            // Analyze certificate expiration from CT log data
+            const certExpiration = this.dnsAnalyzer.analyzeCertificateExpiration(wildcardCerts);
+            if (certExpiration && certExpiration.hasIssues) {
+                securityResults.certificateExpiration = certExpiration;
             }
         }
 

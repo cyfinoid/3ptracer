@@ -239,6 +239,33 @@ class UIRenderer {
             this.displaySubdomains(processedData);
         }, true, processedData.stats.totalSubdomains || 0);
         
+        // NEW: Display Network Graph Visualization (only for complete analysis with subdomains)
+        if (!isProgressive && processedData.stats.totalSubdomains > 0) {
+            this.displayCollapsibleSection('Network Graph', () => {
+                const containerId = `networkGraphContainer-${Date.now()}`;
+                const container = document.createElement('div');
+                container.id = containerId;
+                container.style.height = '500px';
+                container.style.width = '100%';
+                container.style.minHeight = '400px';
+                container.style.border = '1px solid var(--border-color)';
+                container.style.borderRadius = '8px';
+                container.style.background = 'var(--card-bg)';
+                
+                this.dynamicContainer.appendChild(container);
+                
+                // Initialize graph after DOM is ready
+                setTimeout(() => {
+                    if (window.visualizer) {
+                        window.visualizer.setData(processedData, securityResults);
+                        window.visualizer.showNetworkGraph(containerId);
+                    } else {
+                        container.innerHTML = '<div style="padding: 20px; color: var(--text-secondary);">Network visualization library not loaded.</div>';
+                    }
+                }, 100);
+            }, false);
+        }
+        
         this.displayCollapsibleSection('Historical Records', () => {
             this.displayHistoricalRecords(processedData.historicalRecords);
         }, false, processedData.historicalRecords?.length || 0);
@@ -718,6 +745,39 @@ class UIRenderer {
             ...(securityResults.cloudIssues || []).map(issue => ({ ...issue, category: 'cloud' })),
             ...(securityResults.wildcardCertificates || []).map(issue => ({ ...issue, category: 'certificate' }))
         ];
+
+        // Add wildcard DNS warning if detected
+        if (securityResults.wildcardDNS && securityResults.wildcardDNS.isWildcard) {
+            allIssues.push({
+                category: 'dns',
+                risk: 'medium',
+                type: 'Wildcard DNS',
+                description: `Wildcard DNS detected: All test subdomains resolve to ${securityResults.wildcardDNS.wildcardIPs.join(', ')}`,
+                recommendation: 'Wildcard DNS can cause false positives in subdomain discovery. Consider filtering wildcard subdomains from results.',
+                details: {
+                    wildcardIPs: securityResults.wildcardDNS.wildcardIPs,
+                    testSubdomains: securityResults.wildcardDNS.testSubdomains,
+                    confidence: securityResults.wildcardDNS.confidence
+                }
+            });
+        }
+
+        // Add certificate expiration warnings if available (only for expiring soon, not expired)
+        // Note: Expired certificates in CT logs are historical - active subdomains likely have renewed certs
+        if (securityResults.certificateExpiration) {
+            const certExp = securityResults.certificateExpiration;
+            // Only warn about certificates expiring soon (actionable), not expired ones (historical CT log data)
+            if (certExp.expiringSoon > 0) {
+                allIssues.push({
+                    category: 'certificate',
+                    risk: 'medium',
+                    type: 'Expiring Certificates',
+                    description: `${certExp.expiringSoon} certificate(s) expiring within 15 days`,
+                    recommendation: 'Renew certificates before expiration to prevent service disruption.',
+                    details: certExp.expiringSoonCertificates
+                });
+            }
+        }
         
         if (allIssues.length === 0) {
             if (section) section.style.display = 'none';
@@ -1951,7 +2011,28 @@ class UIRenderer {
                                     info = `CNAME → ${sub.cnameTarget}`;
                                 }
                             }
-                            return `• ${this.createSubdomainLink(sub.subdomain)} (${info})`;
+                            
+                            // Add HTTP status indicator
+                            let httpStatus = '';
+                            if (sub.httpStatus) {
+                                const status = sub.httpStatus;
+                                if (status.https && status.https.reachable) {
+                                    httpStatus = ` <span style="color: #28a745; font-size: 0.85em;">✓ HTTPS</span>`;
+                                } else if (status.http && status.http.reachable) {
+                                    httpStatus = ` <span style="color: #ffc107; font-size: 0.85em;">✓ HTTP</span>`;
+                                } else if (status.https && status.https.corsBlocked) {
+                                    httpStatus = ` <span style="color: #17a2b8; font-size: 0.85em;">⚠ CORS</span>`;
+                                }
+                            }
+                            
+                            // Add PTR records if available
+                            let ptrInfo = '';
+                            if (sub.records && sub.records.PTR && sub.records.PTR.length > 0) {
+                                const ptrHostnames = sub.records.PTR.map(ptr => ptr.hostname || ptr.data).join(', ');
+                                ptrInfo = ` <span style="color: #6c757d; font-size: 0.85em;" title="PTR: ${window.CommonUtils.escapeHtml(ptrHostnames)}">🔗 PTR</span>`;
+                            }
+                            
+                            return `• ${this.createSubdomainLink(sub.subdomain)} (${info})${httpStatus}${ptrInfo}`;
                         }).join('<br>')}
                         ${provider.uniqueIPs > 1 ? `<br><br><strong>IPs:</strong><br>${provider.ips.join(', ')}` : ''}
                     </div>
@@ -2048,6 +2129,14 @@ class UIRenderer {
                         <strong>Priority:</strong> ${window.CommonUtils.escapeHtml(String(record.parsed.priority))} |
                         <strong>Weight:</strong> ${window.CommonUtils.escapeHtml(String(record.parsed.weight))} |
                         <strong>Type:</strong> ${window.CommonUtils.escapeHtml(record.parsed.serviceType)}
+                    </div>`;
+                }
+
+                // Show PTR record info if available
+                if (record.type === 'PTR') {
+                    html += `<div class="ptr-parsed">
+                        <strong>Reverse DNS:</strong> ${window.CommonUtils.escapeHtml(record.hostname || record.data)} |
+                        <strong>IP:</strong> ${window.CommonUtils.escapeHtml(record.ip || 'Unknown')}
                     </div>`;
                 }
 

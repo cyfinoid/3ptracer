@@ -449,6 +449,30 @@ class DNSAnalyzer {
                         console.warn(`  ⚠️  ASN lookup failed for ${analysis.ip}:`, error.message);
                     }
                 }
+
+                // Query PTR records for IP addresses (A and AAAA records)
+                const ipAddresses = [];
+                if (analysis.records.A) {
+                    ipAddresses.push(...analysis.records.A.map(r => r.data));
+                }
+                if (analysis.records.AAAA) {
+                    ipAddresses.push(...analysis.records.AAAA.map(r => r.data));
+                }
+                
+                if (ipAddresses.length > 0) {
+                    try {
+                        const ptrResults = await this.queryPTRRecordsForIPs(ipAddresses);
+                        if (ptrResults.size > 0) {
+                            if (!analysis.records.PTR) analysis.records.PTR = [];
+                            for (const [ip, ptrRecords] of ptrResults.entries()) {
+                                analysis.records.PTR.push(...ptrRecords);
+                            }
+                            console.log(`  ✅ PTR records found for ${ptrResults.size} IP(s)`);
+                        }
+                    } catch (error) {
+                        console.warn(`  ⚠️  PTR lookup failed:`, error.message);
+                    }
+                }
                 
                 // Check for takeover from CNAME records (service detection already handled above)
                 if (analysis.records.CNAME && analysis.records.CNAME.length > 0) {
@@ -1826,6 +1850,336 @@ class DNSAnalyzer {
         return descriptions[service] || `Service discovery record for ${service}`;
     }
 
+    // Query PTR (reverse DNS) record for an IP address
+    async queryPTRRecord(ip) {
+        try {
+            // Validate IP address format
+            if (!ip || typeof ip !== 'string') {
+                return null;
+            }
+
+            // Convert IP to reverse DNS format
+            let ptrDomain;
+            if (ip.includes(':')) {
+                // IPv6: reverse hex digits and use .ip6.arpa
+                const parts = ip.split(':');
+                let reversed = '';
+                for (let i = parts.length - 1; i >= 0; i--) {
+                    const part = parts[i].padStart(4, '0');
+                    for (let j = part.length - 1; j >= 0; j--) {
+                        reversed += part[j] + '.';
+                    }
+                }
+                ptrDomain = reversed + 'ip6.arpa';
+            } else {
+                // IPv4: reverse octets and use .in-addr.arpa
+                const parts = ip.split('.');
+                if (parts.length !== 4) {
+                    return null;
+                }
+                ptrDomain = parts.reverse().join('.') + '.in-addr.arpa';
+            }
+
+            console.log(`🔍 Querying PTR record for ${ip} (${ptrDomain})...`);
+
+            // Query PTR record via DoH
+            const records = await this.queryDNS(ptrDomain, 'PTR');
+            if (records && records.length > 0) {
+                const ptrRecords = records.map(record => ({
+                    ip: ip,
+                    hostname: record.data.replace(/\.$/, ''), // Remove trailing dot
+                    type: 'PTR',
+                    raw: record
+                }));
+                console.log(`  ✅ Found ${ptrRecords.length} PTR record(s) for ${ip}:`, ptrRecords.map(r => r.hostname));
+                return ptrRecords;
+            }
+
+            return null;
+        } catch (error) {
+            console.warn(`  ⚠️  PTR lookup failed for ${ip}:`, error.message);
+            return null;
+        }
+    }
+
+    // Query PTR records for multiple IPs in parallel (with rate limiting)
+    async queryPTRRecordsForIPs(ips) {
+        const uniqueIPs = [...new Set(ips.filter(ip => ip && typeof ip === 'string'))];
+        if (uniqueIPs.length === 0) {
+            return new Map();
+        }
+
+        console.log(`🔍 Querying PTR records for ${uniqueIPs.length} unique IP addresses...`);
+        const ptrResults = new Map();
+
+        // Process in batches to respect rate limits
+        const batchSize = 5;
+        for (let i = 0; i < uniqueIPs.length; i += batchSize) {
+            const batch = uniqueIPs.slice(i, i + batchSize);
+            const batchPromises = batch.map(async (ip) => {
+                await this.rateLimiter.throttle();
+                const ptrRecords = await this.queryPTRRecord(ip);
+                if (ptrRecords && ptrRecords.length > 0) {
+                    ptrResults.set(ip, ptrRecords);
+                }
+            });
+
+            await Promise.allSettled(batchPromises);
+        }
+
+        console.log(`📊 PTR lookup complete: ${ptrResults.size} IPs have PTR records`);
+        return ptrResults;
+    }
+
+    // Test HTTP/HTTPS connection for a subdomain (HTTP and HTTPS tested in parallel)
+    async testHTTPConnection(subdomain) {
+        const result = {
+            subdomain: subdomain,
+            http: null,
+            https: null,
+            timestamp: new Date().toISOString()
+        };
+
+        // Test HTTPS and HTTP in parallel
+        const [httpsResult, httpResult] = await Promise.allSettled([
+            this.testHTTPSConnection(subdomain),
+            this.testHTTPConnectionOnly(subdomain)
+        ]);
+
+        // Process HTTPS result
+        if (httpsResult.status === 'fulfilled') {
+            result.https = httpsResult.value;
+        } else {
+            result.https = {
+                reachable: false,
+                error: httpsResult.reason?.message || 'Unknown error',
+                corsBlocked: false
+            };
+        }
+
+        // Process HTTP result
+        if (httpResult.status === 'fulfilled') {
+            result.http = httpResult.value;
+        } else {
+            result.http = {
+                reachable: false,
+                error: httpResult.reason?.message || 'Unknown error',
+                corsBlocked: false
+            };
+        }
+
+        return result;
+    }
+
+    // Test HTTPS connection only
+    async testHTTPSConnection(subdomain) {
+        const httpsUrl = `https://${subdomain}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+
+        try {
+            const response = await fetch(httpsUrl, {
+                method: 'HEAD',
+                signal: controller.signal,
+                redirect: 'follow',
+                mode: 'cors'
+            });
+
+            clearTimeout(timeoutId);
+            return {
+                reachable: true,
+                status: response.status,
+                statusText: response.statusText,
+                finalUrl: response.url,
+                headers: {
+                    server: response.headers.get('server'),
+                    contentType: response.headers.get('content-type'),
+                    location: response.headers.get('location')
+                },
+                corsBlocked: false
+            };
+        } catch (fetchError) {
+            clearTimeout(timeoutId);
+            if (fetchError.name === 'AbortError') {
+                return {
+                    reachable: false,
+                    error: 'timeout',
+                    corsBlocked: false
+                };
+            } else if (fetchError.message.includes('CORS') || fetchError.message.includes('Failed to fetch')) {
+                // Likely CORS blocked, but server exists
+                return {
+                    reachable: true, // Server exists, just CORS blocked
+                    corsBlocked: true,
+                    error: 'CORS blocked'
+                };
+            } else {
+                return {
+                    reachable: false,
+                    error: fetchError.message,
+                    corsBlocked: false
+                };
+            }
+        }
+    }
+
+    // Test HTTP connection only
+    async testHTTPConnectionOnly(subdomain) {
+        const httpUrl = `http://${subdomain}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+
+        try {
+            const response = await fetch(httpUrl, {
+                method: 'HEAD',
+                signal: controller.signal,
+                redirect: 'follow',
+                mode: 'cors'
+            });
+
+            clearTimeout(timeoutId);
+            return {
+                reachable: true,
+                status: response.status,
+                statusText: response.statusText,
+                finalUrl: response.url,
+                headers: {
+                    server: response.headers.get('server'),
+                    contentType: response.headers.get('content-type'),
+                    location: response.headers.get('location')
+                },
+                corsBlocked: false
+            };
+        } catch (fetchError) {
+            clearTimeout(timeoutId);
+            if (fetchError.name === 'AbortError') {
+                return {
+                    reachable: false,
+                    error: 'timeout',
+                    corsBlocked: false
+                };
+            } else if (fetchError.message.includes('CORS') || fetchError.message.includes('Failed to fetch')) {
+                return {
+                    reachable: true,
+                    corsBlocked: true,
+                    error: 'CORS blocked'
+                };
+            } else {
+                return {
+                    reachable: false,
+                    error: fetchError.message,
+                    corsBlocked: false
+                };
+            }
+        }
+    }
+
+    // Test HTTP connections for multiple subdomains in parallel (with concurrency limit)
+    async testHTTPConnections(subdomains, maxConcurrent = 5) {
+        if (!subdomains || subdomains.length === 0) {
+            return new Map();
+        }
+
+        console.log(`🌐 Testing HTTP connections for ${subdomains.length} subdomains (max ${maxConcurrent} concurrent)...`);
+        const httpResults = new Map();
+
+        // Process in batches to limit concurrent connections
+        for (let i = 0; i < subdomains.length; i += maxConcurrent) {
+            const batch = subdomains.slice(i, i + maxConcurrent);
+            const batchPromises = batch.map(async (subdomain) => {
+                const result = await this.testHTTPConnection(subdomain);
+                httpResults.set(subdomain, result);
+            });
+
+            await Promise.allSettled(batchPromises);
+        }
+
+        const reachableCount = Array.from(httpResults.values()).filter(r => 
+            (r.https && r.https.reachable) || (r.http && r.http.reachable)
+        ).length;
+
+        console.log(`📊 HTTP connection testing complete: ${reachableCount}/${subdomains.length} subdomains reachable`);
+        return httpResults;
+    }
+
+    // Detect wildcard DNS configuration for a domain
+    async detectWildcardDNS(domain) {
+        try {
+            console.log(`🔍 Testing for wildcard DNS on ${domain}...`);
+            
+            // Generate random subdomains to test
+            const testSubdomains = [];
+            for (let i = 0; i < 5; i++) {
+                const randomPart = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                testSubdomains.push(`${randomPart}.${domain}`);
+            }
+
+            // Query all test subdomains
+            const testResults = [];
+            for (const testSubdomain of testSubdomains) {
+                try {
+                    const records = await this.queryDNS(testSubdomain);
+                    if (records && records.length > 0) {
+                        const ips = records
+                            .filter(r => r.type === 1 || r.type === 28) // A or AAAA
+                            .map(r => r.data);
+                        if (ips.length > 0) {
+                            testResults.push({
+                                subdomain: testSubdomain,
+                                ips: ips
+                            });
+                        }
+                    }
+                } catch (error) {
+                    // Subdomain doesn't exist, which is expected for non-wildcard
+                }
+            }
+
+            // If all test subdomains resolve to the same IP(s), likely wildcard DNS
+            if (testResults.length >= 3) {
+                const firstIPs = testResults[0].ips.sort().join(',');
+                const allSame = testResults.every(result => 
+                    result.ips.sort().join(',') === firstIPs
+                );
+
+                if (allSame) {
+                    console.log(`  ⚠️  Wildcard DNS detected: All test subdomains resolve to ${firstIPs}`);
+                    return {
+                        isWildcard: true,
+                        wildcardIPs: testResults[0].ips,
+                        testSubdomains: testResults.map(r => r.subdomain),
+                        confidence: 'high'
+                    };
+                }
+            }
+
+            // If some but not all resolve, might be partial wildcard
+            if (testResults.length >= 2 && testResults.length < 5) {
+                console.log(`  ⚠️  Partial wildcard DNS possible: ${testResults.length}/5 test subdomains resolved`);
+                return {
+                    isWildcard: false,
+                    partialWildcard: true,
+                    testSubdomains: testResults.map(r => r.subdomain),
+                    confidence: 'medium'
+                };
+            }
+
+            console.log(`  ✅ No wildcard DNS detected (${testResults.length}/5 test subdomains resolved)`);
+            return {
+                isWildcard: false,
+                partialWildcard: false,
+                confidence: 'high'
+            };
+        } catch (error) {
+            console.warn(`  ⚠️  Wildcard detection failed:`, error.message);
+            return {
+                isWildcard: false,
+                error: error.message,
+                confidence: 'unknown'
+            };
+        }
+    }
+
     // Get ASN information for IP with multiple fallback sources - Enhanced for Data Sovereignty Analysis
     async getASNInfo(ip) {
         const providers = [
@@ -3199,8 +3553,23 @@ class DNSAnalyzer {
     // Detect subdomain takeover
     async detectTakeover(subdomain, cname) {
         try {
+            // Enhanced takeover detection with service-specific patterns
             const records = await this.queryDNS(cname, 'A');
             if (!records || records.length === 0) {
+                // Check for service-specific takeover patterns
+                const takeoverPatterns = this.getTakeoverPatterns(cname);
+                if (takeoverPatterns) {
+                    return {
+                        subdomain: subdomain,
+                        cname: cname,
+                        takeover: true,
+                        risk: takeoverPatterns.risk,
+                        service: takeoverPatterns.service,
+                        description: takeoverPatterns.description,
+                        remediation: takeoverPatterns.remediation
+                    };
+                }
+                
                 return {
                     subdomain: subdomain,
                     cname: cname,
@@ -3209,11 +3578,178 @@ class DNSAnalyzer {
                     description: 'CNAME target does not resolve'
                 };
             }
+            
+            // Even if CNAME resolves, check for known vulnerable patterns
+            const vulnerablePatterns = this.checkVulnerableTakeoverPatterns(cname);
+            if (vulnerablePatterns) {
+                return {
+                    subdomain: subdomain,
+                    cname: cname,
+                    takeover: true,
+                    risk: vulnerablePatterns.risk,
+                    service: vulnerablePatterns.service,
+                    description: vulnerablePatterns.description,
+                    remediation: vulnerablePatterns.remediation
+                };
+            }
+            
             return null;
         } catch (error) {
             console.warn(`Failed to check takeover for ${subdomain}:`, error);
             return null;
         }
+    }
+
+    // Get service-specific takeover patterns
+    getTakeoverPatterns(cname) {
+        const lowerCname = cname.toLowerCase();
+        
+        // GitHub Pages
+        if (lowerCname.includes('github.io') || lowerCname.includes('githubusercontent.com')) {
+            return {
+                service: 'GitHub Pages',
+                risk: 'high',
+                description: 'CNAME points to GitHub Pages but target does not resolve. Subdomain may be available for takeover.',
+                remediation: 'Verify GitHub Pages repository exists and is properly configured.'
+            };
+        }
+        
+        // Heroku
+        if (lowerCname.includes('herokuapp.com') || lowerCname.includes('herokussl.com')) {
+            return {
+                service: 'Heroku',
+                risk: 'high',
+                description: 'CNAME points to Heroku but target does not resolve. Subdomain may be available for takeover.',
+                remediation: 'Verify Heroku app exists and is properly configured.'
+            };
+        }
+        
+        // AWS S3
+        if (lowerCname.includes('s3.amazonaws.com') || lowerCname.includes('s3-website')) {
+            return {
+                service: 'AWS S3',
+                risk: 'high',
+                description: 'CNAME points to AWS S3 but bucket does not exist or is misconfigured.',
+                remediation: 'Verify S3 bucket exists and has proper permissions configured.'
+            };
+        }
+        
+        // CloudFront
+        if (lowerCname.includes('cloudfront.net')) {
+            return {
+                service: 'AWS CloudFront',
+                risk: 'high',
+                description: 'CNAME points to CloudFront but distribution does not exist.',
+                remediation: 'Verify CloudFront distribution exists and is properly configured.'
+            };
+        }
+        
+        // Azure
+        if (lowerCname.includes('azurewebsites.net') || lowerCname.includes('cloudapp.azure.com')) {
+            return {
+                service: 'Microsoft Azure',
+                risk: 'high',
+                description: 'CNAME points to Azure but resource does not exist.',
+                remediation: 'Verify Azure resource exists and is properly configured.'
+            };
+        }
+        
+        // Vercel
+        if (lowerCname.includes('vercel.app') || lowerCname.includes('vercel-dns.com')) {
+            return {
+                service: 'Vercel',
+                risk: 'high',
+                description: 'CNAME points to Vercel but project does not exist.',
+                remediation: 'Verify Vercel project exists and domain is properly configured.'
+            };
+        }
+        
+        // Netlify
+        if (lowerCname.includes('netlify.app') || lowerCname.includes('netlify.com')) {
+            return {
+                service: 'Netlify',
+                risk: 'high',
+                description: 'CNAME points to Netlify but site does not exist.',
+                remediation: 'Verify Netlify site exists and domain is properly configured.'
+            };
+        }
+        
+        // Fastly
+        if (lowerCname.includes('fastly.net') || lowerCname.includes('fastlylb.net')) {
+            return {
+                service: 'Fastly',
+                risk: 'medium',
+                description: 'CNAME points to Fastly but service does not exist.',
+                remediation: 'Verify Fastly service exists and is properly configured.'
+            };
+        }
+        
+        // Shopify
+        if (lowerCname.includes('myshopify.com') || lowerCname.includes('shopifycdn.com')) {
+            return {
+                service: 'Shopify',
+                risk: 'high',
+                description: 'CNAME points to Shopify but store does not exist.',
+                remediation: 'Verify Shopify store exists and domain is properly configured.'
+            };
+        }
+        
+        return null;
+    }
+
+    // Check for vulnerable takeover patterns even when CNAME resolves
+    checkVulnerableTakeoverPatterns(cname) {
+        const lowerCname = cname.toLowerCase();
+        
+        // Some services may resolve but still be vulnerable
+        // This is a placeholder for future enhancements with HTTP response analysis
+        // For now, we focus on non-resolving CNAMEs
+        
+        return null;
+    }
+
+    // Analyze certificate expiration from CT log data
+    analyzeCertificateExpiration(certificates) {
+        if (!certificates || certificates.length === 0) {
+            return null;
+        }
+
+        const now = new Date();
+        const expirationWarnings = [];
+        const expiredCertificates = [];
+        const expiringSoon = [];
+
+        for (const cert of certificates) {
+            if (!cert.notAfter) continue;
+
+            const expirationDate = new Date(cert.notAfter);
+            const daysUntilExpiration = Math.floor((expirationDate - now) / (1000 * 60 * 60 * 24));
+
+            if (expirationDate < now) {
+                expiredCertificates.push({
+                    domain: cert.domain,
+                    expirationDate: cert.notAfter,
+                    daysExpired: Math.abs(daysUntilExpiration),
+                    certificateId: cert.certificateId
+                });
+            } else if (daysUntilExpiration <= 15) {
+                expiringSoon.push({
+                    domain: cert.domain,
+                    expirationDate: cert.notAfter,
+                    daysUntilExpiration: daysUntilExpiration,
+                    certificateId: cert.certificateId
+                });
+            }
+        }
+
+        return {
+            totalCertificates: certificates.length,
+            expired: expiredCertificates.length,
+            expiringSoon: expiringSoon.length,
+            expiredCertificates: expiredCertificates,
+            expiringSoonCertificates: expiringSoon,
+            hasIssues: expiredCertificates.length > 0 || expiringSoon.length > 0
+        };
     }
 }
 

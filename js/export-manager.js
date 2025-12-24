@@ -251,13 +251,35 @@ class ExportManager {
                 const subdomainList = Array.isArray(data.subdomains) ? data.subdomains : Object.values(data.subdomains);
                 if (subdomainList.length > 0) {
                     md += `## Subdomains (${subdomainList.length})\n\n`;
-                    md += `| Subdomain | IP | Provider |\n`;
-                    md += `|-----------|----|---------|\n`;
+                    md += `| Subdomain | IP | Provider | HTTP Status | PTR Records |\n`;
+                    md += `|-----------|----|---------|-------------|-------------|\n`;
                     for (const sub of subdomainList.slice(0, 50)) {
                         const subdomain = sub.subdomain || sub.name || sub;
                         const ip = sub.ip || sub.ipAddresses?.[0] || 'N/A';
                         const provider = sub.asnInfo?.org || sub.provider || 'Unknown';
-                        md += `| ${subdomain} | ${ip} | ${provider} |\n`;
+                        
+                        // Add HTTP status
+                        let httpStatus = 'N/A';
+                        if (sub.httpStatus) {
+                            const status = sub.httpStatus;
+                            if (status.https && status.https.reachable) {
+                                httpStatus = `HTTPS: ${status.https.status || 'OK'}`;
+                            } else if (status.http && status.http.reachable) {
+                                httpStatus = `HTTP: ${status.http.status || 'OK'}`;
+                            } else if (status.https && status.https.corsBlocked) {
+                                httpStatus = 'HTTPS: CORS blocked';
+                            } else {
+                                httpStatus = 'Unreachable';
+                            }
+                        }
+                        
+                        // Add PTR records
+                        let ptrRecords = 'N/A';
+                        if (sub.records && sub.records.PTR && sub.records.PTR.length > 0) {
+                            ptrRecords = sub.records.PTR.map(ptr => ptr.hostname || ptr.data).join(', ');
+                        }
+                        
+                        md += `| ${subdomain} | ${ip} | ${provider} | ${httpStatus} | ${ptrRecords} |\n`;
                     }
                     if (subdomainList.length > 50) {
                         md += `\n*...and ${subdomainList.length - 50} more subdomains*\n`;
@@ -322,9 +344,42 @@ class ExportManager {
                 creator: '3rd Party Tracer'
             });
 
-            let currentY = 15;
             const pageHeight = doc.internal.pageSize.height;
+            const pageWidth = doc.internal.pageSize.width;
             const marginBottom = 20;
+
+            // ===== COVER PAGE =====
+            doc.setPage(1);
+            
+            // Center content vertically
+            const centerY = pageHeight / 2;
+            
+            // Tool name - large and prominent
+            doc.setFontSize(32);
+            doc.setTextColor(102, 126, 234); // Purple color
+            doc.setFont(undefined, 'bold');
+            const toolName = '3rd Party Tracer';
+            const toolNameWidth = doc.getTextWidth(toolName);
+            doc.text(toolName, (pageWidth - toolNameWidth) / 2, centerY - 30);
+            
+            // Domain name - medium size
+            doc.setFontSize(20);
+            doc.setTextColor(0, 0, 0);
+            doc.setFont(undefined, 'normal');
+            const domainText = `Analysis Report for: ${this.exportDomain}`;
+            const domainWidth = doc.getTextWidth(domainText);
+            doc.text(domainText, (pageWidth - domainWidth) / 2, centerY + 10);
+            
+            // Generated date - small
+            doc.setFontSize(10);
+            doc.setTextColor(100, 100, 100);
+            const dateText = `Generated: ${this.analysisData.formattedTimestamp}`;
+            const dateWidth = doc.getTextWidth(dateText);
+            doc.text(dateText, (pageWidth - dateWidth) / 2, centerY + 30);
+            
+            // ===== CONTENT PAGES START =====
+            doc.addPage();
+            let currentY = 15;
 
             // Title and header - compact
             doc.setFontSize(16);
@@ -441,16 +496,18 @@ class ExportManager {
             
             if (subdomainsData.length > 0) {
                 doc.autoTable({
-                    head: [['Subdomain', 'IP Address', 'Provider/Service']],
+                    head: [['Subdomain', 'IP Address', 'Provider/Service', 'HTTP Status', 'PTR Records']],
                     body: subdomainsData,
                     startY: currentY,
                     theme: 'striped',
                     headStyles: { fillColor: [102, 126, 234], fontSize: 8 },
                     margin: { left: 15, right: 15 },
                     columnStyles: {
-                        0: { cellWidth: 85 },
-                        1: { cellWidth: 40 },
-                        2: { cellWidth: 55 }
+                        0: { cellWidth: 70 },
+                        1: { cellWidth: 35 },
+                        2: { cellWidth: 45 },
+                        3: { cellWidth: 35 },
+                        4: { cellWidth: 45 }
                     },
                     styles: { fontSize: 7.5, cellPadding: 1.5, overflow: 'linebreak', lineWidth: 0.1 }
                 });
@@ -548,14 +605,96 @@ class ExportManager {
                 currentY = doc.lastAutoTable.finalY + 8;
             }
 
-            // Add footer to each page - compact
+            // ===== LAST PAGE - ABOUT CYFINOID =====
+            doc.addPage();
+            currentY = 15;
+            
+            doc.setFontSize(18);
+            doc.setTextColor(102, 126, 234);
+            doc.setFont(undefined, 'bold');
+            doc.text('About Cyfinoid Research', 15, currentY);
+            
+            currentY += 15;
+            doc.setFontSize(11);
+            doc.setTextColor(0, 0, 0);
+            doc.setFont(undefined, 'bold');
+            doc.text('Cyfinoid Research', 15, currentY);
+            
+            currentY += 8;
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(10);
+            doc.text('Cutting-Edge Cloud Security Research', 15, currentY);
+            
+            currentY += 7;
+            doc.setFontSize(9);
+            doc.text('Pioneering advanced cloud technology research and developing innovative', 15, currentY, { maxWidth: 180 });
+            currentY += 5;
+            doc.text('cybersecurity tools for the community.', 15, currentY, { maxWidth: 180 });
+            
+            currentY += 10;
+            doc.text('This tool is part of our free research toolkit - helping organizations', 15, currentY, { maxWidth: 180 });
+            currentY += 5;
+            doc.text('discover and analyze their cloud service dependencies.', 15, currentY, { maxWidth: 180 });
+            
+            currentY += 15;
+            doc.setFontSize(11);
+            doc.setFont(undefined, 'bold');
+            doc.text('Cloud Technology Focus', 15, currentY);
+            
+            currentY += 8;
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(9);
+            doc.text('Specializing in cloud infrastructure analysis, third-party service', 15, currentY, { maxWidth: 180 });
+            currentY += 5;
+            doc.text('discovery, and cloud security research.', 15, currentY, { maxWidth: 180 });
+            
+            currentY += 10;
+            doc.text('Our research tools help organizations understand their digital', 15, currentY, { maxWidth: 180 });
+            currentY += 5;
+            doc.text('footprint and cloud service relationships.', 15, currentY, { maxWidth: 180 });
+            
+            currentY += 15;
+            doc.setFontSize(11);
+            doc.setFont(undefined, 'bold');
+            doc.text('Learn & Explore', 15, currentY);
+            
+            currentY += 8;
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(9);
+            doc.text('Explore our professional training programs, latest research insights,', 15, currentY, { maxWidth: 180 });
+            currentY += 5;
+            doc.text('and free open source tools developed from our cutting-edge', 15, currentY, { maxWidth: 180 });
+            currentY += 5;
+            doc.text('cybersecurity research.', 15, currentY, { maxWidth: 180 });
+            
+            currentY += 10;
+            doc.text('• Upcoming Trainings: cyfinoid.com/trainings/', 15, currentY, { maxWidth: 180 });
+            currentY += 6;
+            doc.text('• Read Our Blog: cyfinoid.com/blog/', 15, currentY, { maxWidth: 180 });
+            currentY += 6;
+            doc.text('• Open Source By Cyfinoid: cyfinoid.com/opensource-by-cyfinoid/', 15, currentY, { maxWidth: 180 });
+            
+            currentY += 10;
+            doc.setFontSize(8);
+            doc.setTextColor(100, 100, 100);
+            doc.text('Hands-on training in cloud security, Android security, and software', 15, currentY, { maxWidth: 180 });
+            currentY += 5;
+            doc.text('supply chain protection', 15, currentY, { maxWidth: 180 });
+            
+            currentY += 15;
+            doc.setFontSize(8);
+            doc.setTextColor(102, 126, 234);
+            doc.text('GitHub: github.com/cyfinoid/3ptracer', 15, currentY);
+            currentY += 6;
+            doc.text('Website: cyfinoid.com', 15, currentY);
+            currentY += 6;
+            doc.text('Tool: cyfinoid.github.io/3ptracer', 15, currentY);
+            
+            // Add footer to all pages (cover, content, and last page)
             const pageCount = doc.internal.getNumberOfPages();
             for (let i = 1; i <= pageCount; i++) {
                 doc.setPage(i);
-                doc.setFontSize(7);
-                doc.setTextColor(150, 150, 150);
-                doc.text(`Page ${i}/${pageCount}`, 15, pageHeight - 10);
-                doc.text('3rd Party Tracer - cyfinoid.github.io/3ptracer', 105, pageHeight - 10, { align: 'center' });
+                this.addPDFFooter(doc, i, pageCount, this.exportDomain);
             }
 
             // Save the PDF
@@ -578,6 +717,24 @@ class ExportManager {
         doc.text(title, 15, currentY);
         doc.setFont(undefined, 'normal');
         return currentY + 7;
+    }
+
+    // Helper method to add footer to PDF pages
+    addPDFFooter(doc, pageNum, totalPages, domain) {
+        const pageHeight = doc.internal.pageSize.height;
+        const pageWidth = doc.internal.pageSize.width;
+        
+        doc.setFontSize(7);
+        doc.setTextColor(150, 150, 150);
+        
+        // Left: Page number
+        doc.text(`Page ${pageNum}/${totalPages}`, 15, pageHeight - 10);
+        
+        // Center: Tool URL
+        doc.text('3rd Party Tracer - cyfinoid.github.io/3ptracer', pageWidth / 2, pageHeight - 10, { align: 'center' });
+        
+        // Right: Domain name
+        doc.text(`Domain: ${domain}`, pageWidth - 15, pageHeight - 10, { align: 'right' });
     }
 
     // Format services data for PDF using the verified JSON structure - optimized
@@ -691,10 +848,33 @@ class ExportManager {
                 const provider = subdomain.provider || subdomain.service || 
                                (subdomain.asnInfo ? subdomain.asnInfo.org : 'Unknown');
                 
+                // Add HTTP status
+                let httpStatus = 'N/A';
+                if (subdomain.httpStatus) {
+                    const status = subdomain.httpStatus;
+                    if (status.https && status.https.reachable) {
+                        httpStatus = `HTTPS: ${status.https.status || 'OK'}`;
+                    } else if (status.http && status.http.reachable) {
+                        httpStatus = `HTTP: ${status.http.status || 'OK'}`;
+                    } else if (status.https && status.https.corsBlocked) {
+                        httpStatus = 'HTTPS: CORS blocked';
+                    } else {
+                        httpStatus = 'Unreachable';
+                    }
+                }
+                
+                // Add PTR records
+                let ptrRecords = 'N/A';
+                if (subdomain.records && subdomain.records.PTR && subdomain.records.PTR.length > 0) {
+                    ptrRecords = subdomain.records.PTR.map(ptr => ptr.hostname || ptr.data).join(', ');
+                }
+                
                 subdomains.push([
                     subdomain.subdomain || subdomain.name || 'Unknown',
                     ipAddress,
-                    provider
+                    provider,
+                    httpStatus,
+                    ptrRecords
                 ]);
             });
         }
@@ -1058,6 +1238,8 @@ class ExportManager {
                     parsedInfo = `Tag: ${record.parsed.tag}, Authority: ${record.parsed.authority}, Trust: ${record.parsed.isKnownCA ? 'Known CA' : 'Unknown CA'}`;
                 } else if (record.type === 'SRV') {
                     parsedInfo = `Service: ${record.parsed.service}, Target: ${record.parsed.target}:${record.parsed.port}, Priority: ${record.parsed.priority}`;
+                } else if (record.type === 'PTR') {
+                    parsedInfo = `IP: ${record.ip || 'Unknown'}, Hostname: ${record.hostname || record.data || 'Unknown'}`;
                 }
             }
             

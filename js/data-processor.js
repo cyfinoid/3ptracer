@@ -115,6 +115,8 @@ class DataProcessor {
             takeover: subdomain.takeover || null,
             // FIXED: Keep ASN info for sovereignty analysis
             asnInfo: subdomain.asnInfo || null,
+            // NEW: Preserve HTTP status and PTR records
+            httpStatus: subdomain.httpStatus || null,
             status: 'analyzed'
         };
 

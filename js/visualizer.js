@@ -37,6 +37,26 @@ class Visualizer {
         }
 
         const data = this.analysisData.processedData;
+        
+        // Process subdomains - handle Map, Array, or Object
+        let subdomains = [];
+        if (data.subdomains) {
+            if (data.subdomains instanceof Map) {
+                subdomains = Array.from(data.subdomains.values());
+            } else if (Array.isArray(data.subdomains)) {
+                subdomains = data.subdomains;
+            } else {
+                subdomains = Object.values(data.subdomains);
+            }
+        }
+
+        // Check if we have enough subdomains for a meaningful visualization
+        if (subdomains.length < 2) {
+            container.innerHTML = '<div style="padding: 20px; color: var(--text-secondary); text-align: center;">Not enough subdomain data for network visualization. Need at least 2 subdomains.</div>';
+            console.log('ℹ️ Skipping network graph - not enough subdomain data (need at least 2, found ' + subdomains.length + ')');
+            return;
+        }
+
         const nodes = [];
         const edges = [];
         const nodeIds = new Set();
@@ -54,10 +74,6 @@ class Visualizer {
             size: 30
         });
         nodeIds.add(domain);
-
-        // Process subdomains
-        const subdomains = data.subdomains ? 
-            (Array.isArray(data.subdomains) ? data.subdomains : Object.values(data.subdomains)) : [];
 
         // Color map for providers
         const providerColors = {
@@ -88,6 +104,19 @@ class Visualizer {
 
             nodeIds.add(subName);
             
+            // Build tooltip with IP and HTTP status
+            let tooltip = `${subName}\nIP: ${sub.ip || sub.ipAddresses?.[0] || 'N/A'}\nProvider: ${sub.asnInfo?.org || 'Unknown'}`;
+            if (sub.httpStatus) {
+                const status = sub.httpStatus;
+                if (status.https && status.https.reachable) {
+                    tooltip += `\nHTTPS: ✓ ${status.https.status || 'OK'}`;
+                } else if (status.http && status.http.reachable) {
+                    tooltip += `\nHTTP: ✓ ${status.http.status || 'OK'}`;
+                } else if (status.https && status.https.corsBlocked) {
+                    tooltip += `\nHTTPS: ⚠ CORS blocked`;
+                }
+            }
+            
             // Add subdomain node
             nodes.push({
                 id: subName,
@@ -95,7 +124,7 @@ class Visualizer {
                 shape: 'dot',
                 color: getNodeColor(sub),
                 size: 15,
-                title: `${subName}\nIP: ${sub.ip || 'N/A'}\nProvider: ${sub.asnInfo?.org || 'Unknown'}`
+                title: tooltip
             });
 
             // Add edge to parent domain
@@ -105,6 +134,75 @@ class Visualizer {
                 color: { color: '#cccccc', opacity: 0.5 },
                 width: 1
             });
+
+            // Add IP node and edge if IP exists
+            const ip = sub.ip || sub.ipAddresses?.[0];
+            if (ip && ip !== 'N/A') {
+                const ipNodeId = `ip_${ip}`;
+                if (!nodeIds.has(ipNodeId)) {
+                    nodeIds.add(ipNodeId);
+                    
+                    // Build IP tooltip with PTR records
+                    let ipTooltip = `IP: ${ip}`;
+                    if (sub.records && sub.records.PTR && sub.records.PTR.length > 0) {
+                        const ptrHostnames = sub.records.PTR.map(ptr => ptr.hostname || ptr.data).join(', ');
+                        ipTooltip += `\nPTR: ${ptrHostnames}`;
+                    }
+                    if (sub.asnInfo?.org) {
+                        ipTooltip += `\nASN: ${sub.asnInfo.org}`;
+                    }
+                    
+                    nodes.push({
+                        id: ipNodeId,
+                        label: ip,
+                        shape: 'square',
+                        color: { background: '#17a2b8', border: '#138496' },
+                        font: { color: '#ffffff', size: 10 },
+                        size: 12,
+                        title: ipTooltip
+                    });
+                }
+                
+                // Add edge from subdomain to IP
+                edges.push({
+                    from: subName,
+                    to: ipNodeId,
+                    arrows: 'to',
+                    color: { color: '#17a2b8' },
+                    width: 1,
+                    label: 'A'
+                });
+                
+                // Add PTR edges if available
+                if (sub.records && sub.records.PTR && sub.records.PTR.length > 0) {
+                    for (const ptr of sub.records.PTR) {
+                        const ptrHostname = ptr.hostname || ptr.data;
+                        if (ptrHostname && !nodeIds.has(ptrHostname)) {
+                            nodeIds.add(ptrHostname);
+                            nodes.push({
+                                id: ptrHostname,
+                                label: ptrHostname.length > 20 ? ptrHostname.substring(0, 20) + '...' : ptrHostname,
+                                shape: 'triangle',
+                                color: { background: '#ffc107', border: '#e0a800' },
+                                font: { color: '#000000', size: 9 },
+                                size: 10,
+                                title: `PTR: ${ptrHostname}\nReverse DNS for ${ip}`
+                            });
+                        }
+                        
+                        // Add reverse edge from IP to PTR hostname
+                        edges.push({
+                            from: ipNodeId,
+                            to: ptrHostname,
+                            arrows: 'to',
+                            color: { color: '#ffc107' },
+                            dashes: [5, 5],
+                            width: 1,
+                            label: 'PTR'
+                        });
+                    }
+                }
+            }
 
             // Add CNAME edges if present
             if (sub.cname || sub.cnameTarget) {
@@ -195,8 +293,16 @@ class Visualizer {
         }
 
         const data = this.analysisData.processedData;
-        const subdomains = data.subdomains ? 
-            (Array.isArray(data.subdomains) ? data.subdomains : Object.values(data.subdomains)) : [];
+        let subdomains = [];
+        if (data.subdomains) {
+            if (data.subdomains instanceof Map) {
+                subdomains = Array.from(data.subdomains.values());
+            } else if (Array.isArray(data.subdomains)) {
+                subdomains = data.subdomains;
+            } else {
+                subdomains = Object.values(data.subdomains);
+            }
+        }
 
         // Country coordinates (approximate centers)
         const countryCoords = {
@@ -373,8 +479,17 @@ class Visualizer {
         if (!this.analysisData?.processedData) return false;
         
         const data = this.analysisData.processedData;
-        const subdomains = data.subdomains ? 
-            (Array.isArray(data.subdomains) ? data.subdomains : Object.values(data.subdomains)) : [];
+        let subdomains = [];
+        
+        if (data.subdomains) {
+            if (data.subdomains instanceof Map) {
+                subdomains = Array.from(data.subdomains.values());
+            } else if (Array.isArray(data.subdomains)) {
+                subdomains = data.subdomains;
+            } else {
+                subdomains = Object.values(data.subdomains);
+            }
+        }
         
         // Need at least 2 subdomains for meaningful visualizations
         return subdomains.length >= 2;
@@ -435,11 +550,16 @@ class Visualizer {
         switch (vizType) {
             case 'network':
                 document.getElementById('networkGraphContainer').style.display = 'block';
-                if (!this.networkGraph) this.showNetworkGraph();
+                // Only create graph if we have enough data
+                if (this.hasVisualizableData() && !this.networkGraph) {
+                    this.showNetworkGraph();
+                }
                 break;
             case 'map':
                 document.getElementById('geoMapContainer').style.display = 'block';
-                if (!this.geoMap) this.showGeoMap();
+                if (!this.geoMap && this.hasVisualizableData()) {
+                    this.showGeoMap();
+                }
                 break;
             case 'timeline':
                 document.getElementById('certTimelineContainer').style.display = 'block';
