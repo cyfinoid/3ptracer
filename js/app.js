@@ -411,7 +411,7 @@ async function analyzeBatchDomains(domains) {
         if (batchProgress) {
             batchProgress.innerHTML = `
                 <div class="batch-status">
-                    <strong>Processing ${i + 1}/${domains.length}:</strong> ${domain}
+                    <strong>Processing ${i + 1}/${domains.length}:</strong> ${window.CommonUtils.escapeHtml(domain)}
                     <div class="batch-progress-bar" style="margin-top: 5px; background: var(--bg-tertiary); height: 10px; border-radius: 5px; overflow: hidden;">
                         <div style="width: ${((i + 1) / domains.length) * 100}%; height: 100%; background: var(--accent-blue); transition: width 0.3s;"></div>
                     </div>
