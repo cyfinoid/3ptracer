@@ -411,7 +411,7 @@ async function analyzeBatchDomains(domains) {
         if (batchProgress) {
             batchProgress.innerHTML = `
                 <div class="batch-status">
-                    <strong>Processing ${i + 1}/${domains.length}:</strong> ${domain}
+                    <strong>Processing ${i + 1}/${domains.length}:</strong> ${window.CommonUtils.escapeHtml(domain)}
                     <div class="batch-progress-bar" style="margin-top: 5px; background: var(--bg-tertiary); height: 10px; border-radius: 5px; overflow: hidden;">
                         <div style="width: ${((i + 1) / domains.length) * 100}%; height: 100%; background: var(--accent-blue); transition: width 0.3s;"></div>
                     </div>
@@ -476,13 +476,15 @@ function showBatchResults(results) {
     
     for (const result of results) {
         const icon = result.status === 'success' ? '✅' : '❌';
+        const escapedDomain = window.CommonUtils.escapeHtml(result.domain);
+        const escapedError = result.error ? window.CommonUtils.escapeHtml(result.error) : 'Failed';
         html += `
             <div class="batch-result-item" style="padding: 8px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-                <span>${icon} ${result.domain}</span>
+                <span>${icon} ${escapedDomain}</span>
                 ${result.status === 'success' ? `
-                    <button class="batch-view-btn" onclick="viewBatchResult('${result.domain}')" style="padding: 4px 8px; font-size: 0.85em; cursor: pointer;">View</button>
+                    <button class="batch-view-btn" onclick="viewBatchResult(${JSON.stringify(result.domain)})" style="padding: 4px 8px; font-size: 0.85em; cursor: pointer;">View</button>
                 ` : `
-                    <span style="color: var(--danger-color); font-size: 0.85em;">${result.error || 'Failed'}</span>
+                    <span style="color: var(--danger-color); font-size: 0.85em;">${escapedError}</span>
                 `}
             </div>
         `;

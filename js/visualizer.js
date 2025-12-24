@@ -347,7 +347,10 @@ class Visualizer {
                             ${records.length} certificate${records.length !== 1 ? 's' : ''} observed
                         </div>
                         <div style="font-size: 0.8em; color: var(--text-secondary); margin-top: 3px;">
-                            ${records.slice(0, 3).map(r => r.subdomain || r.name).join(', ')}
+                            ${records.slice(0, 3).map(r => {
+                                const text = r.subdomain || r.name || '';
+                                return window.CommonUtils ? window.CommonUtils.escapeHtml(text) : text.replace(/[<>&"']/g, m => ({'<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;'}[m]));
+                            }).join(', ')}
                             ${records.length > 3 ? ` +${records.length - 3} more` : ''}
                         </div>
                     </div>

@@ -23,7 +23,7 @@ class UIRenderer {
             this.resultsDiv.style.display = 'block';
             this.resultsDiv.innerHTML = `
                 <div class="error-message">
-                    <strong>Error:</strong> ${message}
+                    <strong>Error:</strong> ${window.CommonUtils.escapeHtml(message)}
                 </div>
             `;
         }
@@ -507,9 +507,9 @@ class UIRenderer {
         let html = `
             <div class="${cardClass}">
                 <div class="service-header">
-                    <h3>${service.name}${recordTypesText}</h3>
+                    <h3>${window.CommonUtils.escapeHtml(service.name)}${recordTypesText}</h3>
                 </div>
-                <p class="service-description">${service.description}</p>
+                <p class="service-description">${window.CommonUtils.escapeHtml(service.description)}</p>
         `;
         
         // Add third-party DMARC warning
@@ -523,9 +523,9 @@ class UIRenderer {
                 <div style="${alertStyle}">
                     <strong>${warningIcon} ${warningText}</strong><br>
                     <span style="color: #666; font-size: 0.9em;">
-                        ${service.securityImplication || 'Email authentication data is shared externally.'}
-                        ${service.reportingEmail ? `<br>📧 Reports sent to: ${service.reportingEmail}` : ''}
-                        ${service.domain ? `<br>🌐 External domain: ${service.domain}` : ''}
+                        ${service.securityImplication ? window.CommonUtils.escapeHtml(service.securityImplication) : 'Email authentication data is shared externally.'}
+                        ${service.reportingEmail ? `<br>📧 Reports sent to: ${window.CommonUtils.escapeHtml(service.reportingEmail)}` : ''}
+                        ${service.domain ? `<br>🌐 External domain: ${window.CommonUtils.escapeHtml(service.domain)}` : ''}
                     </span>
                 </div>
             `;
@@ -565,7 +565,7 @@ class UIRenderer {
             
             service.asnBreakdown.forEach(asn => {
                 html += `<li style="margin: 5px 0;">
-                    📍 ${asn.name} - ${asn.recordCount} ${asn.recordCount === 1 ? 'record' : 'records'}
+                    📍 ${window.CommonUtils.escapeHtml(asn.name)} - ${asn.recordCount} ${asn.recordCount === 1 ? 'record' : 'records'}
                 </li>`;
             });
             
@@ -589,7 +589,7 @@ class UIRenderer {
             
             service.serviceBreakdown.forEach(svc => {
                 html += `<li style="margin: 5px 0;">
-                    📡 ${svc.type.charAt(0).toUpperCase() + svc.type.slice(1)}: ${svc.name} - ${svc.recordCount} ${svc.recordCount === 1 ? 'target' : 'targets'}
+                    📡 ${window.CommonUtils.escapeHtml(svc.type.charAt(0).toUpperCase() + svc.type.slice(1))}: ${window.CommonUtils.escapeHtml(svc.name)} - ${svc.recordCount} ${svc.recordCount === 1 ? 'target' : 'targets'}
                 </li>`;
             });
             
@@ -603,8 +603,8 @@ class UIRenderer {
         if (service.infrastructure) {
             html += `
                 <div class="service-infrastructure" style="background: #f8f9fa; padding: 8px; margin: 8px 0; border-radius: 4px; border-left: 3px solid #007bff;">
-                    <strong>🏗️ Infrastructure:</strong> ${service.infrastructure.name}<br>
-                    <span style="color: #666; font-size: 0.9em;">${service.infrastructure.description}</span>
+                    <strong>🏗️ Infrastructure:</strong> ${window.CommonUtils.escapeHtml(service.infrastructure.name)}<br>
+                    <span style="color: #666; font-size: 0.9em;">${window.CommonUtils.escapeHtml(service.infrastructure.description)}</span>
                 </div>
             `;
         }
@@ -835,8 +835,8 @@ class UIRenderer {
             for (const emailInfo of internal) {
                 html += `
                     <div style="padding: 8px 12px; background: var(--card-bg); border-radius: 4px; border-left: 3px solid #28a745; display: flex; justify-content: space-between; align-items: center;">
-                        <code style="font-size: 0.9em; color: var(--text-color);">${emailInfo.email}</code>
-                        <span style="font-size: 0.75em; color: var(--text-secondary);">${emailInfo.source}</span>
+                        <code style="font-size: 0.9em; color: var(--text-color);">${window.CommonUtils.escapeHtml(emailInfo.email)}</code>
+                        <span style="font-size: 0.75em; color: var(--text-secondary);">${window.CommonUtils.escapeHtml(emailInfo.source)}</span>
                     </div>`;
             }
             
@@ -869,10 +869,10 @@ class UIRenderer {
                 
                 html += `
                     <div style="padding: 8px 12px; background: var(--card-bg); border-radius: 4px; border-left: 3px solid #17a2b8; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 5px;">
-                        <code style="font-size: 0.9em; color: var(--text-color);">${emailInfo.email}</code>
+                        <code style="font-size: 0.9em; color: var(--text-color);">${window.CommonUtils.escapeHtml(emailInfo.email)}</code>
                         <div style="display: flex; gap: 8px; align-items: center;">
-                            ${serviceTag ? `<span style="font-size: 0.75em; padding: 2px 6px; background: var(--accent-blue); color: white; border-radius: 3px;">${serviceTag}</span>` : ''}
-                            <span style="font-size: 0.75em; color: var(--text-secondary);">${emailInfo.source}</span>
+                            ${serviceTag ? `<span style="font-size: 0.75em; padding: 2px 6px; background: var(--accent-blue); color: white; border-radius: 3px;">${window.CommonUtils.escapeHtml(serviceTag)}</span>` : ''}
+                            <span style="font-size: 0.75em; color: var(--text-secondary);">${window.CommonUtils.escapeHtml(emailInfo.source)}</span>
                         </div>
                     </div>`;
             }
@@ -1056,7 +1056,7 @@ class UIRenderer {
                         <span style="font-size: 0.85em; color: var(--text-secondary);">${provider}</span>
                     </div>
                     <code style="font-size: 0.75em; word-break: break-all; color: var(--text-secondary); display: block; max-height: 60px; overflow: hidden;">
-                        ${dkim.record.substring(0, 150)}${dkim.record.length > 150 ? '...' : ''}
+                        ${window.CommonUtils.escapeHtml(dkim.record.substring(0, 150))}${dkim.record.length > 150 ? '...' : ''}
                     </code>
                 </div>`;
         }
@@ -1109,7 +1109,7 @@ class UIRenderer {
                 <div style="margin-bottom: 15px;">
                     <strong style="color: var(--text-color);">SPF Record:</strong>
                     <div style="font-family: monospace; font-size: 0.85em; padding: 10px; background: var(--card-bg); border-radius: 4px; word-break: break-all; color: var(--text-color); margin-top: 5px;">
-                        ${this.escapeHtml(spfAnalysis.spfRecord)}
+                        ${window.CommonUtils.escapeHtml(spfAnalysis.spfRecord)}
                     </div>
                 </div>`;
         
@@ -1130,7 +1130,7 @@ class UIRenderer {
                 <div style="margin-bottom: 15px;">
                     <strong style="color: #ffc107;">⚠️ Warnings:</strong>
                     <ul style="margin: 5px 0; padding-left: 20px; color: var(--text-color);">
-                        ${spfAnalysis.warnings.map(w => `<li>${this.escapeHtml(w)}</li>`).join('')}
+                        ${spfAnalysis.warnings.map(w => `<li>${window.CommonUtils.escapeHtml(w)}</li>`).join('')}
                     </ul>
                 </div>`;
         }
@@ -1141,7 +1141,7 @@ class UIRenderer {
                 <div style="margin-bottom: 15px;">
                     <strong style="color: #dc3545;">❌ Errors:</strong>
                     <ul style="margin: 5px 0; padding-left: 20px; color: var(--text-color);">
-                        ${spfAnalysis.errors.map(e => `<li>${this.escapeHtml(e)}</li>`).join('')}
+                        ${spfAnalysis.errors.map(e => `<li>${window.CommonUtils.escapeHtml(e)}</li>`).join('')}
                     </ul>
                 </div>`;
         }
@@ -1152,7 +1152,7 @@ class UIRenderer {
                 <div style="padding: 10px; background: rgba(40, 167, 69, 0.1); border-radius: 4px; border: 1px solid #28a745;">
                     <strong style="color: #28a745;">💡 Suggestion: Flattened SPF Record</strong>
                     <div style="font-family: monospace; font-size: 0.85em; padding: 10px; background: var(--card-bg); border-radius: 4px; word-break: break-all; color: var(--text-color); margin-top: 5px;">
-                        ${this.escapeHtml(spfAnalysis.flattenedRecord)}
+                        ${window.CommonUtils.escapeHtml(spfAnalysis.flattenedRecord)}
                     </div>
                     <div style="font-size: 0.8em; color: var(--text-secondary); margin-top: 5px;">
                         Note: This is a simplified suggestion. A complete flattened record would need to resolve all A/MX records.
@@ -1187,10 +1187,10 @@ class UIRenderer {
             const statusColor = entry.resolved ? 'var(--text-color)' : '#dc3545';
             
             html += `<div style="color: ${statusColor};">`;
-            html += `${indent}├─ ${icon} ${entry.type}: <strong>${entry.domain}</strong> ${statusIcon}`;
+            html += `${indent}├─ ${icon} ${window.CommonUtils.escapeHtml(entry.type)}: <strong>${window.CommonUtils.escapeHtml(entry.domain)}</strong> ${statusIcon}`;
             
             if (entry.error) {
-                html += ` <span style="color: #dc3545; font-size: 0.9em;">(${entry.error})</span>`;
+                html += ` <span style="color: #dc3545; font-size: 0.9em;">(${window.CommonUtils.escapeHtml(entry.error)})</span>`;
             }
             
             html += '</div>';
@@ -1198,14 +1198,6 @@ class UIRenderer {
         
         html += '</div>';
         return html;
-    }
-    
-    // Escape HTML to prevent XSS
-    escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
     
     // H2, H3, H7: Render Email Security Standards (MTA-STS, BIMI, SMTP TLS Reporting)
@@ -1268,7 +1260,7 @@ class UIRenderer {
                 html += `
                     <div style="font-size: 0.85em; color: var(--text-color);">
                         <strong>Version:</strong> ${bimi.version || 'Unknown'}<br>
-                        ${bimi.logoUrl ? `<strong>Logo:</strong> <a href="${this.escapeHtml(bimi.logoUrl)}" target="_blank" rel="noopener" style="color: var(--accent-blue);">${bimi.logoUrl.substring(0, 40)}...</a><br>` : '<strong>Logo:</strong> Not set<br>'}
+                        ${bimi.logoUrl ? `<strong>Logo:</strong> <a href="${window.CommonUtils.escapeHtml(bimi.logoUrl)}" target="_blank" rel="noopener" style="color: var(--accent-blue);">${window.CommonUtils.escapeHtml(bimi.logoUrl.substring(0, 40))}...</a><br>` : '<strong>Logo:</strong> Not set<br>'}
                         ${bimi.certificateUrl ? `<strong>VMC:</strong> Configured<br>` : ''}
                     </div>`;
             } else {
@@ -1532,8 +1524,8 @@ class UIRenderer {
                 
                 issues.forEach(issue => {
                     html += `<li>${issue.subdomain ? this.createSubdomainLink(issue.subdomain) : 'Unknown'}`;
-                    if (issue.ip) html += ` - IP: ${issue.ip}`;
-                    if (issue.issuer) html += ` - Issuer: ${issue.issuer}`;
+                    if (issue.ip) html += ` - IP: ${window.CommonUtils.escapeHtml(issue.ip)}`;
+                    if (issue.issuer) html += ` - Issuer: ${window.CommonUtils.escapeHtml(issue.issuer)}`;
                     html += `</li>`;
                 });
                 
@@ -1544,6 +1536,79 @@ class UIRenderer {
             }
         }
         return html;
+    }
+
+    // Format details object for display
+    formatDetails(details) {
+        if (!details) return '';
+        
+        // If details is a string, return it escaped
+        if (typeof details === 'string') {
+            return window.CommonUtils.escapeHtml(details);
+        }
+        
+        // If details is an object, format it appropriately
+        if (typeof details === 'object') {
+            // Handle wildcard certificate details with certificates array
+            if (details.certificateCount !== undefined && details.certificates && Array.isArray(details.certificates)) {
+                let formatted = `${details.certificateCount} certificate${details.certificateCount !== 1 ? 's' : ''} found`;
+                
+                // Show first few certificates as examples
+                if (details.certificates.length > 0) {
+                    const maxShow = 5;
+                    const certsToShow = details.certificates.slice(0, maxShow);
+                    formatted += '<ul style="margin: 8px 0; padding-left: 20px; color: var(--text-secondary); font-size: 0.9em;">';
+                    
+                    certsToShow.forEach(cert => {
+                        const domain = window.CommonUtils.escapeHtml(cert.domain || 'Unknown');
+                        const issuer = window.CommonUtils.escapeHtml(cert.issuer || 'Unknown');
+                        formatted += `<li><strong>${domain}</strong> - Issuer: ${issuer}`;
+                        if (cert.validTo) {
+                            const expiryDate = new Date(cert.validTo).toLocaleDateString();
+                            formatted += ` (Expires: ${expiryDate})`;
+                        }
+                        formatted += '</li>';
+                    });
+                    
+                    formatted += '</ul>';
+                    
+                    if (details.certificates.length > maxShow) {
+                        formatted += `<em style="color: var(--text-secondary); font-size: 0.85em;">... and ${details.certificates.length - maxShow} more</em>`;
+                    }
+                }
+                
+                return formatted;
+            }
+            
+            // Handle simple count objects (e.g., certificateCount, topLevelCount, subdomainCount)
+            if (details.certificateCount !== undefined) {
+                const counts = [];
+                if (details.certificateCount !== undefined) {
+                    counts.push(`Total: ${details.certificateCount}`);
+                }
+                if (details.topLevelCount !== undefined) {
+                    counts.push(`Top-level: ${details.topLevelCount}`);
+                }
+                if (details.subdomainCount !== undefined) {
+                    counts.push(`Subdomain: ${details.subdomainCount}`);
+                }
+                if (counts.length > 0) {
+                    return counts.join(' • ');
+                }
+            }
+            
+            // Handle other object types - convert to formatted JSON
+            try {
+                return '<pre style="margin: 8px 0; padding: 8px; background: var(--bg-tertiary); border-radius: 4px; font-size: 0.85em; overflow-x: auto;">' + 
+                       window.CommonUtils.escapeHtml(JSON.stringify(details, null, 2)) + 
+                       '</pre>';
+            } catch (e) {
+                return window.CommonUtils.escapeHtml(String(details));
+            }
+        }
+        
+        // Fallback for other types
+        return window.CommonUtils.escapeHtml(String(details));
     }
 
     // Format security issue
@@ -1563,23 +1628,25 @@ class UIRenderer {
         
         let html = `
             <div class="service-item security-issues" style="border-left: 4px solid ${color};">
-                <div class="service-name">${icon} ${issue.description}</div>
+                <div class="service-name">${icon} ${window.CommonUtils.escapeHtml(issue.description)}</div>
                 <div class="service-description">
-                    <strong>Risk:</strong> ${issue.risk.toUpperCase()}<br>
-                    <strong>Type:</strong> ${issue.type}<br>
-                    ${issue.recommendation ? `<strong>Recommendation:</strong> ${issue.recommendation}<br>` : ''}
+                    <strong>Risk:</strong> ${window.CommonUtils.escapeHtml(issue.risk.toUpperCase())}<br>
+                    <strong>Type:</strong> ${window.CommonUtils.escapeHtml(issue.type)}<br>
+                    ${issue.recommendation ? `<strong>Recommendation:</strong> ${window.CommonUtils.escapeHtml(issue.recommendation)}<br>` : ''}
                 </div>
         `;
         
         // Add specific details
         if (issue.subdomain) html += `<div class="service-records"><strong>Subdomain:</strong> ${this.createSubdomainLink(issue.subdomain)}<br>`;
-        if (issue.cname) html += `<strong>CNAME:</strong> ${issue.cname}<br>`;
-        if (issue.service) html += `<strong>Service:</strong> ${issue.service}<br>`;
-        if (issue.ip) html += `<strong>IP:</strong> ${issue.ip}<br>`;
-        if (issue.ipRange) html += `<strong>IP Range:</strong> ${issue.ipRange}<br>`;
-        if (issue.record) html += `<strong>Record:</strong> ${issue.record}<br>`;
-        if (issue.pattern) html += `<strong>Pattern:</strong> ${issue.pattern}<br>`;
-        if (issue.details) html += `<strong>Details:</strong> ${issue.details}<br>`;
+        if (issue.cname) html += `<strong>CNAME:</strong> ${window.CommonUtils.escapeHtml(issue.cname)}<br>`;
+        if (issue.service) html += `<strong>Service:</strong> ${window.CommonUtils.escapeHtml(issue.service)}<br>`;
+        if (issue.ip) html += `<strong>IP:</strong> ${window.CommonUtils.escapeHtml(issue.ip)}<br>`;
+        if (issue.ipRange) html += `<strong>IP Range:</strong> ${window.CommonUtils.escapeHtml(issue.ipRange)}<br>`;
+        if (issue.record) html += `<strong>Record:</strong> ${window.CommonUtils.escapeHtml(issue.record)}<br>`;
+        if (issue.pattern) html += `<strong>Pattern:</strong> ${window.CommonUtils.escapeHtml(issue.pattern)}<br>`;
+        if (issue.details) {
+            html += `<strong>Details:</strong> ${this.formatDetails(issue.details)}<br>`;
+        }
         
         html += '</div></div>';
         return html;
@@ -1638,24 +1705,24 @@ class UIRenderer {
     formatInterestingFinding(finding) {
         let html = `
             <div class="service-item" style="border-left: 4px solid #17a2b8;">
-                <div class="service-name">🔍 ${finding.description}</div>
+                <div class="service-name">🔍 ${window.CommonUtils.escapeHtml(finding.description)}</div>
                 <div class="service-description">
         `;
         
         if (finding.type === 'interesting_subdomain') {
             html += `
-                    <strong>Pattern:</strong> ${finding.pattern}<br>
+                    <strong>Pattern:</strong> ${window.CommonUtils.escapeHtml(finding.pattern)}<br>
                     <strong>Subdomain:</strong> ${this.createSubdomainLink(finding.subdomain)}<br>
             `;
         } else if (finding.type === 'service_subdomain') {
             html += `
-                    <strong>Service:</strong> ${finding.service.toUpperCase()}<br>
+                    <strong>Service:</strong> ${window.CommonUtils.escapeHtml(finding.service.toUpperCase())}<br>
                     <strong>Subdomain:</strong> ${this.createSubdomainLink(finding.subdomain)}<br>
-                    <strong>IP:</strong> ${finding.ip}<br>
+                    <strong>IP:</strong> ${window.CommonUtils.escapeHtml(finding.ip)}<br>
             `;
         }
         
-        html += `${finding.recommendation ? `<strong>Note:</strong> ${finding.recommendation}<br>` : ''}
+        html += `${finding.recommendation ? `<strong>Note:</strong> ${window.CommonUtils.escapeHtml(finding.recommendation)}<br>` : ''}
                 </div>
             </div>
         `;
@@ -1930,19 +1997,19 @@ class UIRenderer {
             recordsByCategory[category].forEach(record => {
                 html += `<div class="dns-record">
                     <div class="dns-record-header">
-                        <span class="dns-record-type">${record.type}</span>
-                        <span class="dns-record-name">${record.name}</span>
+                        <span class="dns-record-type">${window.CommonUtils.escapeHtml(record.type)}</span>
+                        <span class="dns-record-name">${window.CommonUtils.escapeHtml(record.name)}</span>
                     </div>
-                    <div class="dns-record-description">${record.description}</div>
+                    <div class="dns-record-description">${window.CommonUtils.escapeHtml(record.description)}</div>
                     <div class="dns-record-data">
-                        <code>${this.truncateText(record.data, 100)}</code>
+                        <code>${window.CommonUtils.escapeHtml(this.truncateText(record.data, 100))}</code>
                     </div>`;
 
                 // Show parsed DMARC info if available
                 if (record.parsed && record.type === 'DMARC') {
                     html += `<div class="dmarc-parsed">
-                        <strong>Policy:</strong> ${record.parsed.policy} | 
-                        <strong>Reporting:</strong> ${record.parsed.reporting || 'None configured'}
+                        <strong>Policy:</strong> ${window.CommonUtils.escapeHtml(record.parsed.policy)} | 
+                        <strong>Reporting:</strong> ${window.CommonUtils.escapeHtml(record.parsed.reporting || 'None configured')}
                     </div>`;
                 }
 
@@ -1954,10 +2021,10 @@ class UIRenderer {
                                            confidence === 'low' ? '#fd7e14' : '#6c757d';
                     
                     html += `<div class="dkim-parsed">
-                        <strong>Selector:</strong> ${record.parsed.selector} | 
-                        <strong>Service:</strong> <span style="color: ${confidenceColor};">${record.parsed.service}</span> |
-                        <strong>Key:</strong> ${record.parsed.keyType} |
-                        <strong>Confidence:</strong> <span style="color: ${confidenceColor};">${confidence}</span>
+                        <strong>Selector:</strong> ${window.CommonUtils.escapeHtml(record.parsed.selector)} | 
+                        <strong>Service:</strong> <span style="color: ${confidenceColor};">${window.CommonUtils.escapeHtml(record.parsed.service)}</span> |
+                        <strong>Key:</strong> ${window.CommonUtils.escapeHtml(record.parsed.keyType)} |
+                        <strong>Confidence:</strong> <span style="color: ${confidenceColor};">${window.CommonUtils.escapeHtml(confidence)}</span>
                     </div>`;
                 }
 
@@ -1966,9 +2033,9 @@ class UIRenderer {
                     const trustColor = record.parsed.isKnownCA ? '#28a745' : '#ffc107';
                     
                     html += `<div class="caa-parsed">
-                        <strong>Tag:</strong> ${record.parsed.tag} | 
-                        <strong>Authority:</strong> <span style="color: ${trustColor};">${record.parsed.authority}</span> |
-                        <strong>Flags:</strong> ${record.parsed.flags} |
+                        <strong>Tag:</strong> ${window.CommonUtils.escapeHtml(record.parsed.tag)} | 
+                        <strong>Authority:</strong> <span style="color: ${trustColor};">${window.CommonUtils.escapeHtml(record.parsed.authority)}</span> |
+                        <strong>Flags:</strong> ${window.CommonUtils.escapeHtml(record.parsed.flags)} |
                         <strong>Trust Level:</strong> <span style="color: ${trustColor};">${record.parsed.isKnownCA ? 'Known CA' : 'Unknown CA'}</span>
                     </div>`;
                 }
@@ -1976,11 +2043,11 @@ class UIRenderer {
                 // Show parsed SRV info if available
                 if (record.parsed && record.type === 'SRV') {
                     html += `<div class="srv-parsed">
-                        <strong>Service:</strong> ${record.parsed.service} | 
-                        <strong>Target:</strong> ${record.parsed.target}:${record.parsed.port} |
-                        <strong>Priority:</strong> ${record.parsed.priority} |
-                        <strong>Weight:</strong> ${record.parsed.weight} |
-                        <strong>Type:</strong> ${record.parsed.serviceType}
+                        <strong>Service:</strong> ${window.CommonUtils.escapeHtml(record.parsed.service)} | 
+                        <strong>Target:</strong> ${window.CommonUtils.escapeHtml(record.parsed.target)}:${window.CommonUtils.escapeHtml(String(record.parsed.port))} |
+                        <strong>Priority:</strong> ${window.CommonUtils.escapeHtml(String(record.parsed.priority))} |
+                        <strong>Weight:</strong> ${window.CommonUtils.escapeHtml(String(record.parsed.weight))} |
+                        <strong>Type:</strong> ${window.CommonUtils.escapeHtml(record.parsed.serviceType)}
                     </div>`;
                 }
 
@@ -2102,10 +2169,10 @@ class UIRenderer {
                     <td style="padding: 12px 8px; color: var(--text-color); word-break: break-all;">
                         ${this.createSubdomainLink(record.subdomain)}
                     </td>
-                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${source}</td>
-                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${discoveredDate}</td>
-                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${issuer}</td>
-                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${expiryDate}</td>
+                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${window.CommonUtils.escapeHtml(source)}</td>
+                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${window.CommonUtils.escapeHtml(discoveredDate)}</td>
+                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${window.CommonUtils.escapeHtml(issuer)}</td>
+                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${window.CommonUtils.escapeHtml(expiryDate)}</td>
                 </tr>
             `;
         });
@@ -2176,10 +2243,10 @@ class UIRenderer {
         rawRecords.forEach(record => {
             tableRows += `
                 <tr style="border-bottom: 1px solid var(--border-color);">
-                    <td style="padding: 12px 8px; color: var(--text-color); word-break: break-all; font-family: monospace;">${record.host}</td>
-                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.9rem; font-family: monospace;">${record.ttl}</td>
-                    <td style="padding: 12px 8px; color: var(--text-color); font-weight: 600; font-family: monospace;">${record.type}</td>
-                    <td style="padding: 12px 8px; color: var(--text-secondary); word-break: break-word; font-family: monospace; font-size: 0.9rem;">${record.data}</td>
+                    <td style="padding: 12px 8px; color: var(--text-color); word-break: break-all; font-family: monospace;">${window.CommonUtils.escapeHtml(record.host)}</td>
+                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.9rem; font-family: monospace;">${window.CommonUtils.escapeHtml(record.ttl)}</td>
+                    <td style="padding: 12px 8px; color: var(--text-color); font-weight: 600; font-family: monospace;">${window.CommonUtils.escapeHtml(record.type)}</td>
+                    <td style="padding: 12px 8px; color: var(--text-secondary); word-break: break-word; font-family: monospace; font-size: 0.9rem;">${window.CommonUtils.escapeHtml(record.data)}</td>
                 </tr>
             `;
         });
@@ -2281,7 +2348,11 @@ class UIRenderer {
 
     // Create subdomain link (for consistent linking behavior)
     createSubdomainLink(subdomain) {
-        return `<a href="https://${subdomain}" target="_blank" rel="noopener" class="subdomain-link">${subdomain}</a>`;
+        if (!subdomain) return '';
+        const escapedSubdomain = window.CommonUtils.escapeHtml(subdomain);
+        // URL encoding for href attribute (handles special characters in domain names)
+        const urlEncodedSubdomain = encodeURIComponent(subdomain);
+        return `<a href="https://${urlEncodedSubdomain}" target="_blank" rel="noopener" class="subdomain-link">${escapedSubdomain}</a>`;
     }
 
     // Truncate text for display
@@ -2396,7 +2467,7 @@ class UIRenderer {
                     <div class="location-card">
                         <div class="location-header">
                             <span class="country-flag">${flag}</span>
-                            <span class="country-name">${location.country}</span>
+                            <span class="country-name">${window.CommonUtils.escapeHtml(location.country)}</span>
                         </div>
                         <div class="location-stats">
                             <span class="location-stat">${location.services} services</span>
@@ -2412,7 +2483,7 @@ class UIRenderer {
                             <strong>Services:</strong>
                             <ul class="location-list">
                                 ${countryData.services.map(service => 
-                                    `<li><span class="service-name">${service.name}</span> <span class="service-provider">(${service.provider})</span></li>`
+                                    `<li><span class="service-name">${window.CommonUtils.escapeHtml(service.name)}</span> <span class="service-provider">(${window.CommonUtils.escapeHtml(service.provider)})</span></li>`
                                 ).join('')}
                             </ul>
                         </div>
@@ -2426,7 +2497,7 @@ class UIRenderer {
                             <strong>Subdomains:</strong>
                             <ul class="location-list">
                                 ${countryData.subdomains.map(subdomain => 
-                                    `<li><span class="subdomain-name">${subdomain.name}</span> <span class="service-provider">(${subdomain.provider})</span></li>`
+                                    `<li><span class="subdomain-name">${window.CommonUtils.escapeHtml(subdomain.name)}</span> <span class="service-provider">(${window.CommonUtils.escapeHtml(subdomain.provider)})</span></li>`
                                 ).join('')}
                             </ul>
                         </div>
