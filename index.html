@@ -64,6 +64,13 @@
                         <small class="scan-desc-secondary">Fast checks: DNS, email security (MX, SPF, DKIM, DMARC)</small>
                     </div>
                 </div>
+                <div class="import-section">
+                    <button id="importJSON" class="import-btn">
+                        <span style="margin-right: 6px;">📥</span>
+                        <span>Import JSON</span>
+                    </button>
+                    <input type="file" id="jsonFileInput" accept=".json,application/json" style="display: none;">
+                </div>
             </div>
 
             <div class="progress-section" id="progressSection">
@@ -250,7 +257,7 @@
     <script src="js/data-processor.js?v=1.0.5"></script>
     <script src="js/ui-renderer.js?v=1.0.5"></script>
     <script src="js/analysis-controller.js?v=1.0.5"></script>
-    <script src="js/visualizer.js?v=1.0.5"></script>
+    <script src="js/visualizer.js?v=1.0.6"></script>
     <script src="js/app.js?v=1.0.5"></script>
     <script src="js/theme-toggle.js?v=1.0.5"></script>
 </body>

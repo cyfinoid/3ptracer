@@ -210,66 +210,64 @@ class UIRenderer {
             this.hideProgressiveStatus();
         }
 
+        // 1. Stats card (already displayed by displayStats)
         this.displayStats(processedData.stats, securityResults);
-        this.displayAPINotifications(apiNotifications);
         
-        // NEW: Display Raw DNS Records in Zone File Format inside export section (only for complete analysis)
-        if (!isProgressive && processedData.dataProcessor) {
-            const rawRecords = processedData.dataProcessor.getRawDNSRecords();
-            this.displayRawDNSInExportSection(rawRecords);
+        // 2. Export analysis results (already in HTML, no action needed)
+        
+        // 3. API Issues (remove duplicate displayAPINotifications call)
+        // Hide the old API status section from HTML
+        const apiStatusSection = document.getElementById('apiStatusSection');
+        if (apiStatusSection) {
+            apiStatusSection.style.display = 'none';
         }
         
         // Add Collapse/Expand All controls (after export section)
         this.addCollapseControls();
         
-        // Display API Issues as first collapsible section (after collapse controls)
+        // Display API Issues as collapsible section (after collapse controls)
         this.displayAPIIssuesSection(apiNotifications);
         
-        // Calculate DNS record count for services
-        const dnsRecordCount = processedData.dnsRecords?.length || 0;
+        // 4. Raw DNS Records (moved from export section to here)
+        // Only display if dataProcessor exists and has getRawDNSRecords method (not available for imported data)
+        if (!isProgressive && processedData.dataProcessor && typeof processedData.dataProcessor.getRawDNSRecords === 'function') {
+            try {
+                const rawRecords = processedData.dataProcessor.getRawDNSRecords();
+                if (rawRecords && rawRecords.length > 0) {
+                    this.displayRawDNSRecordsSection(rawRecords);
+                }
+            } catch (error) {
+                console.warn('⚠️ Could not get raw DNS records:', error.message);
+                // Silently skip raw DNS records display for imported data
+            }
+        }
         
-        // Wrap major sections in collapsible containers
+        // 5. Visual Analytics (created by visualizer.js - no action needed here)
+        
+        // 6. All Services (Third-Party Services)
+        const dnsRecordCount = processedData.dnsRecords?.length || 0;
         this.displayCollapsibleSection('Third-Party Services', () => {
             this.displayServicesByVendor(processedData.services);
         }, true, processedData.stats.totalServices || 0, dnsRecordCount);
         
-        // NEW: Display Data Sovereignty Analysis (only for complete analysis)
-        if (!isProgressive && processedData.sovereigntyAnalysis) {
-            this.displayCollapsibleSection('Data Sovereignty Analysis', () => {
-                this.displayDataSovereignty(processedData.sovereigntyAnalysis);
-            }, false); 
-        }
+        // 7. Email Security Section (separate from Security Issues)
+        this.displayCollapsibleSection('Email Security', () => {
+            this.displayEmailSecurity(securityResults);
+        }, true, this.calculateEmailSecurityCount(securityResults));
         
-        this.displayCollapsibleSection('Security Issues', () => {
+        // 8. Findings and Security Section (Security Issues)
+        this.displayCollapsibleSection('Findings and Security', () => {
             this.displaySecurity(securityResults);
         }, true, this.calculateTotalSecurityIssues(securityResults));
         
-        this.displayCollapsibleSection('Infrastructure Analysis', () => {
-            this.displayInterestingFindings(interestingFindings);
-        }, false, interestingFindings?.length || 0);
-        
-        this.displayCollapsibleSection('Domain Redirects', () => {
-            this.displayRedirectsToMain(processedData.redirectsToMain);
-        }, false, processedData.redirectsToMain?.length || 0);
-        
-        this.displayCollapsibleSection('CNAME Mappings', () => {
-            this.displayCNAMEMappings(processedData);
-        }, false, processedData.cnameCount || 0);
-        
-        this.displayCollapsibleSection('DNS Records', () => {
-            this.displayDNSRecords(processedData.dnsRecords);
-        }, false, processedData.dnsRecords?.length || 0);
-        
-        this.displayCollapsibleSection('Subdomains', () => {
-            this.displaySubdomains(processedData);
-        }, true, processedData.stats.totalSubdomains || 0);
-        
-        // Note: Network Graph is now part of Visual Analytics section (created by visualizer.js)
-        // which includes Network Graph, Geographic Map, and Certificate Timeline tabs
-        
+        // 9. Historical Subdomains Section
         this.displayCollapsibleSection('Historical Records', () => {
             this.displayHistoricalRecords(processedData.historicalRecords);
         }, false, processedData.historicalRecords?.length || 0);
+        
+        // Remove other sections that are no longer in the main flow
+        // (Infrastructure Analysis, Domain Redirects, CNAME Mappings, DNS Records, Subdomains)
+        // These can be kept for backward compatibility but won't be displayed in main flow
         
         // Make all service-category sections collapsible (expanded by default, except raw DNS)
         this.makeServiceCategoriesCollapsible();
@@ -868,12 +866,11 @@ class UIRenderer {
             }
         }
         
+        // If no issues, show a message
         if (allIssues.length === 0) {
-            if (section) section.style.display = 'none';
-            return;   
+            container.innerHTML = '<p style="color: var(--text-secondary); padding: 20px; text-align: center;">No security issues found. ✅</p>';
+            return;
         }
-        
-        if (section) section.style.display = 'block';
         
         // Group by risk level first, then by type within each risk level
         const riskGroups = {
@@ -908,8 +905,18 @@ class UIRenderer {
             html += '</div>';
         }
         
-        // H1: Add SPF Chain Analysis visualization if available
+        container.innerHTML = html;
+    }
+
+    // Display Email Security section (separate from Security Issues)
+    displayEmailSecurity(securityResults) {
+        // Use dynamicContainer (set by displayCollapsibleSection)
+        const container = this.dynamicContainer;
+        if (!container) return;
+        
         let emailSecurityHtml = '';
+        
+        // H1: Add SPF Chain Analysis visualization if available
         if (securityResults.spfChainAnalysis) {
             emailSecurityHtml += this.renderSPFChainAnalysis(securityResults.spfChainAnalysis);
         }
@@ -953,7 +960,106 @@ class UIRenderer {
             emailSecurityHtml += this.renderDANETLSAStatus(securityResults.daneTLSA);
         }
         
-        container.innerHTML = html + emailSecurityHtml;
+        if (emailSecurityHtml === '') {
+            emailSecurityHtml = '<p style="color: var(--text-secondary); padding: 20px; text-align: center;">No email security data available.</p>';
+        }
+        
+        container.innerHTML = emailSecurityHtml;
+    }
+
+    // Calculate email security count for section header
+    calculateEmailSecurityCount(securityResults) {
+        let count = 0;
+        if (securityResults.spfChainAnalysis) count++;
+        if (securityResults.mtaSts) count++;
+        if (securityResults.bimi) count++;
+        if (securityResults.smtpTlsReporting) count++;
+        if (securityResults.emailSecurity?.mxRecords?.length > 0) count += securityResults.emailSecurity.mxRecords.length;
+        if (securityResults.emailSecurity?.dmarcRecords?.length > 0) count += securityResults.emailSecurity.dmarcRecords.length;
+        if (securityResults.emailSecurity?.extractedEmails) {
+            const emails = securityResults.emailSecurity.extractedEmails;
+            count += (emails.internal?.length || 0) + (emails.external?.length || 0);
+        }
+        if (securityResults.emailSecurity?.dkimSelectors?.length > 0) count += securityResults.emailSecurity.dkimSelectors.length;
+        if (securityResults.dnssec) count++;
+        if (securityResults.daneTLSA) count++;
+        return count;
+    }
+
+    // Display Raw DNS Records as a separate collapsible section (moved from export section)
+    displayRawDNSRecordsSection(rawRecords) {
+        // Check if Raw DNS section already exists (avoid duplicates)
+        const existingSection = document.getElementById('rawDNSWrapper');
+        if (existingSection) {
+            existingSection.remove();
+        }
+        
+        if (!rawRecords || rawRecords.length === 0) {
+            return;
+        }
+        
+        // Create collapsible section matching the exact structure of other sections
+        const sectionId = 'rawDNSContent';
+        const itemCountText = ` (${rawRecords.length})`;
+        
+        // Build table content
+        let tableRows = '';
+        rawRecords.forEach(record => {
+            tableRows += `
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 12px 8px; color: var(--text-color); word-break: break-all; font-family: monospace;">${window.CommonUtils.escapeHtml(record.host)}</td>
+                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.9rem; font-family: monospace;">${window.CommonUtils.escapeHtml(record.ttl)}</td>
+                    <td style="padding: 12px 8px; color: var(--text-color); font-weight: 600; font-family: monospace;">${window.CommonUtils.escapeHtml(record.type)}</td>
+                    <td style="padding: 12px 8px; color: var(--text-color); word-break: break-all; font-family: monospace;">${window.CommonUtils.escapeHtml(record.data)}</td>
+                </tr>
+            `;
+        });
+        
+        const sectionHTML = `
+            <div id="rawDNSWrapper" class="collapsible-section">
+                <div class="section-header" onclick="toggleSection('${sectionId}')">
+                    <div class="section-title">
+                        <span class="toggle-icon">▶</span>
+                        <h2>Raw DNS Records (Zone File Format)${itemCountText}</h2>
+                    </div>
+                </div>
+                <div id="${sectionId}" class="section-content" style="display: none;">
+                    <div class="dns-records-table" style="overflow-x: auto; margin-top: 15px;">
+                        <table style="width: 100%; border-collapse: collapse; background: var(--card-bg); border-radius: 8px; overflow: hidden;">
+                            <thead>
+                                <tr style="background: var(--bg-secondary);">
+                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 200px;">Host Label</th>
+                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 80px;">TTL</th>
+                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 80px;">Record Type</th>
+                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 300px;">Record Data</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableRows}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Insert after API Issues section (or after collapse controls if no API Issues)
+        const apiIssuesSection = document.querySelector('.collapsible-section h2')?.textContent?.includes('API Issues') 
+            ? document.querySelector('.collapsible-section h2')?.closest('.collapsible-section')
+            : null;
+        const collapseControls = document.getElementById('collapseControlsContainer');
+        
+        if (apiIssuesSection) {
+            apiIssuesSection.insertAdjacentHTML('afterend', sectionHTML);
+        } else if (collapseControls) {
+            collapseControls.insertAdjacentHTML('afterend', sectionHTML);
+        } else {
+            // Fallback: insert after export section
+            const exportSection = document.getElementById('exportSection');
+            if (exportSection) {
+                exportSection.insertAdjacentHTML('afterend', sectionHTML);
+            }
+        }
     }
 
     // Email Mode: Render extracted email addresses

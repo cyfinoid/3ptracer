@@ -17,7 +17,7 @@ class Visualizer {
     // L1: Interactive Network Graph
     // ==========================================
 
-    // Build and display network graph from CNAME chains and subdomain relationships
+    // Build and display simple hierarchical network view
     showNetworkGraph(containerId = 'networkGraphContainer') {
         if (!this.analysisData?.processedData) {
             console.warn('No analysis data available for network graph');
@@ -27,12 +27,6 @@ class Visualizer {
         const container = document.getElementById(containerId);
         if (!container) {
             console.error(`Container ${containerId} not found`);
-            return;
-        }
-
-        // Check if vis.js is available
-        if (typeof vis === 'undefined') {
-            container.innerHTML = '<div style="padding: 20px; color: var(--text-secondary);">Network visualization library not loaded.</div>';
             return;
         }
 
@@ -55,35 +49,22 @@ class Visualizer {
             }
         }
 
-        // Check if we have enough subdomains for a meaningful visualization
-        if (subdomains.length < 2) {
-            container.innerHTML = '<div style="padding: 20px; color: var(--text-secondary); text-align: center;">Not enough subdomain data for network visualization. Need at least 2 subdomains.</div>';
-            console.log('ℹ️ Skipping network graph - not enough subdomain data (need at least 2, found ' + subdomains.length + ')');
-            return;
-        }
-
-        const nodes = [];
-        const edges = [];
-        const nodeIds = new Set();
-
         // Get domain from stats or first subdomain
         const domain = data.stats?.domain || 'domain';
+        
+        // Get services
+        let services = [];
+        if (data.services) {
+            if (data.services instanceof Map) {
+                services = Array.from(data.services.values());
+            } else if (Array.isArray(data.services)) {
+                services = data.services;
+            } else {
+                services = Object.values(data.services);
+            }
+        }
 
-        // Add root domain node (colors from CSS variables)
-        nodes.push({
-            id: domain,
-            label: domain,
-            shape: 'diamond',
-            color: { 
-                background: getCSSVar('--accent-blue', '#466fe0'), 
-                border: getCSSVar('--accent-blue', '#466fe0') 
-            },
-            font: { color: getCSSVar('--text-primary', '#ffffff') },
-            size: 30
-        });
-        nodeIds.add(domain);
-
-        // Enhanced provider detection and grouping
+        // Simple hierarchical HTML view - build provider groups
         const providerMap = {
             'cloudflare': { name: 'Cloudflare', color: '#f38020', group: 'cloudflare' },
             'amazon': { name: 'Amazon AWS', color: '#ff9900', group: 'aws' },
@@ -195,19 +176,6 @@ class Visualizer {
             }
         }
         
-        // Check for email services (MX-based) that should create provider boxes even without subdomains
-        // Services are stored in processedData.services (Map or Object)
-        let services = [];
-        if (data.services) {
-            if (data.services instanceof Map) {
-                services = Array.from(data.services.values());
-            } else if (Array.isArray(data.services)) {
-                services = data.services;
-            } else {
-                services = Object.values(data.services);
-            }
-        }
-        
         // Map email service names to provider groups
         const emailServiceToProvider = {
             'Google Workspace': 'google',
@@ -265,411 +233,176 @@ class Visualizer {
             }
         }
 
-        for (const sub of subdomains.slice(0, 100)) { // Limit to 100 nodes for performance
-            const subName = sub.subdomain || sub.name || sub;
-            if (!subName || nodeIds.has(subName)) continue;
-
-            nodeIds.add(subName);
-            
-            // Detect provider for this subdomain
+        // Also group subdomains without providers into "Other"
+        const otherSubdomains = [];
+        for (const sub of subdomains) {
             const provider = detectProvider(sub);
-            
-            // Use default "Other" provider if none detected
-            const displayProvider = provider || { name: 'Other', color: '#6c757d', group: 'other' };
-            
-            // Build tooltip with IP and provider
-            let tooltip = `${subName}\nIP: ${sub.ip || sub.ipAddresses?.[0] || 'N/A'}\nProvider: ${displayProvider.name}`;
-            if (sub.asnInfo?.org) {
-                tooltip += `\nASN: ${sub.asnInfo.org}`;
+            if (!provider || provider.group === 'other') {
+                otherSubdomains.push(sub);
             }
-            
-            // Add subdomain node with provider group (only if provider detected, otherwise no group)
-            nodes.push({
-                id: subName,
-                label: subName.replace(`.${domain}`, ''),
-                shape: 'dot',
-                color: { background: displayProvider.color, border: displayProvider.color },
-                size: 15,
-                group: provider ? provider.group : undefined, // Only set group if provider detected
-                title: tooltip
+        }
+        
+        // Add "Other" group if there are subdomains without providers
+        if (otherSubdomains.length > 0) {
+            providerGroups.set('other', {
+                provider: { name: 'Other', color: '#6c757d', group: 'other' },
+                subdomains: otherSubdomains
             });
-
-            // Add edge to parent domain
-            edges.push({
-                from: domain,
-                to: subName,
-                color: { 
-                    color: getCSSVar('--text-secondary', '#cccccc'), 
-                    opacity: 0.5 
-                },
-                width: 1
-            });
-
-            // Add IP node and edge if IP exists
-            const ip = sub.ip || sub.ipAddresses?.[0];
-            if (ip && ip !== 'N/A') {
-                const ipNodeId = `ip_${ip}`;
-                if (!nodeIds.has(ipNodeId)) {
-                    nodeIds.add(ipNodeId);
-                    
-                    // Build IP tooltip with PTR records
-                    let ipTooltip = `IP: ${ip}`;
-                    if (sub.records && sub.records.PTR && sub.records.PTR.length > 0) {
-                        const ptrHostnames = sub.records.PTR.map(ptr => ptr.hostname || ptr.data).join(', ');
-                        ipTooltip += `\nPTR: ${ptrHostnames}`;
-                    }
-                    if (sub.asnInfo?.org) {
-                        ipTooltip += `\nASN: ${sub.asnInfo.org}`;
-                    }
-                    
-                    nodes.push({
-                        id: ipNodeId,
-                        label: ip,
-                        shape: 'square',
-                        color: { 
-                            background: getCSSVar('--accent-blue', '#17a2b8'), 
-                            border: getCSSVar('--accent-blue', '#17a2b8') 
-                        },
-                        font: { color: getCSSVar('--text-primary', '#ffffff'), size: 10 },
-                        size: 12,
-                        title: ipTooltip
-                    });
-                }
-                
-                // Add edge from subdomain to IP
-                edges.push({
-                    from: subName,
-                    to: ipNodeId,
-                    arrows: 'to',
-                    color: { color: getCSSVar('--accent-blue', '#17a2b8') },
-                    width: 1,
-                    label: 'A'
-                });
-                
-                // Add PTR edges if available
-                if (sub.records && sub.records.PTR && sub.records.PTR.length > 0) {
-                    for (const ptr of sub.records.PTR) {
-                        const ptrHostname = ptr.hostname || ptr.data;
-                        if (ptrHostname && !nodeIds.has(ptrHostname)) {
-                            nodeIds.add(ptrHostname);
-                            nodes.push({
-                                id: ptrHostname,
-                                label: ptrHostname.length > 20 ? ptrHostname.substring(0, 20) + '...' : ptrHostname,
-                                shape: 'triangle',
-                                color: { 
-                                    background: getCSSVar('--accent-yellow', '#ffc107'), 
-                                    border: getCSSVar('--accent-yellow', '#ffc107') 
-                                },
-                                font: { color: '#000000', size: 9 },
-                                size: 10,
-                                title: `PTR: ${ptrHostname}\nReverse DNS for ${ip}`
-                            });
-                        }
-                        
-                        // Add reverse edge from IP to PTR hostname
-                        edges.push({
-                            from: ipNodeId,
-                            to: ptrHostname,
-                            arrows: 'to',
-                            color: { color: getCSSVar('--accent-yellow', '#ffc107') },
-                            dashes: [5, 5],
-                            width: 1,
-                            label: 'PTR'
-                        });
-                    }
-                }
-            }
-
-            // Add CNAME edges if present
-            if (sub.cname || sub.cnameTarget) {
-                const cnameTarget = sub.cname || sub.cnameTarget;
-                if (!nodeIds.has(cnameTarget)) {
-                    nodeIds.add(cnameTarget);
-                    nodes.push({
-                        id: cnameTarget,
-                        label: cnameTarget.substring(0, 20) + '...',
-                        shape: 'box',
-                        color: { 
-                            background: getCSSVar('--accent-green', '#28a745'), 
-                            border: getCSSVar('--accent-green', '#28a745') 
-                        },
-                        font: { color: getCSSVar('--text-primary', '#ffffff'), size: 10 },
-                        size: 10,
-                        title: `CNAME Target: ${cnameTarget}`
-                    });
-                }
-                edges.push({
-                    from: subName,
-                    to: cnameTarget,
-                    arrows: 'to',
-                    color: { color: getCSSVar('--accent-green', '#28a745') },
-                    dashes: true,
-                    width: 1,
-                    label: 'CNAME'
-                });
-            }
-        }
-
-        // Create provider container boxes with structured layout
-        const providerBoxes = [];
-        const subdomainPositions = new Map();
-        const boxWidth = 300;
-        const boxHeight = 400;
-        const subdomainSpacing = 40;
-        const boxSpacing = 50;
-        
-        // Calculate grid layout for provider boxes
-        const boxesPerRow = Math.ceil(Math.sqrt(providerGroups.size));
-        let boxIndex = 0;
-        
-        for (const [groupKey, groupData] of providerGroups) {
-            // Skip only if no subdomains AND it's not an email service provider
-            // Email service providers (like Google Workspace) may have no subdomains but should still show
-            const hasEmailService = services.some(service => {
-                const serviceName = (service.name || '').toLowerCase();
-                const serviceCategory = (service.category || '').toLowerCase();
-                if (serviceCategory === 'email' || serviceCategory === 'email-service') {
-                    const emailServiceToProvider = {
-                        'google workspace': 'google',
-                        'gmail': 'google',
-                        'microsoft 365': 'azure',
-                        'microsoft office 365': 'azure',
-                        'outlook': 'azure'
-                    };
-                    for (const [emailServiceName, providerGroup] of Object.entries(emailServiceToProvider)) {
-                        if (providerGroup === groupKey && serviceName.includes(emailServiceName)) {
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            });
-            
-            // Skip if no subdomains and no email service
-            if (groupData.subdomains.length === 0 && !hasEmailService) continue;
-            
-            const row = Math.floor(boxIndex / boxesPerRow);
-            const col = boxIndex % boxesPerRow;
-            
-            // Position provider box
-            const boxX = col * (boxWidth + boxSpacing) + boxWidth / 2;
-            const boxY = row * (boxHeight + boxSpacing) + boxHeight / 2 + 100; // Offset for root domain
-            
-            const groupNodeId = `provider_box_${groupKey}`;
-            
-            // Determine label based on whether there are subdomains or just email service
-            let boxLabel = groupData.provider.name;
-            let boxTitle = groupData.provider.name;
-            if (groupData.subdomains.length > 0) {
-                boxLabel += `\n(${groupData.subdomains.length} subdomain${groupData.subdomains.length !== 1 ? 's' : ''})`;
-                boxTitle += `\n${groupData.subdomains.length} subdomain(s)`;
-            } else if (hasEmailService) {
-                boxLabel += '\n(Email Service)';
-                boxTitle += '\nEmail Service';
-            }
-            
-            // Create provider box node (larger, as container)
-            // Use CSS variable for background with opacity
-            const providerColor = groupData.provider.color;
-            providerBoxes.push({
-                id: groupNodeId,
-                label: boxLabel,
-                shape: 'box',
-                color: { 
-                    background: providerColor + '40', // Semi-transparent
-                    border: providerColor,
-                    highlight: { 
-                        background: providerColor + '60', 
-                        border: providerColor 
-                    }
-                },
-                font: { color: providerColor, size: 16, face: 'Arial', bold: true },
-                size: { width: boxWidth, height: boxHeight },
-                x: boxX,
-                y: boxY,
-                fixed: { x: true, y: true },
-                physics: false,
-                title: boxTitle,
-                margin: 10
-            });
-            
-            // Position subdomains within the box (grid layout)
-            const subdomainsInBox = groupData.subdomains.slice(0, 50); // Limit per box
-            const subsPerRow = Math.ceil(Math.sqrt(subdomainsInBox.length));
-            const subBoxWidth = boxWidth - 40; // Padding
-                const subBoxHeight = boxHeight - 60; // Padding for label
-            
-            let subIndex = 0;
-            for (const sub of subdomainsInBox) {
-                const subName = sub.subdomain || sub.name || sub;
-                if (!nodeIds.has(subName)) continue;
-                
-                const subRow = Math.floor(subIndex / subsPerRow);
-                const subCol = subIndex % subsPerRow;
-                
-                const subX = boxX - boxWidth/2 + 20 + (subCol + 0.5) * (subBoxWidth / subsPerRow);
-                const subY = boxY - boxHeight/2 + 40 + (subRow + 0.5) * (subBoxHeight / subsPerRow);
-                
-                // Update subdomain node position
-                const nodeIndex = nodes.findIndex(n => n.id === subName);
-                if (nodeIndex !== -1) {
-                    nodes[nodeIndex].x = subX;
-                    nodes[nodeIndex].y = subY;
-                    nodes[nodeIndex].fixed = { x: true, y: true };
-                    nodes[nodeIndex].physics = false;
-                }
-                
-                subdomainPositions.set(subName, { x: subX, y: subY, provider: groupKey });
-                subIndex++;
-            }
-            
-            boxIndex++;
         }
         
-        // Add provider box nodes
-        nodes.push(...providerBoxes);
-
-        // Position root domain node at top center
-        const rootNodeIndex = nodes.findIndex(n => n.id === domain);
-        if (rootNodeIndex !== -1) {
-            const totalWidth = boxesPerRow * (boxWidth + boxSpacing);
-            nodes[rootNodeIndex].x = totalWidth / 2;
-            nodes[rootNodeIndex].y = 50;
-            nodes[rootNodeIndex].fixed = { x: true, y: true };
-            nodes[rootNodeIndex].physics = false;
-        }
-        
-        // Position IP and PTR nodes near their subdomains (or in a separate area)
-        // For now, position them near their connected subdomains
-        for (const edge of edges) {
-            if (edge.label === 'A' && edge.from && edge.to) {
-                const fromNode = nodes.find(n => n.id === edge.from);
-                const toNode = nodes.find(n => n.id === edge.to);
-                if (fromNode && toNode && fromNode.fixed && !toNode.fixed) {
-                    // Position IP node to the right of subdomain
-                    toNode.x = fromNode.x + 60;
-                    toNode.y = fromNode.y;
-                    toNode.fixed = { x: true, y: true };
-                    toNode.physics = false;
+        // Also group services by provider
+        const providerServices = new Map();
+        for (const service of services) {
+            const serviceName = (service.name || '').toLowerCase();
+            const serviceCategory = (service.category || '').toLowerCase();
+            
+            // Check if this service maps to a provider
+            let providerGroup = null;
+            
+            // Check email services
+            if (serviceCategory === 'email' || serviceCategory === 'email-service') {
+                for (const [emailServiceName, providerGroupKey] of Object.entries(emailServiceToProvider)) {
+                    if (serviceName.includes(emailServiceName.toLowerCase())) {
+                        providerGroup = providerGroupKey;
+                        break;
+                    }
                 }
+            }
+            
+            // Check service name for provider keywords
+            if (!providerGroup) {
+                for (const [key, providerInfo] of Object.entries(providerMap)) {
+                    if (serviceName.includes(key)) {
+                        providerGroup = providerInfo.group;
+                        break;
+                    }
+                }
+            }
+            
+            if (providerGroup) {
+                if (!providerServices.has(providerGroup)) {
+                    providerServices.set(providerGroup, []);
+                }
+                providerServices.get(providerGroup).push(service);
+            } else {
+                // Add to "Other" group
+                if (!providerServices.has('other')) {
+                    providerServices.set('other', []);
+                }
+                providerServices.get('other').push(service);
             }
         }
         
-        // Create the network
-        const graphData = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
+        // Build simple HTML hierarchical view
+        let html = `
+            <div style="padding: 20px; font-family: system-ui, -apple-system, sans-serif;">
+                <!-- Domain at top -->
+                <div style="text-align: center; margin-bottom: 30px; padding: 20px; background: var(--card-bg); border: 2px solid var(--accent-blue); border-radius: 12px;">
+                    <h2 style="margin: 0; color: var(--text-color); font-size: 24px;">${window.CommonUtils ? window.CommonUtils.escapeHtml(domain) : domain}</h2>
+                    <div style="margin-top: 8px; color: var(--text-secondary); font-size: 14px;">Root Domain</div>
+                </div>
+                
+                <!-- Provider boxes -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+        `;
         
-        // Define node groups for styling with theme-aware colors
-        const groups = {};
-        for (const [groupKey, groupData] of providerGroups) {
-            groups[groupKey] = {
-                color: { background: groupData.provider.color, border: groupData.provider.color },
-                font: { color: getCSSVar('--text-primary', '#ffffff'), size: 12 }
-            };
-        }
-        groups['other'] = {
-            color: { background: '#6c757d', border: '#545b62' },
-            font: { color: getCSSVar('--text-primary', '#ffffff'), size: 12 }
-        };
+        // Sort providers by name for consistent display
+        const sortedProviders = Array.from(providerGroups.entries()).sort((a, b) => {
+            if (a[0] === 'other') return 1;
+            if (b[0] === 'other') return -1;
+            return a[1].provider.name.localeCompare(b[1].provider.name);
+        });
         
-        const options = {
-            nodes: {
-                font: { size: 11, color: getCSSVar('--text-primary', '#333333') },
-                shapeProperties: {
-                    useBorderWithImage: true,
-                    borderRadius: 4
-                },
-                borderWidth: 2,
-                shadow: {
-                    enabled: true,
-                    color: 'rgba(0,0,0,0.2)',
-                    size: 5,
-                    x: 2,
-                    y: 2
-                }
-            },
-            edges: {
-                font: { size: 9, color: getCSSVar('--text-secondary', '#8a8f98') },
-                smooth: {
-                    type: 'curvedCW',
-                    roundness: 0.2
-                },
-                selectionWidth: 2,
-                arrows: {
-                    to: {
-                        enabled: true,
-                        scaleFactor: 0.8
-                    }
-                },
-                color: {
-                    color: getCSSVar('--text-secondary', '#cccccc'),
-                    highlight: getCSSVar('--accent-blue', '#466fe0'),
-                    hover: getCSSVar('--accent-blue', '#466fe0')
-                }
-            },
-            groups: groups,
-            physics: {
-                enabled: false // Disable physics for fixed layout
-            },
-            interaction: {
-                hover: true,
-                tooltipDelay: 200,
-                zoomView: true,
-                dragView: true,
-                selectConnectedEdges: true,
-                dragNodes: false // Prevent dragging since positions are fixed
-            },
-            layout: {
-                improvedLayout: false,
-                hierarchical: {
-                    enabled: false
-                }
-            },
-            configure: {
-                enabled: false
-            }
-        };
-
-        // Calculate container size based on layout
-        const totalRows = Math.ceil(providerGroups.size / boxesPerRow);
-        const containerHeight = Math.max(600, totalRows * (boxHeight + boxSpacing) + 150);
-        const containerWidth = Math.max(800, boxesPerRow * (boxWidth + boxSpacing) + 100);
-        
-        container.style.height = `${containerHeight}px`;
-        container.style.width = '100%';
-        container.style.border = `1px solid ${getCSSVar('--border-color', 'rgba(80, 200, 120, 0.2)')}`;
-        container.style.borderRadius = '8px';
-        container.style.background = getCSSVar('--card-bg', '#1e1e1e');
-        container.style.position = 'relative';
-        container.style.overflow = 'auto';
-
-        // Add provider legend (CSS variables handle theme automatically)
-        const legendHtml = `
-            <div style="position: absolute; top: 10px; right: 10px; background: var(--card-bg); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); z-index: 1000; font-size: 0.85em; max-width: 200px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                <div style="font-weight: bold; margin-bottom: 8px; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 5px;">Cloud Providers</div>
-                ${Array.from(providerGroups.values()).map(groupData => `
-                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
-                        <div style="width: 12px; height: 12px; background: ${groupData.provider.color}; border-radius: 2px; flex-shrink: 0;"></div>
-                        <span style="color: var(--text-primary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${groupData.provider.name}</span>
-                        <span style="color: var(--text-secondary); font-size: 0.9em; flex-shrink: 0;">(${groupData.subdomains.length})</span>
+        for (const [groupKey, groupData] of sortedProviders) {
+            const provider = groupData.provider;
+            const providerServicesList = providerServices.get(groupKey) || [];
+            const totalItems = groupData.subdomains.length + providerServicesList.length;
+            
+            if (totalItems === 0) continue;
+            
+            const boxId = `provider-box-${groupKey}`;
+            const contentId = `provider-content-${groupKey}`;
+            
+            html += `
+                <div style="background: var(--card-bg); border: 2px solid ${provider.color}; border-radius: 12px; overflow: hidden;">
+                    <div style="background: ${provider.color}20; padding: 15px; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;" onclick="toggleProviderBox('${contentId}')">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span class="provider-toggle-icon" id="icon-${contentId}" style="font-size: 14px; color: ${provider.color}; font-weight: bold;">▼</span>
+                            <h3 style="margin: 0; color: ${provider.color}; font-size: 18px; font-weight: 600;">${window.CommonUtils ? window.CommonUtils.escapeHtml(provider.name) : provider.name}</h3>
+                        </div>
+                        <div style="color: var(--text-secondary); font-size: 14px;">${totalItems} item${totalItems !== 1 ? 's' : ''}</div>
                     </div>
-                `).join('')}
+                    <div id="${contentId}" style="display: block; padding: 15px;">
+            `;
+            
+            // Show subdomains
+            if (groupData.subdomains.length > 0) {
+                html += `<div style="margin-bottom: ${providerServicesList.length > 0 ? '15px' : '0'};"><strong style="color: var(--text-color); font-size: 14px; display: block; margin-bottom: 8px;">Subdomains:</strong>`;
+                for (const sub of groupData.subdomains) {
+                    const subName = sub.subdomain || sub.name || sub;
+                    const escapedSubdomain = window.CommonUtils ? window.CommonUtils.escapeHtml(subName) : subName.replace(/[<>&"']/g, m => ({'<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;'}[m]));
+                    const ip = sub.ip || sub.ipAddresses?.[0] || 'N/A';
+                    html += `
+                        <div style="padding: 8px; margin-bottom: 6px; background: var(--bg-secondary); border-radius: 6px; border-left: 3px solid ${provider.color};">
+                            <div style="color: var(--text-color); font-weight: 500;">
+                                <a href="https://${escapedSubdomain}" target="_blank" rel="noopener" style="color: var(--accent-blue); text-decoration: none;">${escapedSubdomain}</a>
+                            </div>
+                            ${ip !== 'N/A' ? `<div style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">IP: ${window.CommonUtils ? window.CommonUtils.escapeHtml(ip) : ip}</div>` : ''}
+                        </div>
+                    `;
+                }
+                html += `</div>`;
+            }
+            
+            // Show services
+            if (providerServicesList.length > 0) {
+                html += `<div><strong style="color: var(--text-color); font-size: 14px; display: block; margin-bottom: 8px;">Services:</strong>`;
+                for (const service of providerServicesList) {
+                    const serviceName = service.name || 'Unknown Service';
+                    const escapedName = window.CommonUtils ? window.CommonUtils.escapeHtml(serviceName) : serviceName.replace(/[<>&"']/g, m => ({'<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;'}[m]));
+                    html += `
+                        <div style="padding: 8px; margin-bottom: 6px; background: var(--bg-secondary); border-radius: 6px; border-left: 3px solid ${provider.color};">
+                            <div style="color: var(--text-color); font-weight: 500;">${escapedName}</div>
+                            ${service.category ? `<div style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">${window.CommonUtils ? window.CommonUtils.escapeHtml(service.category) : service.category}</div>` : ''}
+                        </div>
+                    `;
+                }
+                html += `</div>`;
+            }
+            
+            html += `
+                    </div>
+                </div>
+            `;
+        }
+        
+        html += `
+                </div>
             </div>
         `;
-        container.insertAdjacentHTML('beforeend', legendHtml);
-
-        this.networkGraph = new vis.Network(container, graphData, options);
         
-        // Fit to viewport after a short delay
-        setTimeout(() => {
-            this.networkGraph.fit({
-                animation: {
-                    duration: 500,
-                    easingFunction: 'easeInOutQuad'
+        // Add toggle function
+        if (!window.toggleProviderBox) {
+            window.toggleProviderBox = function(contentId) {
+                const content = document.getElementById(contentId);
+                const icon = document.getElementById(`icon-${contentId}`);
+                if (content && icon) {
+                    if (content.style.display === 'none') {
+                        content.style.display = 'block';
+                        icon.textContent = '▼';
+                    } else {
+                        content.style.display = 'none';
+                        icon.textContent = '▶';
+                    }
                 }
-            });
-        }, 100);
+            };
+        }
         
-        console.log(`✅ Network graph created with ${nodes.length} nodes, ${edges.length} edges, and ${providerGroups.size} provider boxes in structured layout`);
+        container.innerHTML = html;
+        container.style.padding = '0';
+        container.style.background = 'transparent';
+        
+        console.log(`✅ Simple network view created with ${providerGroups.size} provider groups`);
     }
 
     // ==========================================
@@ -819,30 +552,70 @@ class Visualizer {
             historicalRecords = data.processedData.historicalRecords;
         }
         
-        console.log(`📅 Certificate timeline: Found ${historicalRecords.length} historical records`);
+        // Get current/active subdomains
+        let currentSubdomains = [];
+        if (data.subdomains) {
+            if (data.subdomains instanceof Map) {
+                currentSubdomains = Array.from(data.subdomains.values());
+            } else if (Array.isArray(data.subdomains)) {
+                currentSubdomains = data.subdomains;
+            } else {
+                currentSubdomains = Object.values(data.subdomains);
+            }
+        }
         
-        if (historicalRecords.length === 0) {
-            container.innerHTML = '<div style="padding: 20px; color: var(--text-secondary);">No certificate timeline data available.</div>';
+        // Also collect subdomains from services (sourceSubdomains)
+        const serviceSubdomains = new Set();
+        if (data.services) {
+            let services = [];
+            if (data.services instanceof Map) {
+                services = Array.from(data.services.values());
+            } else if (Array.isArray(data.services)) {
+                services = data.services;
+            } else {
+                services = Object.values(data.services);
+            }
+            
+            for (const service of services) {
+                if (service.sourceSubdomains && Array.isArray(service.sourceSubdomains)) {
+                    service.sourceSubdomains.forEach(sub => {
+                        if (sub && typeof sub === 'string') {
+                            serviceSubdomains.add(sub);
+                        }
+                    });
+                }
+            }
+        }
+        
+        console.log(`📅 Certificate timeline: Found ${historicalRecords.length} historical records, ${currentSubdomains.length} current subdomains, ${serviceSubdomains.size} service subdomains`);
+        
+        // If we have no data at all, show message
+        if (historicalRecords.length === 0 && currentSubdomains.length === 0 && serviceSubdomains.size === 0) {
+            container.innerHTML = '<div style="padding: 20px; color: var(--text-secondary);">No subdomain data available for timeline.</div>';
             return;
         }
 
         // Group records by subdomain and collect ALL certificates
         const subdomainData = new Map();
         
-        // First pass: Collect all certificates for each subdomain
+        // First pass: Collect historical records with certificates
         for (const record of historicalRecords) {
             const subdomain = record.subdomain || record.name;
             if (!subdomain) continue;
             
-            if (!subdomainData.has(subdomain)) {
-                subdomainData.set(subdomain, {
-                    subdomain: subdomain,
+            // Normalize subdomain (remove trailing dot if present)
+            const normalizedSubdomain = subdomain.replace(/\.$/, '');
+            
+            if (!subdomainData.has(normalizedSubdomain)) {
+                subdomainData.set(normalizedSubdomain, {
+                    subdomain: normalizedSubdomain,
                     certificates: [],
-                    discoveryDates: [] // Track discovery dates as fallback
+                    discoveryDates: [],
+                    isHistorical: true
                 });
             }
             
-            const subData = subdomainData.get(subdomain);
+            const subData = subdomainData.get(normalizedSubdomain);
             const certInfo = record.certificateInfo || {};
             
             // Collect certificate if it has dates
@@ -858,6 +631,46 @@ class Visualizer {
             // Track discovery dates as fallback
             if (record.discoveredAt) {
                 subData.discoveryDates.push(new Date(record.discoveredAt));
+            }
+        }
+        
+        // Second pass: Add current/active subdomains (only if they have certificate info)
+        for (const subdomain of currentSubdomains) {
+            const subdomainName = subdomain.subdomain || subdomain.name || subdomain;
+            if (!subdomainName) continue;
+            
+            // Only process if subdomain has certificate info
+            if (!subdomain.certificateInfo) continue;
+            
+            const certInfo = subdomain.certificateInfo;
+            // Only add if certificate has dates
+            if (!certInfo.notBefore && !certInfo.notAfter) continue;
+            
+            // Normalize subdomain (remove trailing dot if present)
+            const normalizedSubdomain = subdomainName.replace(/\.$/, '');
+            
+            if (!subdomainData.has(normalizedSubdomain)) {
+                subdomainData.set(normalizedSubdomain, {
+                    subdomain: normalizedSubdomain,
+                    certificates: [],
+                    discoveryDates: [],
+                    isHistorical: false
+                });
+            }
+            
+            const subData = subdomainData.get(normalizedSubdomain);
+            
+            // Add certificate info
+            subData.certificates.push({
+                notBefore: certInfo.notBefore ? new Date(certInfo.notBefore) : null,
+                notAfter: certInfo.notAfter ? new Date(certInfo.notAfter) : null,
+                issuer: certInfo.issuer || 'Unknown',
+                certificateId: certInfo.certificateId || null
+            });
+            
+            // Track discovery dates
+            if (subdomain.discoveredAt) {
+                subData.discoveryDates.push(new Date(subdomain.discoveredAt));
             }
         }
         
@@ -897,8 +710,13 @@ class Visualizer {
             }
         }
 
-        // Filter out subdomains without valid dates
-        const validSubdomains = Array.from(subdomainData.values()).filter(s => s.firstSeen && s.lastSeen);
+        // Only include subdomains that have certificates (with dates)
+        const validSubdomains = Array.from(subdomainData.values()).filter(s => {
+            // Must have at least one certificate with dates
+            const hasCertDates = s.certificates.length > 0 && s.certificates.some(cert => cert.notBefore || cert.notAfter);
+            // Must have valid firstSeen and lastSeen
+            return hasCertDates && s.firstSeen && s.lastSeen;
+        });
         
         console.log(`📅 Certificate timeline: ${subdomainData.size} unique subdomains found, ${validSubdomains.length} with valid dates`);
         if (subdomainData.size > validSubdomains.length) {

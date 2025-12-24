@@ -302,6 +302,36 @@ input[type="checkbox"] {
     font-weight: 600;
 }
 
+/* Import JSON button (below scan buttons) */
+.import-section {
+    margin-top: 15px;
+    text-align: center;
+}
+
+.import-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    font-family: 'Sen', sans-serif;
+}
+
+.import-btn:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+    transform: translateY(-1px);
+}
+
+.import-btn:active {
+    transform: translateY(0);
+}
+}
+
 .scan-desc-primary,
 .scan-desc-secondary {
     color: var(--text-secondary);
@@ -617,6 +647,11 @@ input[type="checkbox"] {
 .export-json:hover {
     border-color: #f39c12;
     background: rgba(243, 156, 18, 0.2);
+}
+
+.export-import:hover {
+    border-color: #9b59b6;
+    background: rgba(155, 89, 182, 0.2);
 }
 
 /* M2: Save and History buttons */

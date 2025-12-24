@@ -20,7 +20,50 @@ class ExportManager {
             if (exportXLSXBtn) {
                 exportXLSXBtn.addEventListener('click', () => this.exportToXLSX());
             }
+            
+            // Setup import button (now in HTML near scan buttons)
+            this.setupImportButton();
         });
+    }
+    
+    // Setup import button event listener and file input
+    setupImportButton() {
+        const importButton = document.getElementById('importJSON');
+        let fileInput = document.getElementById('jsonFileInput');
+        
+        if (!importButton) {
+            console.warn('⚠️ Import button not found in DOM');
+            return;
+        }
+        
+        // Create file input if it doesn't exist
+        if (!fileInput) {
+            console.log('📝 Creating file input element');
+            fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.json,application/json';
+            fileInput.id = 'jsonFileInput';
+            fileInput.style.display = 'none';
+            fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+            document.body.appendChild(fileInput);
+        } else {
+            console.log('✅ Found existing file input in HTML');
+            // Ensure change event listener is attached
+            if (!fileInput.hasAttribute('data-listener-attached')) {
+                fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+                fileInput.setAttribute('data-listener-attached', 'true');
+            }
+        }
+        
+        // Always store reference to file input
+        this.fileInput = fileInput;
+        
+        // Setup click handler if not already set
+        if (!importButton.hasAttribute('data-listener-attached')) {
+            importButton.addEventListener('click', () => this.importFromJSON());
+            importButton.setAttribute('data-listener-attached', 'true');
+            console.log('✅ Import button event listener attached');
+        }
     }
 
     // Store analysis data for export
@@ -66,6 +109,8 @@ class ExportManager {
             
             const exportButtons = exportSection.querySelector('.export-buttons');
             if (exportButtons) {
+                // Import JSON button is now in HTML near scan buttons, not here
+                
                 // Add JSON export button if not already present
                 if (!document.getElementById('exportJSON')) {
                     const jsonButton = document.createElement('button');
@@ -121,7 +166,72 @@ class ExportManager {
             console.log('📊 Converted services:', Object.keys(servicesObj).length, 'services');
         }
         
+        // Convert subdomains Map to Object
+        if (data.subdomains && data.subdomains instanceof Map) {
+            console.log('📊 Converting subdomains Map to Object for serialization');
+            const subdomainsObj = {};
+            let index = 0;
+            for (const [key, value] of data.subdomains) {
+                subdomainsObj[`subdomain_${index}`] = {
+                    originalKey: key,
+                    ...value
+                };
+                index++;
+            }
+            serialized.subdomains = subdomainsObj;
+            console.log('📊 Converted subdomains:', Object.keys(subdomainsObj).length, 'subdomains');
+        }
+        
         return serialized;
+    }
+
+    // Deserialize data from import (convert Objects back to Maps)
+    deserializeDataFromImport(data) {
+        if (!data) return null;
+        
+        const deserialized = { ...data };
+        
+        // Convert services Object back to Map
+        if (data.services && typeof data.services === 'object' && !(data.services instanceof Map) && !Array.isArray(data.services)) {
+            console.log('📊 Converting services Object back to Map for import');
+            const servicesMap = new Map();
+            for (const [key, value] of Object.entries(data.services)) {
+                if (value && typeof value === 'object') {
+                    const originalKey = value.originalKey || key;
+                    const { originalKey: _, ...serviceData } = value;
+                    servicesMap.set(originalKey, serviceData);
+                }
+            }
+            deserialized.services = servicesMap;
+            console.log('📊 Converted services:', servicesMap.size, 'services');
+        }
+        
+        // Convert subdomains Object back to Map
+        if (data.subdomains && typeof data.subdomains === 'object' && !(data.subdomains instanceof Map)) {
+            console.log('📊 Converting subdomains Object back to Map for import');
+            const subdomainsMap = new Map();
+            
+            // Handle array case (shouldn't happen from our exports, but handle gracefully)
+            if (Array.isArray(data.subdomains)) {
+                data.subdomains.forEach((subdomain, index) => {
+                    const key = subdomain.subdomain || subdomain.name || `subdomain_${index}`;
+                    subdomainsMap.set(key, subdomain);
+                });
+            } else {
+                // Handle object case (from our exports)
+                for (const [key, value] of Object.entries(data.subdomains)) {
+                    if (value && typeof value === 'object') {
+                        const originalKey = value.originalKey || value.subdomain || value.name || key;
+                        const { originalKey: _, ...subdomainData } = value;
+                        subdomainsMap.set(originalKey, subdomainData);
+                    }
+                }
+            }
+            deserialized.subdomains = subdomainsMap;
+            console.log('📊 Converted subdomains:', subdomainsMap.size, 'subdomains');
+        }
+        
+        return deserialized;
     }
 
     // Export to JSON
@@ -177,6 +287,151 @@ class ExportManager {
             console.error('❌ JSON export failed:', error);
             alert('Failed to export JSON. Please try again.');
         }
+    }
+
+    // Import from JSON
+    importFromJSON() {
+        console.log('📥 JSON import requested');
+        
+        // Ensure file input is set up
+        if (!this.fileInput) {
+            this.setupImportButton();
+        }
+        
+        if (this.fileInput) {
+            this.fileInput.click();
+        } else {
+            console.error('❌ File input not found');
+            alert('Import functionality not properly initialized. Please refresh the page.');
+        }
+    }
+
+    // Handle file selection for import
+    async handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) {
+            return;
+        }
+
+        console.log('📥 Processing JSON import file:', file.name);
+        
+        try {
+            const fileContent = await file.text();
+            const importData = JSON.parse(fileContent);
+            
+            // Validate import data structure
+            if (!this.validateImportData(importData)) {
+                alert('Invalid JSON file format. Please ensure this is a valid 3rd Party Tracer export file.');
+                return;
+            }
+
+            console.log('✅ JSON file validated, importing data...');
+            
+            // Extract data from import structure
+            const meta = importData.meta || {};
+            const processedData = importData.processedData || {};
+            const securityResults = importData.securityResults || {};
+            const interestingFindings = importData.interestingFindings || [];
+            
+            // Deserialize Maps from Objects
+            const deserializedProcessedData = this.deserializeDataFromImport(processedData);
+            
+            // Store the imported data
+            this.analysisData = {
+                processedData: deserializedProcessedData,
+                securityResults,
+                interestingFindings,
+                domain: meta.domain || 'Unknown',
+                timestamp: meta.timestamp || new Date().toISOString(),
+                formattedTimestamp: meta.formattedTimestamp || new Date().toLocaleString()
+            };
+            this.exportDomain = meta.domain || 'Unknown';
+            this.exportTimestamp = meta.timestamp ? meta.timestamp.split('T')[0] : new Date().toISOString().split('T')[0];
+            
+            console.log('✅ Data imported successfully:', {
+                domain: this.exportDomain,
+                servicesCount: deserializedProcessedData.services instanceof Map 
+                    ? deserializedProcessedData.services.size 
+                    : Object.keys(deserializedProcessedData.services || {}).length,
+                hasStats: !!deserializedProcessedData.stats,
+                hasSecurityResults: !!securityResults
+            });
+            
+            // Display the imported results
+            if (window.uiRenderer) {
+                window.uiRenderer.displayResults(
+                    deserializedProcessedData,
+                    securityResults,
+                    interestingFindings,
+                    [] // No API notifications for imported data
+                );
+            } else {
+                console.error('❌ UIRenderer not available');
+                alert('Unable to display imported data. UI Renderer not available.');
+                return;
+            }
+            
+            // Show export section (it should already be visible, but ensure it is)
+            this.showExportSection();
+            
+            // Show success message
+            const servicesCount = deserializedProcessedData.services instanceof Map 
+                ? deserializedProcessedData.services.size 
+                : Object.keys(deserializedProcessedData.services || {}).length;
+            const subdomainsCount = deserializedProcessedData.subdomains instanceof Map 
+                ? deserializedProcessedData.subdomains.size 
+                : Object.keys(deserializedProcessedData.subdomains || {}).length;
+            
+            // Count security issues manually
+            let securityIssuesCount = 0;
+            ['emailIssues', 'takeovers', 'dnsIssues', 'cloudIssues'].forEach(issueType => {
+                if (securityResults[issueType]) {
+                    securityIssuesCount += securityResults[issueType].length;
+                }
+            });
+            
+            alert(`Successfully imported analysis data for ${this.exportDomain}!\n\n` +
+                  `Services: ${servicesCount}\n` +
+                  `Subdomains: ${subdomainsCount}\n` +
+                  `Security Issues: ${securityIssuesCount}`);
+            
+            // Reset file input so same file can be imported again
+            if (this.fileInput) {
+                this.fileInput.value = '';
+            }
+            
+        } catch (error) {
+            console.error('❌ JSON import failed:', error);
+            alert('Failed to import JSON file. Please ensure the file is valid and try again.\n\nError: ' + error.message);
+        }
+    }
+
+    // Validate imported JSON data structure
+    validateImportData(data) {
+        if (!data || typeof data !== 'object') {
+            console.error('❌ Import data is not an object');
+            return false;
+        }
+        
+        // Check for required structure
+        if (!data.processedData) {
+            console.error('❌ Import data missing processedData');
+            return false;
+        }
+        
+        // Check for meta information (optional but recommended)
+        if (data.meta) {
+            console.log('📊 Import data has meta information:', data.meta);
+        }
+        
+        // Check for basic processedData structure
+        if (!data.processedData.stats && !data.processedData.services) {
+            console.error('❌ Import data missing required fields (stats or services)');
+            return false;
+        }
+        
+        console.log('✅ Import data structure validated');
+        return true;
     }
     
     // ==========================================
