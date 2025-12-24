@@ -476,13 +476,15 @@ function showBatchResults(results) {
     
     for (const result of results) {
         const icon = result.status === 'success' ? '✅' : '❌';
+        const escapedDomain = window.CommonUtils.escapeHtml(result.domain);
+        const escapedError = result.error ? window.CommonUtils.escapeHtml(result.error) : 'Failed';
         html += `
             <div class="batch-result-item" style="padding: 8px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-                <span>${icon} ${result.domain}</span>
+                <span>${icon} ${escapedDomain}</span>
                 ${result.status === 'success' ? `
-                    <button class="batch-view-btn" onclick="viewBatchResult('${result.domain}')" style="padding: 4px 8px; font-size: 0.85em; cursor: pointer;">View</button>
+                    <button class="batch-view-btn" onclick="viewBatchResult(${JSON.stringify(result.domain)})" style="padding: 4px 8px; font-size: 0.85em; cursor: pointer;">View</button>
                 ` : `
-                    <span style="color: var(--danger-color); font-size: 0.85em;">${result.error || 'Failed'}</span>
+                    <span style="color: var(--danger-color); font-size: 0.85em;">${escapedError}</span>
                 `}
             </div>
         `;

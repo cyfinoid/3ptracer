@@ -507,9 +507,9 @@ class UIRenderer {
         let html = `
             <div class="${cardClass}">
                 <div class="service-header">
-                    <h3>${service.name}${recordTypesText}</h3>
+                    <h3>${this.escapeHtml(service.name)}${recordTypesText}</h3>
                 </div>
-                <p class="service-description">${service.description}</p>
+                <p class="service-description">${this.escapeHtml(service.description)}</p>
         `;
         
         // Add third-party DMARC warning
@@ -523,9 +523,9 @@ class UIRenderer {
                 <div style="${alertStyle}">
                     <strong>${warningIcon} ${warningText}</strong><br>
                     <span style="color: #666; font-size: 0.9em;">
-                        ${service.securityImplication || 'Email authentication data is shared externally.'}
-                        ${service.reportingEmail ? `<br>📧 Reports sent to: ${service.reportingEmail}` : ''}
-                        ${service.domain ? `<br>🌐 External domain: ${service.domain}` : ''}
+                        ${service.securityImplication ? this.escapeHtml(service.securityImplication) : 'Email authentication data is shared externally.'}
+                        ${service.reportingEmail ? `<br>📧 Reports sent to: ${this.escapeHtml(service.reportingEmail)}` : ''}
+                        ${service.domain ? `<br>🌐 External domain: ${this.escapeHtml(service.domain)}` : ''}
                     </span>
                 </div>
             `;
@@ -565,7 +565,7 @@ class UIRenderer {
             
             service.asnBreakdown.forEach(asn => {
                 html += `<li style="margin: 5px 0;">
-                    📍 ${asn.name} - ${asn.recordCount} ${asn.recordCount === 1 ? 'record' : 'records'}
+                    📍 ${this.escapeHtml(asn.name)} - ${asn.recordCount} ${asn.recordCount === 1 ? 'record' : 'records'}
                 </li>`;
             });
             
@@ -589,7 +589,7 @@ class UIRenderer {
             
             service.serviceBreakdown.forEach(svc => {
                 html += `<li style="margin: 5px 0;">
-                    📡 ${svc.type.charAt(0).toUpperCase() + svc.type.slice(1)}: ${svc.name} - ${svc.recordCount} ${svc.recordCount === 1 ? 'target' : 'targets'}
+                    📡 ${this.escapeHtml(svc.type.charAt(0).toUpperCase() + svc.type.slice(1))}: ${this.escapeHtml(svc.name)} - ${svc.recordCount} ${svc.recordCount === 1 ? 'target' : 'targets'}
                 </li>`;
             });
             
@@ -603,8 +603,8 @@ class UIRenderer {
         if (service.infrastructure) {
             html += `
                 <div class="service-infrastructure" style="background: #f8f9fa; padding: 8px; margin: 8px 0; border-radius: 4px; border-left: 3px solid #007bff;">
-                    <strong>🏗️ Infrastructure:</strong> ${service.infrastructure.name}<br>
-                    <span style="color: #666; font-size: 0.9em;">${service.infrastructure.description}</span>
+                    <strong>🏗️ Infrastructure:</strong> ${this.escapeHtml(service.infrastructure.name)}<br>
+                    <span style="color: #666; font-size: 0.9em;">${this.escapeHtml(service.infrastructure.description)}</span>
                 </div>
             `;
         }
@@ -835,8 +835,8 @@ class UIRenderer {
             for (const emailInfo of internal) {
                 html += `
                     <div style="padding: 8px 12px; background: var(--card-bg); border-radius: 4px; border-left: 3px solid #28a745; display: flex; justify-content: space-between; align-items: center;">
-                        <code style="font-size: 0.9em; color: var(--text-color);">${emailInfo.email}</code>
-                        <span style="font-size: 0.75em; color: var(--text-secondary);">${emailInfo.source}</span>
+                        <code style="font-size: 0.9em; color: var(--text-color);">${this.escapeHtml(emailInfo.email)}</code>
+                        <span style="font-size: 0.75em; color: var(--text-secondary);">${this.escapeHtml(emailInfo.source)}</span>
                     </div>`;
             }
             
@@ -869,10 +869,10 @@ class UIRenderer {
                 
                 html += `
                     <div style="padding: 8px 12px; background: var(--card-bg); border-radius: 4px; border-left: 3px solid #17a2b8; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 5px;">
-                        <code style="font-size: 0.9em; color: var(--text-color);">${emailInfo.email}</code>
+                        <code style="font-size: 0.9em; color: var(--text-color);">${this.escapeHtml(emailInfo.email)}</code>
                         <div style="display: flex; gap: 8px; align-items: center;">
-                            ${serviceTag ? `<span style="font-size: 0.75em; padding: 2px 6px; background: var(--accent-blue); color: white; border-radius: 3px;">${serviceTag}</span>` : ''}
-                            <span style="font-size: 0.75em; color: var(--text-secondary);">${emailInfo.source}</span>
+                            ${serviceTag ? `<span style="font-size: 0.75em; padding: 2px 6px; background: var(--accent-blue); color: white; border-radius: 3px;">${this.escapeHtml(serviceTag)}</span>` : ''}
+                            <span style="font-size: 0.75em; color: var(--text-secondary);">${this.escapeHtml(emailInfo.source)}</span>
                         </div>
                     </div>`;
             }
@@ -1056,7 +1056,7 @@ class UIRenderer {
                         <span style="font-size: 0.85em; color: var(--text-secondary);">${provider}</span>
                     </div>
                     <code style="font-size: 0.75em; word-break: break-all; color: var(--text-secondary); display: block; max-height: 60px; overflow: hidden;">
-                        ${dkim.record.substring(0, 150)}${dkim.record.length > 150 ? '...' : ''}
+                        ${this.escapeHtml(dkim.record.substring(0, 150))}${dkim.record.length > 150 ? '...' : ''}
                     </code>
                 </div>`;
         }
@@ -1187,10 +1187,10 @@ class UIRenderer {
             const statusColor = entry.resolved ? 'var(--text-color)' : '#dc3545';
             
             html += `<div style="color: ${statusColor};">`;
-            html += `${indent}├─ ${icon} ${entry.type}: <strong>${entry.domain}</strong> ${statusIcon}`;
+            html += `${indent}├─ ${icon} ${this.escapeHtml(entry.type)}: <strong>${this.escapeHtml(entry.domain)}</strong> ${statusIcon}`;
             
             if (entry.error) {
-                html += ` <span style="color: #dc3545; font-size: 0.9em;">(${entry.error})</span>`;
+                html += ` <span style="color: #dc3545; font-size: 0.9em;">(${this.escapeHtml(entry.error)})</span>`;
             }
             
             html += '</div>';
@@ -1268,7 +1268,7 @@ class UIRenderer {
                 html += `
                     <div style="font-size: 0.85em; color: var(--text-color);">
                         <strong>Version:</strong> ${bimi.version || 'Unknown'}<br>
-                        ${bimi.logoUrl ? `<strong>Logo:</strong> <a href="${this.escapeHtml(bimi.logoUrl)}" target="_blank" rel="noopener" style="color: var(--accent-blue);">${bimi.logoUrl.substring(0, 40)}...</a><br>` : '<strong>Logo:</strong> Not set<br>'}
+                        ${bimi.logoUrl ? `<strong>Logo:</strong> <a href="${this.escapeHtml(bimi.logoUrl)}" target="_blank" rel="noopener" style="color: var(--accent-blue);">${this.escapeHtml(bimi.logoUrl.substring(0, 40))}...</a><br>` : '<strong>Logo:</strong> Not set<br>'}
                         ${bimi.certificateUrl ? `<strong>VMC:</strong> Configured<br>` : ''}
                     </div>`;
             } else {
@@ -1532,8 +1532,8 @@ class UIRenderer {
                 
                 issues.forEach(issue => {
                     html += `<li>${issue.subdomain ? this.createSubdomainLink(issue.subdomain) : 'Unknown'}`;
-                    if (issue.ip) html += ` - IP: ${issue.ip}`;
-                    if (issue.issuer) html += ` - Issuer: ${issue.issuer}`;
+                    if (issue.ip) html += ` - IP: ${this.escapeHtml(issue.ip)}`;
+                    if (issue.issuer) html += ` - Issuer: ${this.escapeHtml(issue.issuer)}`;
                     html += `</li>`;
                 });
                 
@@ -1563,23 +1563,23 @@ class UIRenderer {
         
         let html = `
             <div class="service-item security-issues" style="border-left: 4px solid ${color};">
-                <div class="service-name">${icon} ${issue.description}</div>
+                <div class="service-name">${icon} ${this.escapeHtml(issue.description)}</div>
                 <div class="service-description">
-                    <strong>Risk:</strong> ${issue.risk.toUpperCase()}<br>
-                    <strong>Type:</strong> ${issue.type}<br>
-                    ${issue.recommendation ? `<strong>Recommendation:</strong> ${issue.recommendation}<br>` : ''}
+                    <strong>Risk:</strong> ${this.escapeHtml(issue.risk.toUpperCase())}<br>
+                    <strong>Type:</strong> ${this.escapeHtml(issue.type)}<br>
+                    ${issue.recommendation ? `<strong>Recommendation:</strong> ${this.escapeHtml(issue.recommendation)}<br>` : ''}
                 </div>
         `;
         
         // Add specific details
         if (issue.subdomain) html += `<div class="service-records"><strong>Subdomain:</strong> ${this.createSubdomainLink(issue.subdomain)}<br>`;
-        if (issue.cname) html += `<strong>CNAME:</strong> ${issue.cname}<br>`;
-        if (issue.service) html += `<strong>Service:</strong> ${issue.service}<br>`;
-        if (issue.ip) html += `<strong>IP:</strong> ${issue.ip}<br>`;
-        if (issue.ipRange) html += `<strong>IP Range:</strong> ${issue.ipRange}<br>`;
-        if (issue.record) html += `<strong>Record:</strong> ${issue.record}<br>`;
-        if (issue.pattern) html += `<strong>Pattern:</strong> ${issue.pattern}<br>`;
-        if (issue.details) html += `<strong>Details:</strong> ${issue.details}<br>`;
+        if (issue.cname) html += `<strong>CNAME:</strong> ${this.escapeHtml(issue.cname)}<br>`;
+        if (issue.service) html += `<strong>Service:</strong> ${this.escapeHtml(issue.service)}<br>`;
+        if (issue.ip) html += `<strong>IP:</strong> ${this.escapeHtml(issue.ip)}<br>`;
+        if (issue.ipRange) html += `<strong>IP Range:</strong> ${this.escapeHtml(issue.ipRange)}<br>`;
+        if (issue.record) html += `<strong>Record:</strong> ${this.escapeHtml(issue.record)}<br>`;
+        if (issue.pattern) html += `<strong>Pattern:</strong> ${this.escapeHtml(issue.pattern)}<br>`;
+        if (issue.details) html += `<strong>Details:</strong> ${this.escapeHtml(issue.details)}<br>`;
         
         html += '</div></div>';
         return html;
@@ -1638,24 +1638,24 @@ class UIRenderer {
     formatInterestingFinding(finding) {
         let html = `
             <div class="service-item" style="border-left: 4px solid #17a2b8;">
-                <div class="service-name">🔍 ${finding.description}</div>
+                <div class="service-name">🔍 ${this.escapeHtml(finding.description)}</div>
                 <div class="service-description">
         `;
         
         if (finding.type === 'interesting_subdomain') {
             html += `
-                    <strong>Pattern:</strong> ${finding.pattern}<br>
+                    <strong>Pattern:</strong> ${this.escapeHtml(finding.pattern)}<br>
                     <strong>Subdomain:</strong> ${this.createSubdomainLink(finding.subdomain)}<br>
             `;
         } else if (finding.type === 'service_subdomain') {
             html += `
-                    <strong>Service:</strong> ${finding.service.toUpperCase()}<br>
+                    <strong>Service:</strong> ${this.escapeHtml(finding.service.toUpperCase())}<br>
                     <strong>Subdomain:</strong> ${this.createSubdomainLink(finding.subdomain)}<br>
-                    <strong>IP:</strong> ${finding.ip}<br>
+                    <strong>IP:</strong> ${this.escapeHtml(finding.ip)}<br>
             `;
         }
         
-        html += `${finding.recommendation ? `<strong>Note:</strong> ${finding.recommendation}<br>` : ''}
+        html += `${finding.recommendation ? `<strong>Note:</strong> ${this.escapeHtml(finding.recommendation)}<br>` : ''}
                 </div>
             </div>
         `;
@@ -1930,19 +1930,19 @@ class UIRenderer {
             recordsByCategory[category].forEach(record => {
                 html += `<div class="dns-record">
                     <div class="dns-record-header">
-                        <span class="dns-record-type">${record.type}</span>
-                        <span class="dns-record-name">${record.name}</span>
+                        <span class="dns-record-type">${this.escapeHtml(record.type)}</span>
+                        <span class="dns-record-name">${this.escapeHtml(record.name)}</span>
                     </div>
-                    <div class="dns-record-description">${record.description}</div>
+                    <div class="dns-record-description">${this.escapeHtml(record.description)}</div>
                     <div class="dns-record-data">
-                        <code>${this.truncateText(record.data, 100)}</code>
+                        <code>${this.escapeHtml(this.truncateText(record.data, 100))}</code>
                     </div>`;
 
                 // Show parsed DMARC info if available
                 if (record.parsed && record.type === 'DMARC') {
                     html += `<div class="dmarc-parsed">
-                        <strong>Policy:</strong> ${record.parsed.policy} | 
-                        <strong>Reporting:</strong> ${record.parsed.reporting || 'None configured'}
+                        <strong>Policy:</strong> ${this.escapeHtml(record.parsed.policy)} | 
+                        <strong>Reporting:</strong> ${this.escapeHtml(record.parsed.reporting || 'None configured')}
                     </div>`;
                 }
 
@@ -1954,10 +1954,10 @@ class UIRenderer {
                                            confidence === 'low' ? '#fd7e14' : '#6c757d';
                     
                     html += `<div class="dkim-parsed">
-                        <strong>Selector:</strong> ${record.parsed.selector} | 
-                        <strong>Service:</strong> <span style="color: ${confidenceColor};">${record.parsed.service}</span> |
-                        <strong>Key:</strong> ${record.parsed.keyType} |
-                        <strong>Confidence:</strong> <span style="color: ${confidenceColor};">${confidence}</span>
+                        <strong>Selector:</strong> ${this.escapeHtml(record.parsed.selector)} | 
+                        <strong>Service:</strong> <span style="color: ${confidenceColor};">${this.escapeHtml(record.parsed.service)}</span> |
+                        <strong>Key:</strong> ${this.escapeHtml(record.parsed.keyType)} |
+                        <strong>Confidence:</strong> <span style="color: ${confidenceColor};">${this.escapeHtml(confidence)}</span>
                     </div>`;
                 }
 
@@ -1966,9 +1966,9 @@ class UIRenderer {
                     const trustColor = record.parsed.isKnownCA ? '#28a745' : '#ffc107';
                     
                     html += `<div class="caa-parsed">
-                        <strong>Tag:</strong> ${record.parsed.tag} | 
-                        <strong>Authority:</strong> <span style="color: ${trustColor};">${record.parsed.authority}</span> |
-                        <strong>Flags:</strong> ${record.parsed.flags} |
+                        <strong>Tag:</strong> ${this.escapeHtml(record.parsed.tag)} | 
+                        <strong>Authority:</strong> <span style="color: ${trustColor};">${this.escapeHtml(record.parsed.authority)}</span> |
+                        <strong>Flags:</strong> ${this.escapeHtml(record.parsed.flags)} |
                         <strong>Trust Level:</strong> <span style="color: ${trustColor};">${record.parsed.isKnownCA ? 'Known CA' : 'Unknown CA'}</span>
                     </div>`;
                 }
@@ -1976,11 +1976,11 @@ class UIRenderer {
                 // Show parsed SRV info if available
                 if (record.parsed && record.type === 'SRV') {
                     html += `<div class="srv-parsed">
-                        <strong>Service:</strong> ${record.parsed.service} | 
-                        <strong>Target:</strong> ${record.parsed.target}:${record.parsed.port} |
-                        <strong>Priority:</strong> ${record.parsed.priority} |
-                        <strong>Weight:</strong> ${record.parsed.weight} |
-                        <strong>Type:</strong> ${record.parsed.serviceType}
+                        <strong>Service:</strong> ${this.escapeHtml(record.parsed.service)} | 
+                        <strong>Target:</strong> ${this.escapeHtml(record.parsed.target)}:${this.escapeHtml(String(record.parsed.port))} |
+                        <strong>Priority:</strong> ${this.escapeHtml(String(record.parsed.priority))} |
+                        <strong>Weight:</strong> ${this.escapeHtml(String(record.parsed.weight))} |
+                        <strong>Type:</strong> ${this.escapeHtml(record.parsed.serviceType)}
                     </div>`;
                 }
 
@@ -2102,10 +2102,10 @@ class UIRenderer {
                     <td style="padding: 12px 8px; color: var(--text-color); word-break: break-all;">
                         ${this.createSubdomainLink(record.subdomain)}
                     </td>
-                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${source}</td>
-                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${discoveredDate}</td>
-                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${issuer}</td>
-                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${expiryDate}</td>
+                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${this.escapeHtml(source)}</td>
+                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${this.escapeHtml(discoveredDate)}</td>
+                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${this.escapeHtml(issuer)}</td>
+                    <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${this.escapeHtml(expiryDate)}</td>
                 </tr>
             `;
         });
@@ -2281,7 +2281,11 @@ class UIRenderer {
 
     // Create subdomain link (for consistent linking behavior)
     createSubdomainLink(subdomain) {
-        return `<a href="https://${subdomain}" target="_blank" rel="noopener" class="subdomain-link">${subdomain}</a>`;
+        if (!subdomain) return '';
+        const escapedSubdomain = this.escapeHtml(subdomain);
+        // URL encoding for href attribute (handles special characters in domain names)
+        const urlEncodedSubdomain = encodeURIComponent(subdomain);
+        return `<a href="https://${urlEncodedSubdomain}" target="_blank" rel="noopener" class="subdomain-link">${escapedSubdomain}</a>`;
     }
 
     // Truncate text for display
@@ -2396,7 +2400,7 @@ class UIRenderer {
                     <div class="location-card">
                         <div class="location-header">
                             <span class="country-flag">${flag}</span>
-                            <span class="country-name">${location.country}</span>
+                            <span class="country-name">${this.escapeHtml(location.country)}</span>
                         </div>
                         <div class="location-stats">
                             <span class="location-stat">${location.services} services</span>
@@ -2412,7 +2416,7 @@ class UIRenderer {
                             <strong>Services:</strong>
                             <ul class="location-list">
                                 ${countryData.services.map(service => 
-                                    `<li><span class="service-name">${service.name}</span> <span class="service-provider">(${service.provider})</span></li>`
+                                    `<li><span class="service-name">${this.escapeHtml(service.name)}</span> <span class="service-provider">(${this.escapeHtml(service.provider)})</span></li>`
                                 ).join('')}
                             </ul>
                         </div>
@@ -2426,7 +2430,7 @@ class UIRenderer {
                             <strong>Subdomains:</strong>
                             <ul class="location-list">
                                 ${countryData.subdomains.map(subdomain => 
-                                    `<li><span class="subdomain-name">${subdomain.name}</span> <span class="service-provider">(${subdomain.provider})</span></li>`
+                                    `<li><span class="subdomain-name">${this.escapeHtml(subdomain.name)}</span> <span class="service-provider">(${this.escapeHtml(subdomain.provider)})</span></li>`
                                 ).join('')}
                             </ul>
                         </div>

@@ -75,6 +75,23 @@ const CommonUtils = {
         if (typeof record === 'string') return record;
         if (record.data) return String(record.data);
         return String(record);
+    },
+
+    /**
+     * Escape HTML special characters to prevent XSS attacks.
+     * Converts <, >, &, ", ' to their HTML entity equivalents.
+     * 
+     * @param {string} text - The text to escape
+     * @returns {string} - The escaped HTML-safe text
+     * 
+     * @example
+     * escapeHtml('<script>alert("XSS")</script>') // Returns: &lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt;
+     */
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 };
 
