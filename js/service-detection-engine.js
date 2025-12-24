@@ -1048,22 +1048,82 @@ class ServiceDetectionEngine {
                 'GoDaddy DNS': {
                     patterns: ['godaddy.com'],
                     nsPatterns: ['godaddy.com', 'domaincontrol.com'],
+                    soaPatterns: ['godaddy.com', 'domaincontrol.com'],
                     description: 'Domain registration and DNS management'
                 },
                 'Namecheap DNS': {
                     patterns: ['namecheap.com'],
                     nsPatterns: ['namecheap.com'],
+                    soaPatterns: ['namecheap.com'],
                     description: 'Domain registration and DNS management'
                 },
                 'Google Domains': {
                     patterns: ['domains.google'],
                     nsPatterns: ['domains.google'],
+                    soaPatterns: ['domains.google'],
                     description: 'Domain registration and DNS management'
                 },
                 'AWS Route 53': {
                     patterns: ['amazonaws.com'],
                     nsPatterns: ['awsdns'],
+                    soaPatterns: ['awsdns', 'amazonaws.com'],
                     description: 'Amazon DNS service'
+                },
+                'Cloudflare DNS': {
+                    patterns: ['cloudflare.com'],
+                    nsPatterns: ['cloudflare'],
+                    soaPatterns: ['cloudflare.com', 'cloudflare'],
+                    description: 'CDN and DNS management services'
+                },
+                'DNS Made Easy': {
+                    patterns: ['dnsmadeeasy.com'],
+                    soaPatterns: ['dnsmadeeasy.com', 'dnsmadeeasy'],
+                    description: 'Managed DNS service'
+                },
+                'Dyn (Oracle)': {
+                    patterns: ['dyn.com', 'oracle.com'],
+                    soaPatterns: ['dyn.com', 'dynect.net'],
+                    description: 'Managed DNS and traffic management'
+                },
+                'Name.com': {
+                    patterns: ['name.com'],
+                    soaPatterns: ['name.com'],
+                    description: 'Domain registration and DNS management'
+                },
+                'Hover': {
+                    patterns: ['hover.com'],
+                    soaPatterns: ['hover.com'],
+                    description: 'Domain registration and DNS management'
+                },
+                '1&1 IONOS': {
+                    patterns: ['ionos.com', '1and1.com'],
+                    soaPatterns: ['ionos.com', '1and1.com'],
+                    description: 'Domain registration and DNS management'
+                },
+                'Bluehost': {
+                    patterns: ['bluehost.com'],
+                    soaPatterns: ['bluehost.com'],
+                    description: 'Web hosting and DNS management'
+                },
+                'HostGator': {
+                    patterns: ['hostgator.com'],
+                    soaPatterns: ['hostgator.com'],
+                    description: 'Web hosting and DNS management'
+                },
+                'DigitalOcean DNS': {
+                    patterns: ['digitalocean.com'],
+                    soaPatterns: ['digitalocean.com'],
+                    description: 'Cloud infrastructure DNS service'
+                },
+                'Vercel DNS': {
+                    patterns: ['vercel.com'],
+                    soaPatterns: ['vercel-dns.com'],
+                    description: 'Deployment platform DNS'
+                },
+                'Netlify DNS': {
+                    patterns: ['netlify.com'],
+                    soaPatterns: ['netlify-dns.com'],
+                    description: 'Site hosting platform DNS'
                 }
             }
         };
@@ -1097,6 +1157,11 @@ class ServiceDetectionEngine {
         this.processRecordType(records.SPF, 'spfPatterns', 'SPF', detectedServices);
         this.processRecordType(records.CNAME, 'cnamePatterns', 'CNAME', detectedServices);
         this.processRecordType(records.NS, 'nsPatterns', 'NS', detectedServices);
+        
+        // Process SOA records to detect DNS hosting providers
+        if (records.SOA && domainBeingAnalyzed) {
+            this.processSOARecords(records.SOA, detectedServices, domainBeingAnalyzed);
+        }
 
         // Process CAA records to detect certificate authority trust relationships
         if (records.CAA && domainBeingAnalyzed) {
@@ -1309,6 +1374,31 @@ class ServiceDetectionEngine {
             }
         }
 
+        // Process SOA records
+        if (records.SOA) {
+            for (const record of records.SOA) {
+                const soaInfo = this.parseSOARecord(record.data);
+                
+                dnsRecords.push({
+                    type: 'SOA',
+                    name: 'Start of Authority',
+                    description: 'Zone authority and administrative information',
+                    data: record.data,
+                    record: record,
+                    category: 'dns-configuration',
+                    parsed: soaInfo || {
+                        mname: 'Parse failed',
+                        rname: 'Parse failed',
+                        serial: 0,
+                        refresh: 0,
+                        retry: 0,
+                        expire: 0,
+                        minimum: 0
+                    }
+                });
+            }
+        }
+
         return dnsRecords;
     }
 
@@ -1492,6 +1582,97 @@ class ServiceDetectionEngine {
                     );
                 }
             }
+        }
+    }
+
+    // Process SOA records to detect DNS hosting providers
+    processSOARecords(soaRecords, detectedServices, domainBeingAnalyzed) {
+        if (!soaRecords || !Array.isArray(soaRecords) || soaRecords.length === 0) {
+            return;
+        }
+
+        console.log(`🔍 Processing ${soaRecords.length} SOA record(s) for DNS hosting provider detection...`);
+
+        for (const record of soaRecords) {
+            const soaInfo = this.parseSOARecord(record.data);
+            if (!soaInfo || !soaInfo.mname) {
+                console.warn(`⚠️  Could not parse SOA record: ${record.data}`);
+                continue;
+            }
+
+            const mname = soaInfo.mname.toLowerCase();
+            console.log(`  📋 SOA MNAME (Primary Nameserver): ${soaInfo.mname}`);
+
+            // Check all service categories for SOA patterns
+            for (const [category, services] of Object.entries(this.servicePatterns)) {
+                for (const [serviceName, serviceConfig] of Object.entries(services)) {
+                    if (this.matchesPattern(mname, serviceConfig.soaPatterns)) {
+                        console.log(`  ✅ Detected DNS hosting provider from SOA: ${serviceName} (MNAME: ${soaInfo.mname})`);
+                        
+                        // Create enhanced record with SOA details
+                        const enhancedRecord = {
+                            ...record,
+                            subdomain: domainBeingAnalyzed || 'unknown',
+                            soaInfo: soaInfo
+                        };
+
+                        this.addOrUpdateService(detectedServices, serviceName, serviceConfig, category, enhancedRecord, 'SOA');
+                    }
+                }
+            }
+        }
+    }
+
+    // Parse SOA record data
+    // SOA format: MNAME RNAME SERIAL REFRESH RETRY EXPIRE MINIMUM
+    parseSOARecord(soaData) {
+        if (!soaData || typeof soaData !== 'string') {
+            return null;
+        }
+
+        try {
+            // SOA records are space-separated fields
+            // Format: "ns1.example.com. admin.example.com. 2024010101 3600 600 604800 300"
+            const parts = soaData.trim().split(/\s+/);
+            
+            if (parts.length < 7) {
+                // Try alternative parsing if spaces don't work
+                // Some DNS servers return SOA with different formatting
+                const match = soaData.match(/^(\S+)\s+(\S+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/);
+                if (match) {
+                    let rname = match[2].replace(/\.$/, ''); // Remove trailing dot
+                    // Convert first dot to @ for email format (e.g., "admin.example.com" -> "admin@example.com")
+                    rname = rname.replace(/^([^.]+)\./, '$1@');
+                    
+                    return {
+                        mname: match[1].replace(/\.$/, ''), // Remove trailing dot
+                        rname: rname,
+                        serial: parseInt(match[3], 10),
+                        refresh: parseInt(match[4], 10),
+                        retry: parseInt(match[5], 10),
+                        expire: parseInt(match[6], 10),
+                        minimum: parseInt(match[7], 10)
+                    };
+                }
+                return null;
+            }
+
+            let rname = parts[1].replace(/\.$/, ''); // Remove trailing dot
+            // Convert first dot to @ for email format
+            rname = rname.replace(/^([^.]+)\./, '$1@');
+
+            return {
+                mname: parts[0].replace(/\.$/, ''), // Remove trailing dot
+                rname: rname,
+                serial: parseInt(parts[2], 10),
+                refresh: parseInt(parts[3], 10),
+                retry: parseInt(parts[4], 10),
+                expire: parseInt(parts[5], 10),
+                minimum: parseInt(parts[6], 10)
+            };
+        } catch (error) {
+            console.warn(`Failed to parse SOA record: ${soaData}`, error);
+            return null;
         }
     }
 

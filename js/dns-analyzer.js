@@ -249,7 +249,7 @@ class DNSAnalyzer {
 
     // Fallback method for specific record type queries
     async querySpecificRecordTypes(domain, results) {
-        const recordTypes = ['A', 'CNAME', 'TXT', 'MX', 'NS', 'CAA'];
+        const recordTypes = ['A', 'AAAA', 'CNAME', 'TXT', 'MX', 'NS', 'CAA', 'SOA'];
         let hasARecords = false;
         
         for (const type of recordTypes) {
@@ -377,6 +377,13 @@ class DNSAnalyzer {
                         if (!analysis.records.A) analysis.records.A = [];
                         analysis.records.A.push(record);
                         analysis.ip = record.data;
+                    } else if (record.type === 28) { // AAAA record (IPv6)
+                        if (!analysis.records.AAAA) analysis.records.AAAA = [];
+                        analysis.records.AAAA.push(record);
+                        // Use IPv6 as IP if no IPv4 found
+                        if (!analysis.ip) {
+                            analysis.ip = record.data;
+                        }
                     } else if (record.type === 5) { // CNAME record
                         if (!analysis.records.CNAME) analysis.records.CNAME = [];
                         analysis.records.CNAME.push(record);
@@ -407,6 +414,21 @@ class DNSAnalyzer {
                     }
                 }
                 
+                // Query AAAA records explicitly for subdomains (IPv6 support)
+                try {
+                    const aaaaRecords = await this.queryDNS(subdomain, 'AAAA');
+                    if (aaaaRecords && aaaaRecords.length > 0) {
+                        if (!analysis.records.AAAA) analysis.records.AAAA = [];
+                        analysis.records.AAAA.push(...aaaaRecords);
+                        // Use IPv6 as IP if no IPv4 found
+                        if (!analysis.ip && aaaaRecords[0]) {
+                            analysis.ip = aaaaRecords[0].data;
+                        }
+                    }
+                } catch (error) {
+                    // AAAA records are optional, silently continue if not available
+                }
+                
                 // For subdomains, we don't need to query MX, TXT, or NS records
                 // These are typically only relevant for the main domain:
                 // - MX: Email routing (domain-level)
@@ -414,7 +436,7 @@ class DNSAnalyzer {
                 // - NS: Authoritative nameservers (domain-level)
                 // Subdomains typically only need A/AAAA and CNAME records
                 
-                console.log(`  ✅ Subdomain ${subdomain} analysis complete - skipping MX/TXT/NS queries`);
+                console.log(`  ✅ Subdomain ${subdomain} analysis complete - A/AAAA/CNAME records processed`);
                 
                 // Get ASN info if we have an IP
                 if (analysis.ip && /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(analysis.ip)) {
@@ -888,9 +910,9 @@ class DNSAnalyzer {
                 console.log(`  📋 Primary query found: ${Array.from(foundTypes).join(', ')}`);
                 results.records = recordsByType;
                 
-                // Now query for other important record types (TXT, MX, NS, CAA)
+                // Now query for other important record types (AAAA, TXT, MX, NS, CAA, SOA)
                 // Skip CNAME since we already know from the primary query if it exists
-                const otherTypes = ['TXT', 'MX', 'NS', 'CAA'];
+                const otherTypes = ['AAAA', 'TXT', 'MX', 'NS', 'CAA', 'SOA'];
                 for (const type of otherTypes) {
                     try {
                         const records = await this.queryDNS(domain, type);
