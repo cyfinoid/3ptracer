@@ -7,75 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.5] - 2025-12-24
+
 ### Added
-- **New `js/common.js` Utilities Module** - Created shared utility module to centralize common functions used across multiple JavaScript files. Includes `isDomainOrSubdomain()` for secure domain/subdomain matching with protection against domain confusion attacks.
-- **SPF Include Third-Party Detection** - SPF `include:` mechanisms are now explicitly identified as third-party email sending dependencies. Known services (Microsoft 365, Google Workspace, SendGrid, Mailgun, Amazon SES, Mailchimp, Proofpoint, Mimecast, etc.) are labeled, and unknown includes are flagged as "Third-Party SPF Include" for investigation.
+- **Shared utilities module (`js/common.js`)** - Centralized common functions including secure `isDomainOrSubdomain()` helper
+- **SPF include third-party detection** - Identifies third-party email sending dependencies in SPF records
+- **Two-button scan mode UI** - Simplified interface with "Analyze Domain" (full analysis) and "Quick + Email Checks" (fast mode)
+- **Email security enhancements** - SPF chain analysis, MTA-STS, BIMI, TLS-RPT detection, and email security dashboard
+- **Service detection expansion** - Added detection for monitoring (Splunk, PagerDuty, Grafana, Opsgenie), CI/CD (CircleCI, GitLab, Travis, Jenkins), workflow automation (Make, Tray.io, n8n), and payment services (Adyen, Braintree, Klarna, Mollie)
+- **DNSSEC validation** - Checks DNSSEC configuration with DNSKEY and DS record analysis
+- **Blocklist integration** - SURBL and URIBL checking alongside Spamhaus DBL
+- **Dangling NS detection** - Identifies nameserver takeover vulnerabilities
+- **Visual analytics** - Interactive network graph, geographic distribution map, and certificate timeline
+- **PWA support** - Progressive Web App with offline functionality
+- **Batch analysis** - Analyze up to 10 domains simultaneously
+- **Export formats** - JSON, PDF, Excel (XLSX), Markdown exports
+- **Keyboard shortcuts** - Power user shortcuts (Ctrl+Enter, Ctrl+E, Ctrl+J, etc.)
+- **Shareable URLs** - Generate shareable links with pre-filled domain parameters
+- **THC API integration** - Additional subdomain discovery source via reverse DNS database
+- **DANE/TLSA checking** - DNS-based authentication for SMTP and HTTPS services
+- **Mobile and accessibility improvements** - Touch-friendly UI, ARIA labels, keyboard navigation, screen reader support
 
 ### Changed
-- **Two-Button UI for Scan Modes** - Replaced the confusing dropdown scan mode selector with two distinct buttons:
-  - "Analyze Domain" (primary, green) - Full analysis with subdomain discovery
-  - "Quick + Email Checks" (secondary, blue) - Fast checks without subdomain discovery
-- **Merged Quick Scan and Email Scan** - Combined the separate Quick Scan and Email Scan modes into a single "Quick + Email Checks" mode. This new mode provides main domain DNS analysis plus comprehensive email security checks (MX, SPF, DKIM with 12 common selectors, DMARC, MTA-STS, BIMI, TLS-RPT) without the time-consuming subdomain discovery.
-- **Simplified Scan Options** - Reduced from 3 scan modes (Standard, Quick, Email) to 2 clear options (Analyze Domain, Quick + Email Checks), making the UI more intuitive.
-- **Refactored isDomainOrSubdomain** - Moved duplicate `isDomainOrSubdomain()` implementations from `dns-analyzer.js` and `service-detection-engine.js` to the shared `CommonUtils` module.
+- **Simplified scan modes** - Merged Quick Scan and Email Scan into single "Quick + Email Checks" mode
+- **Refactored domain validation** - Moved `isDomainOrSubdomain()` to shared module, eliminating code duplication
 
 ### Removed
-- **Scan Mode Dropdown** - Removed the dropdown selector in favor of two distinct action buttons.
-- **Separate Quick Scan Mode** - Merged into the new "Quick + Email Checks" mode.
-- **Separate Email Scan Mode** - Merged into the new "Quick + Email Checks" mode.
-- **Removed ~220 lines of duplicate code** - Removed `analyzeQuickScan()` and `analyzeEmailMode()` methods from `analysis-controller.js` after merging their functionality.
-- **Removed `setupScanModeDropdown()` function** - No longer needed with the new two-button UI.
+- **Scan mode dropdown** - Replaced with two-button interface
+- **Legacy scan modes** - Removed separate Quick Scan and Email Scan modes (~220 lines of duplicate code removed)
+- **Streamlined exports** - Removed CSV, Save Analysis, History, and Compare exports
 
 ### Fixed
-- **RRSIG Records Incorrectly Processed as NS Records** - Fixed bug where DNSSEC RRSIG signature records (type 46) returned with `do=true` queries were incorrectly processed as nameserver records. This caused the dangling NS check to attempt DNS queries for RRSIG signature data (e.g., `ns 13 3 86400 1766367464...`) as if they were domain names. Now properly filters out RRSIG records in dangling NS checks and general record processing.
-- **Added DNSSEC Record Type Names** - Extended `getRecordTypeName()` to include DNSSEC record types (RRSIG, NSEC, NSEC3, DNSKEY, DS, TLSA, SOA) for better debugging and logging.
-- **Valimail DMARC Detection** - Added `vali.email` domain recognition for Valimail DMARC reporting service. Also added EasyDMARC, DMARC Analyzer, MXToolbox, URIports, and OnDMARC (Red Sift) to known DMARC services.
-- **DMARC Multiple Email Parsing** - Fixed regex parsing of DMARC records with multiple `mailto:` addresses in `rua=` and `ruf=` tags. Previously only the first email was extracted; now correctly parses all comma-separated mailto addresses (e.g., `rua=mailto:a@example.com,mailto:b@vali.email`).
-- **Spamhaus DBL Query Type** - Fixed critical bug where DBL was querying TXT records instead of A records. DBL uses A records in the 127.0.1.x range to indicate listings. Also added support for additional codes (127.0.1.102-106 for abused legit domains) and proper error handling for 127.255.255.x error responses.
-- **URIBL Bitmask Logic** - Fixed incorrect bitmask values that caused false positives. Query blocked responses (127.0.0.1, bit 1) were incorrectly treated as "listed in black". Corrected bitmask: 1=blocked, 2=black, 4=grey, 8=red. Changed endpoint to multi.uribl.com for proper bitmask support.
-- **SURBL Bitmask Logic** - Fixed completely incorrect bitmask values. Corrected to match SURBL documentation: 4=DM, 8=PH (Phishing), 16=MW (Malware), 32=CT, 64=ABUSE, 128=CR (Cracked sites). Previous implementation had wrong list names and bit positions.
+- **RRSIG record processing** - Fixed DNSSEC RRSIG records incorrectly processed as NS records
+- **DNSSEC record type names** - Added proper type names for RRSIG, NSEC, NSEC3, DNSKEY, DS, TLSA, SOA
+- **DMARC parsing** - Fixed multiple email address parsing in DMARC `rua=` and `ruf=` tags
+- **Blocklist query fixes** - Fixed Spamhaus DBL (TXT → A records), URIBL bitmask logic, SURBL bitmask values
+- **DMARC service detection** - Added Valimail, EasyDMARC, DMARC Analyzer, MXToolbox, URIports, OnDMARC
+- **Security analysis counting** - Fixed NaN issue in security analysis results
 
 ### Optimizations
-- **Reduced code duplication** - Centralized the `isDomainOrSubdomain()` function into a shared module, eliminating duplicate implementations across files.
-- **Collapse/Expand All Controls** - Added "Collapse All" and "Expand All" buttons at the top of results to quickly manage all collapsible sections.
-- **DNS Record Counts in Headers** - Section headers now show the count of DNS records that contributed to findings (e.g., "Third-Party Services (15) from 42 DNS records").
-- **Streamlined Export Options** - Removed CSV, Save Analysis, History, and Compare exports. Kept JSON, PDF, Excel (XLSX), Markdown, and Copy Link for essential export needs.
-- **Deep Scan Mode removal** - Merged functionality into Standard Scan which now performs full analysis including subdomain discovery from all sources.
+- **Code deduplication** - Centralized domain validation, removed ~220 lines of duplicate code
+- **UI enhancements** - Collapse/Expand All controls, DNS record counts in section headers
+- **Export streamlining** - Focused on essential export formats
+
+## [1.0.4] - 2025-12-05
 
 ### Added
-- **SPF Include Chain Analysis (H1)** - Comprehensive SPF record analysis that recursively resolves all `include:` and `redirect=` mechanisms, counts DNS lookups against RFC 7208 limit (max 10), detects void lookups, and provides visual tree representation of the include chain. Warns when approaching or exceeding lookup limits, and suggests flattened SPF records when over limit.
-- **MTA-STS Detection (H2)** - Checks for Mail Transfer Agent Strict Transport Security (RFC 8461) by querying `_mta-sts.{domain}` TXT record. Displays status, version, and policy ID. Adds informational security finding when not configured.
-- **BIMI Detection (H3)** - Checks for Brand Indicators for Message Identification by querying `default._bimi.{domain}` TXT record. Displays logo URL and VMC (Verified Mark Certificate) status when configured.
-- **SMTP TLS Reporting Detection (H7)** - Checks for TLS Reporting (RFC 8460) by querying `_smtp._tls.{domain}` TXT record. Displays reporting addresses when configured.
-- **Email Security Standards Dashboard** - New visual dashboard in Security Analysis section showing status of MTA-STS, BIMI, and TLS-RPT with color-coded indicators and explanations.
-- **Additional Service Detection Patterns (H4)** - Added detection for Splunk, PagerDuty, Grafana Cloud, Opsgenie monitoring services. Enhanced CNAME detection for Datadog, New Relic, Shopify, DocuSign, OneTrust, and Cookiebot.
-- **JSON Export (H5)** - Machine-readable JSON export for automation pipelines. Includes complete analysis data with metadata, services, security results, and interesting findings.
-- **Additional Service Detection Patterns Batch 2 (H6)** - Added CI/CD platforms: CircleCI, GitLab, Travis CI, Jenkins, Bitbucket Pipelines. Workflow automation: Make/Integromat, Tray.io, n8n, Workato. Payment services: Adyen, Braintree, Klarna, Mollie.
-- **DNSSEC Validation (M1)** - Checks DNSSEC configuration by querying DNSKEY and DS records. Reports status as Secure (fully validated), Insecure (keys present but not validated), or Unsigned (not configured). Shows key types (KSK/ZSK), algorithms, and DS key tags.
-- **Shareable URL Links (M3)** - Share domain analysis with URL parameters. Use `?d=domain.com` to pre-fill domain or `?d=domain.com&auto=1` to auto-start analysis. "Copy Link" button generates shareable URLs for quick sharing.
-- **Keyboard Shortcuts (M4)** - Power user keyboard shortcuts: Ctrl+Enter (analyze), Ctrl+E (export PDF), Ctrl+J (export JSON), Ctrl+D (toggle theme), / (focus input), ? (show help).
-- **SURBL and URIBL Blocklist Integration (M5)** - Added SURBL (multi.surbl.org) and URIBL (black.uribl.com) blocklist checking alongside existing Spamhaus DBL. Checks domains and subdomains against all three blocklists in parallel for comprehensive threat detection.
-- **Dangling NS Record Detection (M6)** - Detects nameservers that point to unregistered or non-responsive domains. Identifies potential NS takeover vulnerabilities where attackers could register the nameserver domain to hijack DNS.
-- **Markdown Export (M7)** - Export analysis as GitHub/GitLab-ready Markdown report. Includes summary statistics, services, security issues, and subdomains in a clean, readable format.
-- **Quick Scan Mode (M10)** - Fast analysis mode that skips subdomain discovery. Analyzes only the main domain DNS records for quick security checks. Select from scan mode dropdown.
-- **DANE/TLSA Record Checking (L10)** - Checks for DANE (DNS-based Authentication of Named Entities) by querying TLSA records for SMTP (port 25, 587) and HTTPS (port 443). Shows which services are protected by DANE and parses TLSA record parameters.
-- **Interactive Network Graph (L1)** - Visual network graph showing subdomain relationships and CNAME chains using vis.js. Nodes are color-coded by provider (AWS, Google, Cloudflare, etc.) with interactive zoom, pan, and hover tooltips.
-- **Geographic Distribution Map (L2)** - Interactive Leaflet.js map showing geographic distribution of infrastructure. Markers sized by subdomain count per country with popup details.
-- **Certificate Timeline (L5)** - Timeline visualization of certificate observations from CT logs. Shows when subdomains were first seen in certificate transparency data.
-- **PWA Support (L3)** - Progressive Web App support with manifest.json and service worker for offline functionality. Install to home screen on mobile devices. Caches static assets for faster loading.
-- **Batch Analysis Mode (L4)** - Analyze up to 10 domains at once. Enter multiple domains (comma-separated in main input). Uses Quick Scan for each domain. Export all results as combined JSON.
-- **Email Scan Mode (L6)** - Specialized mode for email security analysis. Checks common DKIM selectors (google, selector1, selector2, k1, default, mail, etc.). Only queries email records: MX, SPF, DKIM, DMARC, MTA-STS, BIMI, and TLSRPT - skips A/AAAA/NS/CNAME records.
-- **Mobile UX Improvements (L8)** - Touch-friendly targets (44px minimum), responsive layout, collapsible sections on mobile, swipe-friendly tables, improved modal sizing, and better form layout on small screens.
-- **Accessibility Enhancements (L9)** - Skip to main content link, ARIA roles and labels, keyboard focus indicators, high contrast mode support, reduced motion preference support, screen reader friendly content, and accessible tooltips.
-- **Visual Analytics Dashboard** - New tabbed visualization section with Network Graph, Geographic Map, and Certificate Timeline views. Switch between visualizations with tab buttons.
-- **THC ip.thc.org API integration** - Added 4th subdomain discovery source using THC's reverse DNS database. Complements existing CT log sources (crt.sh, SSLMate) and HackerTarget by providing subdomains discovered through reverse DNS data. CORS compliant, no authentication required. Documentation: https://ip.thc.org/docs/API/subdomain-lookup
 - **Excessive CAA entries detection** - Security finding when more than 3 CAA (Certificate Authority Authorization) entries are found. Having too many authorized CAs weakens security controls and increases attack surface, effectively leaving the security gate wide open.
 - **IP Geolocation API failure notifications** - User-visible notifications when IP-to-location mapping APIs fail or are rate-limited. Notifications appear in the API Issues section with clear error messages.
 - **429 Rate limit detection** - Proper detection and handling of HTTP 429 (Too Many Requests) errors from IP geolocation APIs. When rate-limited, the tool stops making requests to that provider and switches to fallback providers.
 - **Abuse IP and Domain Blocklist Checking** - Automatic checking of IP addresses and domains against Spamhaus blocklists (ZEN for IPs, DBL for domains) via DNS over HTTPS. Detects malicious IPs and domains flagged in abuse blocklists and reports them as security findings with appropriate risk levels.
 
 ### Fixed
-- **Security analysis NaN issue** - Fixed bug where security analysis reported "NaN issues found" instead of the actual count. The issue occurred because `securityResults` object contains both issue arrays and analysis result objects (like `dnsRecords`, `spfChainAnalysis`, `mtaSts`, etc.), and the calculation was trying to sum `.length` on non-array properties. Now explicitly sums only the issue array properties: `takeovers`, `dnsIssues`, `emailIssues`, `cloudIssues`, and `wildcardCertificates`.
 - **Rate limit handling** - Fixed issue where 429 errors were ignored and requests continued to be sent to rate-limited APIs. Now properly detects 429 status codes and stops retrying rate-limited providers.
 - **API failure visibility** - IP geolocation API failures are now visible to users through the API Issues notification system, instead of silently failing in the background.
 
