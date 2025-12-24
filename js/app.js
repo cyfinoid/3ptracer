@@ -22,10 +22,11 @@ class App {
 // Global app instance
 const app = new App();
 
-// Main analysis function (called from HTML)
-async function analyzeDomain() {
+// Standard analysis function - Full analysis with subdomain discovery (called from HTML)
+async function analyzeStandard() {
     const domainInput = document.getElementById('domain');
-    const analyzeBtn = document.querySelector('.analyze-btn');
+    const standardBtn = document.getElementById('analyzeStandardBtn');
+    const quickEmailBtn = document.getElementById('analyzeQuickEmailBtn');
     const inputValue = domainInput.value.trim();
     
     if (!inputValue) {
@@ -45,44 +46,80 @@ async function analyzeDomain() {
     
     const domain = domains[0] || inputValue;
     
-    // Get scan mode from dropdown
-    const scanModeSelect = document.getElementById('scanMode');
-    const scanMode = scanModeSelect?.value || 'standard';
-    
-    // Determine analysis mode label
-    const modeLabels = {
-        'standard': 'Analyzing',
-        'quick': 'Quick Scanning',
-        'email': 'Email Scanning'
-    };
-    const modeLabel = modeLabels[scanMode] || 'Analyzing';
-    
-    // Disable button and show progress
-    analyzeBtn.disabled = true;
-    analyzeBtn.textContent = `${modeLabel}...`;
+    // Disable buttons and show progress
+    if (standardBtn) {
+        standardBtn.disabled = true;
+        standardBtn.querySelector('.btn-text').textContent = 'Analyzing...';
+    }
+    if (quickEmailBtn) quickEmailBtn.disabled = true;
     analysisInProgress = true;
     
     // Hide previous results
     document.getElementById('results').style.display = 'none';
     
     try {
-        switch (scanMode) {
-            case 'quick':
-                await app.analysisController.analyzeQuickScan(domain);
-                break;
-            case 'email':
-                await app.analysisController.analyzeEmailMode(domain);
-                break;
-            default:
-                await app.analyzeDomain(domain);
-        }
+        await app.analyzeDomain(domain);
         app.saveResults();
     } catch (error) {
         console.error('Analysis failed:', error);
     } finally {
-        // Re-enable button
-        analyzeBtn.disabled = false;
-        analyzeBtn.textContent = 'Analyze Domain';
+        // Re-enable buttons
+        if (standardBtn) {
+            standardBtn.disabled = false;
+            standardBtn.querySelector('.btn-text').textContent = 'Analyze Domain';
+        }
+        if (quickEmailBtn) quickEmailBtn.disabled = false;
+        analysisInProgress = false;
+    }
+}
+
+// Quick + Email Checks - Fast analysis without subdomain discovery (called from HTML)
+async function analyzeQuickEmail() {
+    const domainInput = document.getElementById('domain');
+    const standardBtn = document.getElementById('analyzeStandardBtn');
+    const quickEmailBtn = document.getElementById('analyzeQuickEmailBtn');
+    const inputValue = domainInput.value.trim();
+    
+    if (!inputValue) {
+        alert('Please enter a domain name');
+        return;
+    }
+    
+    // L4: Auto-detect batch mode from comma-separated input
+    const domains = inputValue.split(/[,\s]+/)
+        .map(d => d.trim())
+        .filter(d => d && d.includes('.'));
+    
+    if (domains.length > 1) {
+        await analyzeBatchDomains(domains);
+        return;
+    }
+    
+    const domain = domains[0] || inputValue;
+    
+    // Disable buttons and show progress
+    if (quickEmailBtn) {
+        quickEmailBtn.disabled = true;
+        quickEmailBtn.querySelector('.btn-text').textContent = 'Scanning...';
+    }
+    if (standardBtn) standardBtn.disabled = true;
+    analysisInProgress = true;
+    
+    // Hide previous results
+    document.getElementById('results').style.display = 'none';
+    
+    try {
+        await app.analysisController.analyzeQuickEmail(domain);
+        app.saveResults();
+    } catch (error) {
+        console.error('Quick + Email checks failed:', error);
+    } finally {
+        // Re-enable buttons
+        if (quickEmailBtn) {
+            quickEmailBtn.disabled = false;
+            quickEmailBtn.querySelector('.btn-text').textContent = 'Quick + Email Checks';
+        }
+        if (standardBtn) standardBtn.disabled = false;
         analysisInProgress = false;
     }
 }
@@ -107,7 +144,7 @@ function setupKeyboardShortcuts() {
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
             e.preventDefault();
             if (!analysisInProgress) {
-                analyzeDomain();
+                analyzeStandard();
             }
             return;
         }
@@ -334,26 +371,9 @@ function addCopyLinkButton() {
 let batchResults = [];
 let batchInProgress = false;
 
-function setupScanModeDropdown() {
-    // Setup scan mode dropdown description updater
-    const scanModeSelect = document.getElementById('scanMode');
-    const scanModeDesc = document.getElementById('scanModeDesc');
-    
-    const descriptions = {
-        'standard': 'Full analysis with subdomain discovery from all sources',
-        'quick': 'Domain-only checks, no subdomain discovery',
-        'email': 'Email records only: MX, SPF, DKIM, DMARC, MTA-STS, BIMI'
-    };
-    
-    if (scanModeSelect && scanModeDesc) {
-        scanModeSelect.addEventListener('change', function() {
-            scanModeDesc.textContent = descriptions[this.value] || descriptions['standard'];
-        });
-    }
-}
-
 async function analyzeBatchDomains(domains) {
-    const analyzeBtn = document.querySelector('.analyze-btn');
+    const standardBtn = document.getElementById('analyzeStandardBtn');
+    const quickEmailBtn = document.getElementById('analyzeQuickEmailBtn');
     const batchProgress = document.getElementById('batchProgress');
     
     // Limit to 10 domains
@@ -367,9 +387,12 @@ async function analyzeBatchDomains(domains) {
     batchInProgress = true;
     batchResults = [];
     
-    // Disable inputs
-    analyzeBtn.disabled = true;
-    analyzeBtn.textContent = `Batch Analyzing (0/${domains.length})...`;
+    // Disable buttons
+    if (standardBtn) {
+        standardBtn.disabled = true;
+        standardBtn.querySelector('.btn-text').textContent = `Batch (0/${domains.length})...`;
+    }
+    if (quickEmailBtn) quickEmailBtn.disabled = true;
     
     // Show progress
     if (batchProgress) {
@@ -381,7 +404,9 @@ async function analyzeBatchDomains(domains) {
     
     for (let i = 0; i < domains.length; i++) {
         const domain = domains[i];
-        analyzeBtn.textContent = `Batch Analyzing (${i + 1}/${domains.length})...`;
+        if (standardBtn) {
+            standardBtn.querySelector('.btn-text').textContent = `Batch (${i + 1}/${domains.length})...`;
+        }
         
         if (batchProgress) {
             batchProgress.innerHTML = `
@@ -395,8 +420,8 @@ async function analyzeBatchDomains(domains) {
         }
         
         try {
-            // Use quick scan for batch mode to save time
-            await app.analysisController.analyzeQuickScan(domain);
+            // Use Quick + Email checks for batch mode to save time
+            await app.analysisController.analyzeQuickEmail(domain);
             
             // Get the analysis data
             if (window.exportManager && window.exportManager.analysisData) {
@@ -424,9 +449,12 @@ async function analyzeBatchDomains(domains) {
     batchResults = results;
     batchInProgress = false;
     
-    // Re-enable inputs
-    analyzeBtn.disabled = false;
-    analyzeBtn.textContent = 'Analyze Domain';
+    // Re-enable buttons
+    if (standardBtn) {
+        standardBtn.disabled = false;
+        standardBtn.querySelector('.btn-text').textContent = 'Analyze Domain';
+    }
+    if (quickEmailBtn) quickEmailBtn.disabled = false;
     
     // Show batch results summary
     showBatchResults(results);
@@ -562,15 +590,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const domainInput = document.getElementById('domain');
     
     if (domainInput) {
-        // Handle Enter key in input field
+        // Handle Enter key in input field - defaults to standard analysis
         domainInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                analyzeDomain();
+                analyzeStandard();
             }
         });
-        
-        // Setup scan mode dropdown
-        setupScanModeDropdown();
         
         // M3: Check URL parameters first
         const urlParams = getURLParams();
@@ -585,7 +610,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('🚀 Auto-starting analysis...');
                 // Small delay to ensure DOM is fully ready
                 setTimeout(() => {
-                    analyzeDomain();
+                    analyzeStandard();
                 }, 100);
             }
         } else {

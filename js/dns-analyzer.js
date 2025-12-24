@@ -86,21 +86,8 @@ class DiscoveryQueue {
 // DNS Analyzer Module
 class DNSAnalyzer {
     constructor() {
-        // Helper function to safely match domain suffixes (prevents domain confusion attacks)
-        this.isDomainOrSubdomain = (target, domain) => {
-            if (!target || !domain) return false;
-            
-            const targetLower = target.toLowerCase().trim();
-            const domainLower = domain.toLowerCase().trim();
-            
-            // Exact match
-            if (targetLower === domainLower) return true;
-            
-            // Subdomain match - must end with .domain (not just contain it)
-            if (targetLower.endsWith('.' + domainLower)) return true;
-            
-            return false;
-        };
+        // Use shared isDomainOrSubdomain from CommonUtils (prevents domain confusion attacks)
+        this.isDomainOrSubdomain = CommonUtils.isDomainOrSubdomain;
         
         // Primary DNS servers (Google and Cloudflare only - more reliable)
         this.primaryDNSServers = [
@@ -245,9 +232,16 @@ class DNSAnalyzer {
             1: 'A',
             2: 'NS', 
             5: 'CNAME',
+            6: 'SOA',
             15: 'MX',
             16: 'TXT',
             28: 'AAAA',
+            43: 'DS',
+            46: 'RRSIG',
+            47: 'NSEC',
+            48: 'DNSKEY',
+            50: 'NSEC3',
+            52: 'TLSA',
             257: 'CAA'
         };
         return types[typeNumber] || `TYPE${typeNumber}`;
@@ -879,6 +873,10 @@ class DNSAnalyzer {
                 const foundTypes = new Set();
                 
                 for (const record of primaryRecords) {
+                    // Skip DNSSEC signature records (RRSIG) - they're returned with do=true but we don't need to display them
+                    if (record.type === 46) { // RRSIG
+                        continue;
+                    }
                     const typeName = this.getRecordTypeName(record.type);
                     if (!recordsByType[typeName]) {
                         recordsByType[typeName] = [];
@@ -2371,10 +2369,24 @@ class DNSAnalyzer {
                 return result;
             }
             
-            // Check each nameserver
+            // Check each nameserver (filter out RRSIG records which may be returned with do=true)
+            // NS records have type 2, RRSIG records have type 46
             for (const record of nsRecords) {
+                // Skip non-NS records (e.g., RRSIG records returned with DNSSEC-enabled queries)
+                if (record.type && record.type !== 2) {
+                    console.log(`  ⏭️  Skipping non-NS record type ${record.type}`);
+                    continue;
+                }
+                
                 const nsHostname = (record.data || '').replace(/\.$/, '').toLowerCase();
                 if (!nsHostname) continue;
+                
+                // Additional safety check: valid NS hostnames should look like domain names
+                // RRSIG data contains spaces and Base64 - filter these out
+                if (nsHostname.includes(' ') || nsHostname.includes('=')) {
+                    console.log(`  ⏭️  Skipping invalid NS hostname (likely RRSIG data): ${nsHostname.substring(0, 50)}...`);
+                    continue;
+                }
                 
                 result.nameservers.push(nsHostname);
                 

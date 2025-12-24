@@ -73,6 +73,7 @@ jobs:
           echo "✅ Copied CSS file"
           
           # JavaScript files
+          cp js/common.js _site/js/
           cp js/logger.js _site/js/
           cp js/app.js _site/js/
           cp js/dns-analyzer.js _site/js/
@@ -83,7 +84,7 @@ jobs:
           cp js/export-manager.js _site/js/
           cp js/visualizer.js _site/js/
           cp js/theme-toggle.js _site/js/
-          echo "✅ Copied 10 JavaScript files"
+          echo "✅ Copied 11 JavaScript files"
           
           # PWA files (L3)
           cp manifest.json _site/
@@ -116,6 +117,7 @@ jobs:
             "index.html"
             "about.html"
             "css/style.css"
+            "js/common.js"
             "js/logger.js"
             "js/app.js"
             "js/dns-analyzer.js"
@@ -188,5 +190,5 @@ jobs:
           echo "### 📊 Deployment Details" >> $GITHUB_STEP_SUMMARY
           echo "- Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- Trigger: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Files deployed: 17 (2 HTML, 1 CSS, 10 JS, 2 PWA, 2 metadata)" >> $GITHUB_STEP_SUMMARY
+          echo "- Files deployed: 18 (2 HTML, 1 CSS, 11 JS, 2 PWA, 2 metadata)" >> $GITHUB_STEP_SUMMARY
 

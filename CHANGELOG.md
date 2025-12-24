@@ -7,22 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **New `js/common.js` Utilities Module** - Created shared utility module to centralize common functions used across multiple JavaScript files. Includes `isDomainOrSubdomain()` for secure domain/subdomain matching with protection against domain confusion attacks.
+- **SPF Include Third-Party Detection** - SPF `include:` mechanisms are now explicitly identified as third-party email sending dependencies. Known services (Microsoft 365, Google Workspace, SendGrid, Mailgun, Amazon SES, Mailchimp, Proofpoint, Mimecast, etc.) are labeled, and unknown includes are flagged as "Third-Party SPF Include" for investigation.
+
+### Changed
+- **Two-Button UI for Scan Modes** - Replaced the confusing dropdown scan mode selector with two distinct buttons:
+  - "Analyze Domain" (primary, green) - Full analysis with subdomain discovery
+  - "Quick + Email Checks" (secondary, blue) - Fast checks without subdomain discovery
+- **Merged Quick Scan and Email Scan** - Combined the separate Quick Scan and Email Scan modes into a single "Quick + Email Checks" mode. This new mode provides main domain DNS analysis plus comprehensive email security checks (MX, SPF, DKIM with 12 common selectors, DMARC, MTA-STS, BIMI, TLS-RPT) without the time-consuming subdomain discovery.
+- **Simplified Scan Options** - Reduced from 3 scan modes (Standard, Quick, Email) to 2 clear options (Analyze Domain, Quick + Email Checks), making the UI more intuitive.
+- **Refactored isDomainOrSubdomain** - Moved duplicate `isDomainOrSubdomain()` implementations from `dns-analyzer.js` and `service-detection-engine.js` to the shared `CommonUtils` module.
+
+### Removed
+- **Scan Mode Dropdown** - Removed the dropdown selector in favor of two distinct action buttons.
+- **Separate Quick Scan Mode** - Merged into the new "Quick + Email Checks" mode.
+- **Separate Email Scan Mode** - Merged into the new "Quick + Email Checks" mode.
+- **Removed ~220 lines of duplicate code** - Removed `analyzeQuickScan()` and `analyzeEmailMode()` methods from `analysis-controller.js` after merging their functionality.
+- **Removed `setupScanModeDropdown()` function** - No longer needed with the new two-button UI.
+
 ### Fixed
+- **RRSIG Records Incorrectly Processed as NS Records** - Fixed bug where DNSSEC RRSIG signature records (type 46) returned with `do=true` queries were incorrectly processed as nameserver records. This caused the dangling NS check to attempt DNS queries for RRSIG signature data (e.g., `ns 13 3 86400 1766367464...`) as if they were domain names. Now properly filters out RRSIG records in dangling NS checks and general record processing.
+- **Added DNSSEC Record Type Names** - Extended `getRecordTypeName()` to include DNSSEC record types (RRSIG, NSEC, NSEC3, DNSKEY, DS, TLSA, SOA) for better debugging and logging.
+- **Valimail DMARC Detection** - Added `vali.email` domain recognition for Valimail DMARC reporting service. Also added EasyDMARC, DMARC Analyzer, MXToolbox, URIports, and OnDMARC (Red Sift) to known DMARC services.
+- **DMARC Multiple Email Parsing** - Fixed regex parsing of DMARC records with multiple `mailto:` addresses in `rua=` and `ruf=` tags. Previously only the first email was extracted; now correctly parses all comma-separated mailto addresses (e.g., `rua=mailto:a@example.com,mailto:b@vali.email`).
 - **Spamhaus DBL Query Type** - Fixed critical bug where DBL was querying TXT records instead of A records. DBL uses A records in the 127.0.1.x range to indicate listings. Also added support for additional codes (127.0.1.102-106 for abused legit domains) and proper error handling for 127.255.255.x error responses.
 - **URIBL Bitmask Logic** - Fixed incorrect bitmask values that caused false positives. Query blocked responses (127.0.0.1, bit 1) were incorrectly treated as "listed in black". Corrected bitmask: 1=blocked, 2=black, 4=grey, 8=red. Changed endpoint to multi.uribl.com for proper bitmask support.
 - **SURBL Bitmask Logic** - Fixed completely incorrect bitmask values. Corrected to match SURBL documentation: 4=DM, 8=PH (Phishing), 16=MW (Malware), 32=CT, 64=ABUSE, 128=CR (Cracked sites). Previous implementation had wrong list names and bit positions.
 
-### Changed
-- **Simplified Scan Modes** - Reduced from 5 scan modes to 3: Standard Scan (full analysis with subdomain discovery from all 4 sources), Quick Scan (domain-only checks, no subdomain discovery), and Email Scan (email records only: MX, SPF, DKIM, DMARC, MTA-STS, BIMI, TLSRPT).
-- **Streamlined Export Options** - Removed CSV, Save Analysis, History, and Compare exports. Kept JSON, PDF, Excel (XLSX), Markdown, and Copy Link for essential export needs.
+### Optimizations
+- **Reduced code duplication** - Centralized the `isDomainOrSubdomain()` function into a shared module, eliminating duplicate implementations across files.
 - **Collapse/Expand All Controls** - Added "Collapse All" and "Expand All" buttons at the top of results to quickly manage all collapsible sections.
 - **DNS Record Counts in Headers** - Section headers now show the count of DNS records that contributed to findings (e.g., "Third-Party Services (15) from 42 DNS records").
-
-### Removed
-- **Deep Scan Mode** - Merged functionality into Standard Scan which now performs full analysis including subdomain discovery from all sources.
-- **CSV Export** - Removed in favor of more comprehensive export options (JSON, XLSX, Markdown).
-- **Analysis Snapshots** - Removed Save Analysis and History features to simplify the UI.
-- **Comparison View** - Removed analysis comparison feature.
+- **Streamlined Export Options** - Removed CSV, Save Analysis, History, and Compare exports. Kept JSON, PDF, Excel (XLSX), Markdown, and Copy Link for essential export needs.
+- **Deep Scan Mode removal** - Merged functionality into Standard Scan which now performs full analysis including subdomain discovery from all sources.
 
 ### Added
 - **SPF Include Chain Analysis (H1)** - Comprehensive SPF record analysis that recursively resolves all `include:` and `redirect=` mechanisms, counts DNS lookups against RFC 7208 limit (max 10), detects void lookups, and provides visual tree representation of the include chain. Warns when approaching or exceeding lookup limits, and suggests flattened SPF records when over limit.

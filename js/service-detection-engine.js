@@ -5,20 +5,9 @@ class ServiceDetectionEngine {
         this.vendorPatterns = this.initializeVendorPatterns();
     }
 
-    // Helper function to safely match domain suffixes (prevents domain confusion attacks)
+    // Use shared isDomainOrSubdomain from CommonUtils (prevents domain confusion attacks)
     isDomainOrSubdomain(target, domain) {
-        if (!target || !domain) return false;
-        
-        const targetLower = target.toLowerCase().trim();
-        const domainLower = domain.toLowerCase().trim();
-        
-        // Exact match
-        if (targetLower === domainLower) return true;
-        
-        // Subdomain match - must end with .domain (not just contain it)
-        if (targetLower.endsWith('.' + domainLower)) return true;
-        
-        return false;
+        return CommonUtils.isDomainOrSubdomain(target, domain);
     }
 
     // Initialize service patterns in a cleaner structure
@@ -1138,6 +1127,11 @@ class ServiceDetectionEngine {
             this.processDKIMRecords(records.DKIM, detectedServices, domainBeingAnalyzed);
         }
 
+        // Process SPF records to detect third-party email sending services from includes
+        if (records.SPF && domainBeingAnalyzed) {
+            this.processSPFIncludes(records.SPF, detectedServices, domainBeingAnalyzed);
+        }
+
         // Note: DMARC and SPF policy records are now handled separately as DNS records
 
         return Array.from(detectedServices.values());
@@ -1381,6 +1375,126 @@ class ServiceDetectionEngine {
         }
     }
 
+    // Process SPF records to detect third-party email sending services from includes
+    processSPFIncludes(spfRecords, detectedServices, domainBeingAnalyzed) {
+        console.log(`🔍 Processing ${spfRecords.length} SPF records for third-party includes`);
+        
+        // Known SPF include patterns and their services
+        const spfIncludeServices = {
+            'spf.protection.outlook.com': { name: 'Microsoft 365', description: 'Microsoft email sending' },
+            'outlook.com': { name: 'Microsoft 365', description: 'Microsoft email sending' },
+            '_spf.google.com': { name: 'Google Workspace', description: 'Google email sending' },
+            'spf.google.com': { name: 'Google Workspace', description: 'Google email sending' },
+            'sendgrid.net': { name: 'SendGrid', description: 'Transactional email service' },
+            'mailgun.org': { name: 'Mailgun', description: 'Email API service' },
+            'amazonses.com': { name: 'Amazon SES', description: 'AWS email sending service' },
+            'spf.mandrillapp.com': { name: 'Mandrill', description: 'Mailchimp transactional email' },
+            'servers.mcsv.net': { name: 'Mailchimp', description: 'Email marketing service' },
+            'mailchimp.com': { name: 'Mailchimp', description: 'Email marketing service' },
+            'pphosted.com': { name: 'Proofpoint', description: 'Email security service' },
+            'spf.pphosted.com': { name: 'Proofpoint', description: 'Email security service' },
+            'spf.mimecast.com': { name: 'Mimecast', description: 'Email security service' },
+            'spf.barracuda.com': { name: 'Barracuda', description: 'Email security service' },
+            'spf.sophos.com': { name: 'Sophos', description: 'Email security service' },
+            'zoho.com': { name: 'Zoho Mail', description: 'Business email service' },
+            'spf.zoho.com': { name: 'Zoho Mail', description: 'Business email service' },
+            '_spf.protonmail.ch': { name: 'ProtonMail', description: 'Secure email service' },
+            'icloud.com': { name: 'iCloud Mail', description: 'Apple email service' },
+            'freshdesk.com': { name: 'Freshdesk', description: 'Customer support email' },
+            'zendesk.com': { name: 'Zendesk', description: 'Customer support email' },
+            'salesforce.com': { name: 'Salesforce', description: 'CRM email sending' },
+            'hubspot.com': { name: 'HubSpot', description: 'Marketing automation email' },
+            'intercom.io': { name: 'Intercom', description: 'Customer messaging platform' },
+            'constantcontact.com': { name: 'Constant Contact', description: 'Email marketing' },
+            'cmail19.com': { name: 'Campaign Monitor', description: 'Email marketing' },
+            'cmail20.com': { name: 'Campaign Monitor', description: 'Email marketing' },
+            'postmarkapp.com': { name: 'Postmark', description: 'Transactional email' },
+            'sparkpostmail.com': { name: 'SparkPost', description: 'Email delivery service' },
+            'mailjet.com': { name: 'Mailjet', description: 'Email delivery service' },
+            'sendinblue.com': { name: 'Brevo (Sendinblue)', description: 'Marketing email service' },
+            'aweber.com': { name: 'AWeber', description: 'Email marketing service' },
+            'getresponse.com': { name: 'GetResponse', description: 'Email marketing service' },
+            'klaviyo.com': { name: 'Klaviyo', description: 'E-commerce email marketing' },
+            'drip.com': { name: 'Drip', description: 'E-commerce CRM' },
+            'convertkit.com': { name: 'ConvertKit', description: 'Creator email marketing' },
+            'activecampaign.com': { name: 'ActiveCampaign', description: 'Marketing automation' },
+            'elasticemail.com': { name: 'Elastic Email', description: 'Email delivery service' },
+            'socketlabs.com': { name: 'SocketLabs', description: 'Email delivery service' },
+            'netcorecloud.com': { name: 'Netcore', description: 'Email marketing platform' },
+            'pepipost.com': { name: 'Pepipost', description: 'Email delivery service' }
+        };
+
+        for (const record of spfRecords) {
+            const spfData = record.data;
+            
+            // Extract all include: values
+            const includeMatches = spfData.match(/include:([^\s;]+)/gi) || [];
+            
+            for (const match of includeMatches) {
+                const includeDomain = match.replace(/include:/i, '').toLowerCase();
+                
+                // Check if it's a known service
+                let serviceInfo = null;
+                let matchedDomain = null;
+                
+                // Check for exact match first
+                if (spfIncludeServices[includeDomain]) {
+                    serviceInfo = spfIncludeServices[includeDomain];
+                    matchedDomain = includeDomain;
+                } else {
+                    // Check for partial matches (e.g., xxx.sendgrid.net matches sendgrid.net)
+                    for (const [knownDomain, info] of Object.entries(spfIncludeServices)) {
+                        if (includeDomain.endsWith('.' + knownDomain) || includeDomain === knownDomain) {
+                            serviceInfo = info;
+                            matchedDomain = knownDomain;
+                            break;
+                        }
+                    }
+                }
+                
+                if (serviceInfo) {
+                    // Known third-party email service
+                    const serviceName = `${serviceInfo.name} (SPF Include)`;
+                    console.log(`🚨 Found third-party SPF include: ${serviceName} (${includeDomain})`);
+                    
+                    this.addOrUpdateService(
+                        detectedServices,
+                        serviceName,
+                        {
+                            description: `${serviceInfo.description} - Email sending authorized via SPF include`,
+                            includeDomain: includeDomain,
+                            isThirdParty: true,
+                            isEmailSender: true,
+                            securityImplication: 'External service authorized to send email on behalf of domain'
+                        },
+                        'email',
+                        record,
+                        'SPF-Include'
+                    );
+                } else {
+                    // Unknown SPF include - flag as potential third-party dependency
+                    const serviceName = `Third-Party SPF Include (${includeDomain})`;
+                    console.log(`⚠️ Found unknown SPF include: ${includeDomain}`);
+                    
+                    this.addOrUpdateService(
+                        detectedServices,
+                        serviceName,
+                        {
+                            description: `Unknown email sending service authorized via SPF - EXTERNAL DEPENDENCY`,
+                            includeDomain: includeDomain,
+                            isThirdParty: true,
+                            isEmailSender: true,
+                            securityImplication: 'Unknown external service authorized to send email on behalf of domain'
+                        },
+                        'email',
+                        record,
+                        'SPF-Include'
+                    );
+                }
+            }
+        }
+    }
+
     // Process a specific record type against patterns
     processRecordType(records, patternType, recordType, detectedServices) {
         if (!records || !Array.isArray(records)) return;
@@ -1500,22 +1614,34 @@ class ServiceDetectionEngine {
         console.log(`📧 DMARC data: ${dmarcData}`);
         
         // Extract RUA (aggregate reports) and RUF (forensic reports) emails
+        // DMARC records can have multiple mailto: addresses separated by commas
+        // e.g., rua=mailto:a@example.com,mailto:b@vali.email; ruf=mailto:c@test.com
         const reportingEmails = [];
         
-        const ruaMatch = dmarcData.match(/rua=mailto:([^;,\s]+)/gi);
-        if (ruaMatch) {
-            ruaMatch.forEach(match => {
-                const email = match.replace(/rua=mailto:/i, '');
-                reportingEmails.push({ email, type: 'aggregate' });
-            });
+        // Extract RUA value (everything between rua= and the next tag or end)
+        const ruaValueMatch = dmarcData.match(/rua=([^;]+)/i);
+        if (ruaValueMatch) {
+            // Extract all mailto: addresses from the rua value
+            const mailtoMatches = ruaValueMatch[1].match(/mailto:([^,\s]+)/gi);
+            if (mailtoMatches) {
+                mailtoMatches.forEach(match => {
+                    const email = match.replace(/mailto:/i, '');
+                    reportingEmails.push({ email, type: 'aggregate' });
+                });
+            }
         }
         
-        const rufMatch = dmarcData.match(/ruf=mailto:([^;,\s]+)/gi);
-        if (rufMatch) {
-            rufMatch.forEach(match => {
-                const email = match.replace(/ruf=mailto:/i, '');
-                reportingEmails.push({ email, type: 'forensic' });
-            });
+        // Extract RUF value (everything between ruf= and the next tag or end)
+        const rufValueMatch = dmarcData.match(/ruf=([^;]+)/i);
+        if (rufValueMatch) {
+            // Extract all mailto: addresses from the ruf value
+            const mailtoMatches = rufValueMatch[1].match(/mailto:([^,\s]+)/gi);
+            if (mailtoMatches) {
+                mailtoMatches.forEach(match => {
+                    const email = match.replace(/mailto:/i, '');
+                    reportingEmails.push({ email, type: 'forensic' });
+                });
+            }
         }
         
         console.log(`📬 Extracted ${reportingEmails.length} reporting emails:`, reportingEmails);
@@ -1568,7 +1694,9 @@ class ServiceDetectionEngine {
         const dmarcServices = {
             'dmarcian.com': 'Dmarcian',
             'valimail.com': 'Valimail',
+            'vali.email': 'Valimail',           // Valimail's DMARC reporting domain
             'ondmarc.redsift.com': 'OnDMARC',
+            'redsift.com': 'OnDMARC (Red Sift)',
             'dmarc.postmarkapp.com': 'Postmark DMARC',
             'reports.dmarc.cyber.gov.au': 'Australian Cyber Security Centre',
             'dmarc-reports.cloudflare.com': 'Cloudflare DMARC',
@@ -1578,7 +1706,11 @@ class ServiceDetectionEngine {
             'agari.com': 'Agari',
             'fraudmarc.com': 'FraudMARC',
             'returnpath.com': 'Return Path',
-            'proofpoint.com': 'Proofpoint'
+            'proofpoint.com': 'Proofpoint',
+            'easydmarc.com': 'EasyDMARC',
+            'dmarcanalyzer.com': 'DMARC Analyzer',
+            'mxtoolbox.com': 'MXToolbox',
+            'uriports.com': 'URIports'
         };
         
         // Check for exact domain match

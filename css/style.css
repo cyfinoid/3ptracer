@@ -238,6 +238,89 @@ input[type="checkbox"] {
     transform: none;
 }
 
+/* Two-button scan layout */
+.scan-buttons-container {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.analyze-btn-primary,
+.analyze-btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 200px;
+    justify-content: center;
+}
+
+.analyze-btn-primary {
+    background: var(--accent-green);
+}
+
+.analyze-btn-primary:hover {
+    background: var(--text-primary);
+    box-shadow: 0 4px 12px rgba(80, 200, 120, 0.5);
+}
+
+.analyze-btn-secondary {
+    background: var(--accent-blue);
+}
+
+.analyze-btn-secondary:hover {
+    background: #3a5cc0;
+    box-shadow: 0 4px 12px rgba(70, 111, 224, 0.5);
+}
+
+.btn-icon {
+    font-size: 1.1em;
+}
+
+.btn-text {
+    font-weight: 600;
+}
+
+.scan-descriptions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.scan-desc-primary,
+.scan-desc-secondary {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    min-width: 200px;
+    text-align: center;
+}
+
+@media (max-width: 520px) {
+    .scan-buttons-container {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .analyze-btn-primary,
+    .analyze-btn-secondary {
+        width: 100%;
+        max-width: 300px;
+    }
+    
+    .scan-descriptions {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .scan-desc-primary,
+    .scan-desc-secondary {
+        min-width: auto;
+    }
+}
+
 .progress-section {
     display: none;
     margin: 20px 0;
