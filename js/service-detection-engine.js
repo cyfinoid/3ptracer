@@ -2146,6 +2146,9 @@ class ServiceDetectionEngine {
         
         console.log(`🔍 Analyzing ${wildcardCertificates.length} wildcard certificates for security implications...`);
         
+        const now = new Date();
+        const oneYearInMs = 365 * 24 * 60 * 60 * 1000; // 1 year in milliseconds
+        
         // Group certificates by risk level and domain scope
         const topLevelWildcards = wildcardCertificates.filter(cert => 
             cert.domain.match(/^\*\.[^.]+\.[^.]+$/)
@@ -2154,7 +2157,74 @@ class ServiceDetectionEngine {
             cert.domain.includes('*.') && !cert.domain.match(/^\*\.[^.]+\.[^.]+$/)
         );
         
-        // Create grouped findings instead of individual ones
+        // Check for long-term certificates (1+ year validity, currently active)
+        const longTermCerts = wildcardCertificates.filter(cert => {
+            if (!cert.notBefore || !cert.notAfter) {
+                return false;
+            }
+            
+            try {
+                const notBefore = new Date(cert.notBefore);
+                const notAfter = new Date(cert.notAfter);
+                const validityPeriod = notAfter.getTime() - notBefore.getTime();
+                const isCurrentlyActive = now >= notBefore && now <= notAfter;
+                const isLongTerm = validityPeriod >= oneYearInMs;
+                
+                return isCurrentlyActive && isLongTerm;
+            } catch (error) {
+                console.warn(`Failed to parse certificate dates for ${cert.domain}:`, error);
+                return false;
+            }
+        });
+        
+        // Data accuracy warning - wildcard certs mean we may miss subdomains
+        if (wildcardCertificates.length > 0) {
+            issues.push({
+                type: 'wildcard_certificate_data_accuracy',
+                risk: 'medium',
+                description: `Wildcard certificates detected (${wildcardCertificates.length}) - subdomain discovery data may be incomplete`,
+                recommendation: 'Wildcard certificates allow SSL for any subdomain matching the pattern. Subdomains using these certificates may not appear in Certificate Transparency logs, making discovery incomplete. Consider manual subdomain enumeration techniques.',
+                details: {
+                    certificateCount: wildcardCertificates.length,
+                    topLevelCount: topLevelWildcards.length,
+                    subdomainCount: subdomainWildcards.length
+                },
+                securityImplication: 'Subdomain discovery may be inaccurate - domains with wildcard certificates can have many more subdomains than what appears in CT logs'
+            });
+        }
+        
+        // Long-term certificate security concern
+        if (longTermCerts.length > 0) {
+            issues.push({
+                type: 'wildcard_certificate_long_term',
+                risk: 'high',
+                description: `Long-term wildcard certificates detected (${longTermCerts.length}) - 1+ year validity, currently active`,
+                recommendation: 'Long-term certificates pose a significant security risk if compromised. Consider using shorter validity periods (90 days or less) and automated certificate rotation. If a long-term wildcard certificate is stolen, attackers gain extended decryption access to all matching subdomains.',
+                details: {
+                    certificateCount: longTermCerts.length,
+                    certificates: longTermCerts.map(cert => {
+                        const notBefore = new Date(cert.notBefore);
+                        const notAfter = new Date(cert.notAfter);
+                        const validityDays = Math.round((notAfter.getTime() - notBefore.getTime()) / (24 * 60 * 60 * 1000));
+                        const daysRemaining = Math.round((notAfter.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+                        
+                        return {
+                            domain: cert.domain,
+                            issuer: cert.issuer,
+                            source: cert.source,
+                            validFrom: cert.notBefore,
+                            validTo: cert.notAfter,
+                            validityDays: validityDays,
+                            daysRemaining: daysRemaining,
+                            certificateId: cert.certificateId
+                        };
+                    })
+                },
+                securityImplication: 'Long-term wildcard certificates provide attackers with extended decryption access if compromised. A stolen certificate can be used to decrypt traffic for all matching subdomains for the remaining validity period.'
+            });
+        }
+        
+        // Create grouped findings for top-level wildcards
         if (topLevelWildcards.length > 0) {
             issues.push({
                 type: 'wildcard_certificate',
@@ -2176,6 +2246,7 @@ class ServiceDetectionEngine {
             });
         }
         
+        // Create grouped findings for subdomain wildcards
         if (subdomainWildcards.length > 0) {
             issues.push({
                 type: 'wildcard_certificate',

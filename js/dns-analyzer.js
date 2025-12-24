@@ -1093,18 +1093,42 @@ class DNSAnalyzer {
             // Process entries and add to discovery queue
             let processedCount = 0;
             let addedCount = 0;
+            let wildcardCount = 0;
             for (const entry of data) {
                 const nameValue = entry.name_value;
-                if (nameValue && !nameValue.startsWith('*.')) {
-                    // Handle case where name_value contains multiple subdomains separated by newlines
-                    const subdomains = nameValue.split(/\n|,/).map(s => s.trim()).filter(s => s && !s.startsWith('*.'));
+                if (nameValue) {
+                    // Handle case where name_value contains multiple domains/subdomains separated by newlines or commas
+                    const domains = nameValue.split(/\n|,/).map(s => s.trim()).filter(s => s);
                     
-                    for (const subdomain of subdomains) {
-                        if (subdomain && subdomain.endsWith(`.${domain}`) && subdomain !== domain) {
+                    for (const dnsName of domains) {
+                        // Check if this is a wildcard certificate
+                        if (dnsName.includes('*') && (dnsName.endsWith(`.${domain}`) || dnsName === `*.${domain}`)) {
+                            // Collect wildcard certificate
+                            const wildcardCert = {
+                                domain: dnsName,
+                                issuer: entry.issuer_name || 'Unknown',
+                                source: 'crt.sh',
+                                notBefore: entry.not_before || null,
+                                notAfter: entry.not_after || null,
+                                certificateId: entry.id || entry.certificate_id || null
+                            };
+                            
+                            // Check if we already have this wildcard cert (avoid duplicates)
+                            const isDuplicate = this.wildcardCertificates.some(cert => 
+                                cert.domain === wildcardCert.domain && 
+                                cert.certificateId === wildcardCert.certificateId
+                            );
+                            
+                            if (!isDuplicate) {
+                                this.wildcardCertificates.push(wildcardCert);
+                                wildcardCount++;
+                            }
+                        } else if (!dnsName.startsWith('*.') && dnsName.endsWith(`.${domain}`) && dnsName !== domain) {
+                            // Regular subdomain - add to discovery queue
                             processedCount++;
                             // Check if this subdomain was actually added (not a duplicate)
                             const beforeCount = this.discoveryQueue.discoveredSubdomains.size;
-                            this.discoveryQueue.addDiscovered(subdomain, 'crt.sh');
+                            this.discoveryQueue.addDiscovered(dnsName, 'crt.sh');
                             const afterCount = this.discoveryQueue.discoveredSubdomains.size;
                             if (afterCount > beforeCount) {
                                 addedCount++;
@@ -1114,7 +1138,7 @@ class DNSAnalyzer {
                 }
             }
             
-            console.log(`    ✅ crt.sh: Processed ${processedCount} entries, added ${addedCount} unique subdomains to discovery queue`);
+            console.log(`    ✅ crt.sh: Processed ${processedCount} entries, added ${addedCount} unique subdomains to discovery queue, collected ${wildcardCount} wildcard certificates`);
             this.notifyAPIStatus('crt.sh', 'success', `Found ${addedCount} unique subdomains from ${processedCount} entries`);
             
         } catch (error) {
@@ -1150,11 +1174,34 @@ class DNSAnalyzer {
             // Process entries and add to discovery queue
             let processedCount = 0;
             let addedCount = 0;
+            let wildcardCount = 0;
             for (const issuance of data) {
                 if (issuance.dns_names) {
                     for (const dnsName of issuance.dns_names) {
-                        // Filter out wildcards and only include subdomains
-                        if (dnsName.endsWith(`.${domain}`) && dnsName !== domain && !dnsName.includes('*')) {
+                        // Check if this is a wildcard certificate
+                        if (dnsName.includes('*') && (dnsName.endsWith(`.${domain}`) || dnsName === `*.${domain}` || dnsName === domain)) {
+                            // Collect wildcard certificate
+                            const wildcardCert = {
+                                domain: dnsName,
+                                issuer: issuance.issuer_name || issuance.issuer?.name || 'Unknown',
+                                source: 'SSLMate CT Search',
+                                notBefore: issuance.not_before || null,
+                                notAfter: issuance.not_after || null,
+                                certificateId: issuance.id || null
+                            };
+                            
+                            // Check if we already have this wildcard cert (avoid duplicates)
+                            const isDuplicate = this.wildcardCertificates.some(cert => 
+                                cert.domain === wildcardCert.domain && 
+                                cert.certificateId === wildcardCert.certificateId
+                            );
+                            
+                            if (!isDuplicate) {
+                                this.wildcardCertificates.push(wildcardCert);
+                                wildcardCount++;
+                            }
+                        } else if (dnsName.endsWith(`.${domain}`) && dnsName !== domain && !dnsName.includes('*')) {
+                            // Regular subdomain - add to discovery queue
                             processedCount++;
                             // Check if this subdomain was actually added (not a duplicate)
                             const beforeCount = this.discoveryQueue.discoveredSubdomains.size;
@@ -1168,7 +1215,7 @@ class DNSAnalyzer {
                 }
             }
             
-            console.log(`    ✅ SSLMate CT Search: Processed ${processedCount} entries, added ${addedCount} unique subdomains to discovery queue`);
+            console.log(`    ✅ SSLMate CT Search: Processed ${processedCount} entries, added ${addedCount} unique subdomains to discovery queue, collected ${wildcardCount} wildcard certificates`);
             this.notifyAPIStatus('SSLMate CT Search', 'success', `Found ${addedCount} unique subdomains from ${processedCount} entries`);
             
         } catch (error) {
