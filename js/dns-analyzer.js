@@ -11,7 +11,7 @@ class DiscoveryQueue {
         };
     }
     
-    addDiscovered(subdomain, source) {
+    addDiscovered(subdomain, source, certificateInfo = null) {
         // Clean and validate subdomain name
         const cleanSubdomain = subdomain.trim().toLowerCase();
         
@@ -22,20 +22,58 @@ class DiscoveryQueue {
         }
         
         if (!this.discoveredSubdomains.has(cleanSubdomain)) {
-            this.discoveredSubdomains.set(cleanSubdomain, {
+            const entry = {
                 sources: [source],
                 status: 'discovered',
                 discoveredAt: new Date()
-            });
+            };
+            
+            // Store certificate info if provided (from CT logs)
+            if (certificateInfo) {
+                entry.certificateInfo = {
+                    notBefore: certificateInfo.notBefore || null,
+                    notAfter: certificateInfo.notAfter || null,
+                    issuer: certificateInfo.issuer || null,
+                    certificateId: certificateInfo.certificateId || null
+                };
+            }
+            
+            this.discoveredSubdomains.set(cleanSubdomain, entry);
             this.processingQueue.push(cleanSubdomain);
             this.stats.discovered++;
-            console.log(`🆕 Added to discovery queue: ${cleanSubdomain} (from ${source})`);
+            console.log(`🆕 Added to discovery queue: ${cleanSubdomain} (from ${source})${certificateInfo ? ' with certificate dates' : ''}`);
         } else {
             // Add source to existing entry
             const entry = this.discoveredSubdomains.get(cleanSubdomain);
             if (!entry.sources.includes(source)) {
                 entry.sources.push(source);
                 console.log(`📝 Added source ${source} to existing subdomain: ${cleanSubdomain}`);
+            }
+            
+            // Merge certificate info if provided and not already present
+            if (certificateInfo && !entry.certificateInfo) {
+                entry.certificateInfo = {
+                    notBefore: certificateInfo.notBefore || null,
+                    notAfter: certificateInfo.notAfter || null,
+                    issuer: certificateInfo.issuer || null,
+                    certificateId: certificateInfo.certificateId || null
+                };
+            } else if (certificateInfo && entry.certificateInfo) {
+                // Merge certificate dates (keep earliest notBefore, latest notAfter)
+                if (certificateInfo.notBefore) {
+                    const newNotBefore = new Date(certificateInfo.notBefore);
+                    const existingNotBefore = entry.certificateInfo.notBefore ? new Date(entry.certificateInfo.notBefore) : null;
+                    if (!existingNotBefore || newNotBefore < existingNotBefore) {
+                        entry.certificateInfo.notBefore = certificateInfo.notBefore;
+                    }
+                }
+                if (certificateInfo.notAfter) {
+                    const newNotAfter = new Date(certificateInfo.notAfter);
+                    const existingNotAfter = entry.certificateInfo.notAfter ? new Date(entry.certificateInfo.notAfter) : null;
+                    if (!existingNotAfter || newNotAfter > existingNotAfter) {
+                        entry.certificateInfo.notAfter = certificateInfo.notAfter;
+                    }
+                }
             }
         }
     }
@@ -1059,10 +1097,24 @@ class DNSAnalyzer {
                 // Process single subdomain
                 const result = await this.analyzeSingleSubdomain(subdomain);
                 
-                // Add source information from discovery queue
+                // Add source information and certificate info from discovery queue
                 const discoveryInfo = this.discoveryQueue?.discoveredSubdomains?.get(subdomain);
-                if (discoveryInfo && discoveryInfo.sources) {
-                    result.sources = discoveryInfo.sources;
+                if (discoveryInfo) {
+                    if (discoveryInfo.sources) {
+                        result.sources = discoveryInfo.sources;
+                    } else {
+                        result.sources = ['discovery'];
+                    }
+                    
+                    // Add certificate info if available
+                    if (discoveryInfo.certificateInfo) {
+                        result.certificateInfo = discoveryInfo.certificateInfo;
+                    }
+                    
+                    // Add discoveredAt if available
+                    if (discoveryInfo.discoveredAt) {
+                        result.discoveredAt = discoveryInfo.discoveredAt;
+                    }
                 } else {
                     result.sources = ['discovery'];
                 }
@@ -1170,11 +1222,20 @@ class DNSAnalyzer {
                                 wildcardCount++;
                             }
                         } else if (!dnsName.startsWith('*.') && dnsName.endsWith(`.${domain}`) && dnsName !== domain) {
-                            // Regular subdomain - add to discovery queue
+                            // Regular subdomain - add to discovery queue with certificate info
                             processedCount++;
                             // Check if this subdomain was actually added (not a duplicate)
                             const beforeCount = this.discoveryQueue.discoveredSubdomains.size;
-                            this.discoveryQueue.addDiscovered(dnsName, 'crt.sh');
+                            
+                            // Extract certificate info from CT log entry
+                            const certInfo = {
+                                notBefore: entry.not_before || null,
+                                notAfter: entry.not_after || null,
+                                issuer: entry.issuer_name || null,
+                                certificateId: entry.id || entry.certificate_id || null
+                            };
+                            
+                            this.discoveryQueue.addDiscovered(dnsName, 'crt.sh', certInfo);
                             const afterCount = this.discoveryQueue.discoveredSubdomains.size;
                             if (afterCount > beforeCount) {
                                 addedCount++;
@@ -1247,11 +1308,20 @@ class DNSAnalyzer {
                                 wildcardCount++;
                             }
                         } else if (dnsName.endsWith(`.${domain}`) && dnsName !== domain && !dnsName.includes('*')) {
-                            // Regular subdomain - add to discovery queue
+                            // Regular subdomain - add to discovery queue with certificate info
                             processedCount++;
                             // Check if this subdomain was actually added (not a duplicate)
                             const beforeCount = this.discoveryQueue.discoveredSubdomains.size;
-                            this.discoveryQueue.addDiscovered(dnsName, 'SSLMate CT Search');
+                            
+                            // Extract certificate info from CT log entry
+                            const certInfo = {
+                                notBefore: issuance.not_before || null,
+                                notAfter: issuance.not_after || null,
+                                issuer: issuance.issuer_name || issuance.issuer?.name || null,
+                                certificateId: issuance.id || null
+                            };
+                            
+                            this.discoveryQueue.addDiscovered(dnsName, 'SSLMate CT Search', certInfo);
                             const afterCount = this.discoveryQueue.discoveredSubdomains.size;
                             if (afterCount > beforeCount) {
                                 addedCount++;
@@ -1929,177 +1999,6 @@ class DNSAnalyzer {
 
         console.log(`📊 PTR lookup complete: ${ptrResults.size} IPs have PTR records`);
         return ptrResults;
-    }
-
-    // Test HTTP/HTTPS connection for a subdomain (HTTP and HTTPS tested in parallel)
-    async testHTTPConnection(subdomain) {
-        const result = {
-            subdomain: subdomain,
-            http: null,
-            https: null,
-            timestamp: new Date().toISOString()
-        };
-
-        // Test HTTPS and HTTP in parallel
-        const [httpsResult, httpResult] = await Promise.allSettled([
-            this.testHTTPSConnection(subdomain),
-            this.testHTTPConnectionOnly(subdomain)
-        ]);
-
-        // Process HTTPS result
-        if (httpsResult.status === 'fulfilled') {
-            result.https = httpsResult.value;
-        } else {
-            result.https = {
-                reachable: false,
-                error: httpsResult.reason?.message || 'Unknown error',
-                corsBlocked: false
-            };
-        }
-
-        // Process HTTP result
-        if (httpResult.status === 'fulfilled') {
-            result.http = httpResult.value;
-        } else {
-            result.http = {
-                reachable: false,
-                error: httpResult.reason?.message || 'Unknown error',
-                corsBlocked: false
-            };
-        }
-
-        return result;
-    }
-
-    // Test HTTPS connection only
-    async testHTTPSConnection(subdomain) {
-        const httpsUrl = `https://${subdomain}`;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
-
-        try {
-            const response = await fetch(httpsUrl, {
-                method: 'HEAD',
-                signal: controller.signal,
-                redirect: 'follow',
-                mode: 'cors'
-            });
-
-            clearTimeout(timeoutId);
-            return {
-                reachable: true,
-                status: response.status,
-                statusText: response.statusText,
-                finalUrl: response.url,
-                headers: {
-                    server: response.headers.get('server'),
-                    contentType: response.headers.get('content-type'),
-                    location: response.headers.get('location')
-                },
-                corsBlocked: false
-            };
-        } catch (fetchError) {
-            clearTimeout(timeoutId);
-            if (fetchError.name === 'AbortError') {
-                return {
-                    reachable: false,
-                    error: 'timeout',
-                    corsBlocked: false
-                };
-            } else if (fetchError.message.includes('CORS') || fetchError.message.includes('Failed to fetch')) {
-                // Likely CORS blocked, but server exists
-                return {
-                    reachable: true, // Server exists, just CORS blocked
-                    corsBlocked: true,
-                    error: 'CORS blocked'
-                };
-            } else {
-                return {
-                    reachable: false,
-                    error: fetchError.message,
-                    corsBlocked: false
-                };
-            }
-        }
-    }
-
-    // Test HTTP connection only
-    async testHTTPConnectionOnly(subdomain) {
-        const httpUrl = `http://${subdomain}`;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
-
-        try {
-            const response = await fetch(httpUrl, {
-                method: 'HEAD',
-                signal: controller.signal,
-                redirect: 'follow',
-                mode: 'cors'
-            });
-
-            clearTimeout(timeoutId);
-            return {
-                reachable: true,
-                status: response.status,
-                statusText: response.statusText,
-                finalUrl: response.url,
-                headers: {
-                    server: response.headers.get('server'),
-                    contentType: response.headers.get('content-type'),
-                    location: response.headers.get('location')
-                },
-                corsBlocked: false
-            };
-        } catch (fetchError) {
-            clearTimeout(timeoutId);
-            if (fetchError.name === 'AbortError') {
-                return {
-                    reachable: false,
-                    error: 'timeout',
-                    corsBlocked: false
-                };
-            } else if (fetchError.message.includes('CORS') || fetchError.message.includes('Failed to fetch')) {
-                return {
-                    reachable: true,
-                    corsBlocked: true,
-                    error: 'CORS blocked'
-                };
-            } else {
-                return {
-                    reachable: false,
-                    error: fetchError.message,
-                    corsBlocked: false
-                };
-            }
-        }
-    }
-
-    // Test HTTP connections for multiple subdomains in parallel (with concurrency limit)
-    async testHTTPConnections(subdomains, maxConcurrent = 5) {
-        if (!subdomains || subdomains.length === 0) {
-            return new Map();
-        }
-
-        console.log(`🌐 Testing HTTP connections for ${subdomains.length} subdomains (max ${maxConcurrent} concurrent)...`);
-        const httpResults = new Map();
-
-        // Process in batches to limit concurrent connections
-        for (let i = 0; i < subdomains.length; i += maxConcurrent) {
-            const batch = subdomains.slice(i, i + maxConcurrent);
-            const batchPromises = batch.map(async (subdomain) => {
-                const result = await this.testHTTPConnection(subdomain);
-                httpResults.set(subdomain, result);
-            });
-
-            await Promise.allSettled(batchPromises);
-        }
-
-        const reachableCount = Array.from(httpResults.values()).filter(r => 
-            (r.https && r.https.reachable) || (r.http && r.http.reachable)
-        ).length;
-
-        console.log(`📊 HTTP connection testing complete: ${reachableCount}/${subdomains.length} subdomains reachable`);
-        return httpResults;
     }
 
     // Detect wildcard DNS configuration for a domain

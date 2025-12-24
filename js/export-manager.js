@@ -251,27 +251,12 @@ class ExportManager {
                 const subdomainList = Array.isArray(data.subdomains) ? data.subdomains : Object.values(data.subdomains);
                 if (subdomainList.length > 0) {
                     md += `## Subdomains (${subdomainList.length})\n\n`;
-                    md += `| Subdomain | IP | Provider | HTTP Status | PTR Records |\n`;
-                    md += `|-----------|----|---------|-------------|-------------|\n`;
+                    md += `| Subdomain | IP | Provider | PTR Records |\n`;
+                    md += `|-----------|----|---------|-------------|\n`;
                     for (const sub of subdomainList.slice(0, 50)) {
                         const subdomain = sub.subdomain || sub.name || sub;
                         const ip = sub.ip || sub.ipAddresses?.[0] || 'N/A';
                         const provider = sub.asnInfo?.org || sub.provider || 'Unknown';
-                        
-                        // Add HTTP status
-                        let httpStatus = 'N/A';
-                        if (sub.httpStatus) {
-                            const status = sub.httpStatus;
-                            if (status.https && status.https.reachable) {
-                                httpStatus = `HTTPS: ${status.https.status || 'OK'}`;
-                            } else if (status.http && status.http.reachable) {
-                                httpStatus = `HTTP: ${status.http.status || 'OK'}`;
-                            } else if (status.https && status.https.corsBlocked) {
-                                httpStatus = 'HTTPS: CORS blocked';
-                            } else {
-                                httpStatus = 'Unreachable';
-                            }
-                        }
                         
                         // Add PTR records
                         let ptrRecords = 'N/A';
@@ -279,7 +264,7 @@ class ExportManager {
                             ptrRecords = sub.records.PTR.map(ptr => ptr.hostname || ptr.data).join(', ');
                         }
                         
-                        md += `| ${subdomain} | ${ip} | ${provider} | ${httpStatus} | ${ptrRecords} |\n`;
+                        md += `| ${subdomain} | ${ip} | ${provider} | ${ptrRecords} |\n`;
                     }
                     if (subdomainList.length > 50) {
                         md += `\n*...and ${subdomainList.length - 50} more subdomains*\n`;
@@ -496,7 +481,7 @@ class ExportManager {
             
             if (subdomainsData.length > 0) {
                 doc.autoTable({
-                    head: [['Subdomain', 'IP Address', 'Provider/Service', 'HTTP Status', 'PTR Records']],
+                    head: [['Subdomain', 'IP Address', 'Provider/Service', 'PTR Records']],
                     body: subdomainsData,
                     startY: currentY,
                     theme: 'striped',
@@ -848,21 +833,6 @@ class ExportManager {
                 const provider = subdomain.provider || subdomain.service || 
                                (subdomain.asnInfo ? subdomain.asnInfo.org : 'Unknown');
                 
-                // Add HTTP status
-                let httpStatus = 'N/A';
-                if (subdomain.httpStatus) {
-                    const status = subdomain.httpStatus;
-                    if (status.https && status.https.reachable) {
-                        httpStatus = `HTTPS: ${status.https.status || 'OK'}`;
-                    } else if (status.http && status.http.reachable) {
-                        httpStatus = `HTTP: ${status.http.status || 'OK'}`;
-                    } else if (status.https && status.https.corsBlocked) {
-                        httpStatus = 'HTTPS: CORS blocked';
-                    } else {
-                        httpStatus = 'Unreachable';
-                    }
-                }
-                
                 // Add PTR records
                 let ptrRecords = 'N/A';
                 if (subdomain.records && subdomain.records.PTR && subdomain.records.PTR.length > 0) {
@@ -873,7 +843,6 @@ class ExportManager {
                     subdomain.subdomain || subdomain.name || 'Unknown',
                     ipAddress,
                     provider,
-                    httpStatus,
                     ptrRecords
                 ]);
             });

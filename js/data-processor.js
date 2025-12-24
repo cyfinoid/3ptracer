@@ -68,12 +68,19 @@ class DataProcessor {
                 });
             } else if (this.isHistoricalSubdomain(subdomain)) {
                 // Subdomain with no DNS records - categorize as historical
-                historicalSubdomains.push({
+                const historicalRecord = {
                     subdomain: subdomain.subdomain,
                     sources: subdomain.sources || ['discovery'],
                     discoveredAt: subdomain.discoveredAt || new Date(),
                     status: 'historical'
-                });
+                };
+                
+                // Include certificate info if available (from CT logs)
+                if (subdomain.certificateInfo) {
+                    historicalRecord.certificateInfo = subdomain.certificateInfo;
+                }
+                
+                historicalSubdomains.push(historicalRecord);
             } else {
                 regularSubdomains.push(subdomain);
             }
@@ -115,8 +122,6 @@ class DataProcessor {
             takeover: subdomain.takeover || null,
             // FIXED: Keep ASN info for sovereignty analysis
             asnInfo: subdomain.asnInfo || null,
-            // NEW: Preserve HTTP status and PTR records
-            httpStatus: subdomain.httpStatus || null,
             status: 'analyzed'
         };
 

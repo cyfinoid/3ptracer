@@ -38,6 +38,11 @@ class Visualizer {
 
         const data = this.analysisData.processedData;
         
+        // Helper to get CSS variable values (CSS handles theme switching automatically)
+        const getCSSVar = (varName, fallback = '') => {
+            return getComputedStyle(document.documentElement).getPropertyValue(varName).trim() || fallback;
+        };
+        
         // Process subdomains - handle Map, Array, or Object
         let subdomains = [];
         if (data.subdomains) {
@@ -64,39 +69,201 @@ class Visualizer {
         // Get domain from stats or first subdomain
         const domain = data.stats?.domain || 'domain';
 
-        // Add root domain node
+        // Add root domain node (colors from CSS variables)
         nodes.push({
             id: domain,
             label: domain,
             shape: 'diamond',
-            color: { background: '#667eea', border: '#5a6fd6' },
-            font: { color: '#ffffff' },
+            color: { 
+                background: getCSSVar('--accent-blue', '#466fe0'), 
+                border: getCSSVar('--accent-blue', '#466fe0') 
+            },
+            font: { color: getCSSVar('--text-primary', '#ffffff') },
             size: 30
         });
         nodeIds.add(domain);
 
-        // Color map for providers
-        const providerColors = {
-            'cloudflare': '#f38020',
-            'amazon': '#ff9900',
-            'aws': '#ff9900',
-            'google': '#4285f4',
-            'microsoft': '#00a4ef',
-            'azure': '#00a4ef',
-            'digitalocean': '#0080ff',
-            'akamai': '#009aff',
-            'fastly': '#ff282d'
+        // Enhanced provider detection and grouping
+        const providerMap = {
+            'cloudflare': { name: 'Cloudflare', color: '#f38020', group: 'cloudflare' },
+            'amazon': { name: 'Amazon AWS', color: '#ff9900', group: 'aws' },
+            'aws': { name: 'Amazon AWS', color: '#ff9900', group: 'aws' },
+            'google': { name: 'Google Cloud', color: '#4285f4', group: 'google' },
+            'gcp': { name: 'Google Cloud', color: '#4285f4', group: 'google' },
+            'microsoft': { name: 'Microsoft Azure', color: '#00a4ef', group: 'azure' },
+            'azure': { name: 'Microsoft Azure', color: '#00a4ef', group: 'azure' },
+            'digitalocean': { name: 'DigitalOcean', color: '#0080ff', group: 'digitalocean' },
+            'akamai': { name: 'Akamai', color: '#009aff', group: 'akamai' },
+            'fastly': { name: 'Fastly', color: '#ff282d', group: 'fastly' },
+            'vercel': { name: 'Vercel', color: '#000000', group: 'vercel' },
+            'netlify': { name: 'Netlify', color: '#00ad9f', group: 'netlify' },
+            'heroku': { name: 'Heroku', color: '#6762a6', group: 'heroku' }
         };
 
-        const getNodeColor = (subdomain) => {
-            const provider = (subdomain.asnInfo?.org || subdomain.provider || '').toLowerCase();
-            for (const [key, color] of Object.entries(providerColors)) {
-                if (provider.includes(key)) {
-                    return { background: color, border: color };
+        // Detect provider from subdomain data - only if actual service usage is detected
+        const detectProvider = (subdomain) => {
+            // Priority 1: Check infrastructure (CNAME targets pointing to provider domains)
+            const infrastructure = (subdomain.infrastructure?.name || '').toLowerCase();
+            if (infrastructure) {
+                for (const [key, providerInfo] of Object.entries(providerMap)) {
+                    if (infrastructure.includes(key)) {
+                        return providerInfo;
+                    }
                 }
             }
-            return { background: '#6c757d', border: '#545b62' };
+            
+            // Priority 2: Check primary service (detected services from CNAME analysis)
+            const primaryService = (subdomain.primaryService?.name || '').toLowerCase();
+            if (primaryService) {
+                for (const [key, providerInfo] of Object.entries(providerMap)) {
+                    if (primaryService.includes(key)) {
+                        return providerInfo;
+                    }
+                }
+            }
+            
+            // Priority 3: Check detected services array
+            if (subdomain.detectedServices && Array.isArray(subdomain.detectedServices)) {
+                const serviceNames = subdomain.detectedServices.map(s => (s.name || '').toLowerCase()).join(' ');
+                for (const [key, providerInfo] of Object.entries(providerMap)) {
+                    if (serviceNames.includes(key)) {
+                        return providerInfo;
+                    }
+                }
+            }
+            
+            // Priority 4: Check CNAME target directly (if infrastructure wasn't set)
+            const cnameTarget = (subdomain.cname || subdomain.cnameTarget || '').toLowerCase();
+            if (cnameTarget) {
+                for (const [key, providerInfo] of Object.entries(providerMap)) {
+                    // Check if CNAME points to provider's domain
+                    if (cnameTarget.includes(key) && (
+                        cnameTarget.includes('.amazonaws.com') ||
+                        cnameTarget.includes('.azurewebsites.net') ||
+                        cnameTarget.includes('.cloudflare.com') ||
+                        cnameTarget.includes('.ondigitalocean.app') ||
+                        cnameTarget.includes('.vercel.app') ||
+                        cnameTarget.includes('.netlify.app') ||
+                        cnameTarget.includes('.herokuapp.com')
+                    )) {
+                        return providerInfo;
+                    }
+                }
+            }
+            
+            // Priority 5: Check vendor (only if it's a known cloud provider, not just ASN)
+            const vendor = (subdomain.vendor?.vendor || '').toLowerCase();
+            if (vendor && (vendor.includes('amazon') || vendor.includes('aws') || vendor.includes('microsoft') || vendor.includes('azure') || vendor.includes('google'))) {
+                for (const [key, providerInfo] of Object.entries(providerMap)) {
+                    if (vendor.includes(key)) {
+                        return providerInfo;
+                    }
+                }
+            }
+            
+            // Priority 6: Check ASN org (only for known cloud providers, and only if subdomain has an IP)
+            // This ensures we detect providers based on IP ownership
+            if (subdomain.ip || (subdomain.ipAddresses && subdomain.ipAddresses.length > 0)) {
+                const asnOrg = (subdomain.asnInfo?.org || '').toLowerCase();
+                if (asnOrg) {
+                    // Check for known cloud provider ASNs
+                    for (const [key, providerInfo] of Object.entries(providerMap)) {
+                        if (asnOrg.includes(key)) {
+                            return providerInfo;
+                        }
+                    }
+                }
+            }
+            
+            // Return 'Other' if no service usage or provider IP detected
+            return { name: 'Other', color: '#6c757d', group: 'other' };
         };
+
+        // Group subdomains by provider - only include providers with actual service usage
+        const providerGroups = new Map();
+        for (const sub of subdomains) {
+            const provider = detectProvider(sub);
+            // Only add to provider groups if it's not "Other" (meaning actual service usage detected)
+            if (provider && provider.group !== 'other') {
+                if (!providerGroups.has(provider.group)) {
+                    providerGroups.set(provider.group, {
+                        provider: provider,
+                        subdomains: []
+                    });
+                }
+                providerGroups.get(provider.group).subdomains.push(sub);
+            }
+        }
+        
+        // Check for email services (MX-based) that should create provider boxes even without subdomains
+        // Services are stored in processedData.services (Map or Object)
+        let services = [];
+        if (data.services) {
+            if (data.services instanceof Map) {
+                services = Array.from(data.services.values());
+            } else if (Array.isArray(data.services)) {
+                services = data.services;
+            } else {
+                services = Object.values(data.services);
+            }
+        }
+        
+        // Map email service names to provider groups
+        const emailServiceToProvider = {
+            'Google Workspace': 'google',
+            'Gmail': 'google',
+            'Microsoft 365': 'azure',
+            'Microsoft Office 365': 'azure',
+            'Outlook': 'azure'
+        };
+        
+        // Check for email services and add providers if found
+        for (const service of services) {
+            const serviceName = (service.name || '').toLowerCase();
+            const serviceCategory = (service.category || '').toLowerCase();
+            
+            // Check if this is an email service that maps to a provider
+            if (serviceCategory === 'email' || serviceCategory === 'email-service') {
+                for (const [emailServiceName, providerGroup] of Object.entries(emailServiceToProvider)) {
+                    if (serviceName.includes(emailServiceName.toLowerCase())) {
+                        // Add provider group if it doesn't exist
+                        if (!providerGroups.has(providerGroup)) {
+                            const providerInfo = providerMap[providerGroup] || providerMap[emailServiceName.toLowerCase().split(' ')[0]];
+                            if (providerInfo) {
+                                providerGroups.set(providerGroup, {
+                                    provider: providerInfo,
+                                    subdomains: [] // Empty subdomains list - service is at domain level
+                                });
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Filter out provider groups with no subdomains AND no services (safety check)
+        // But keep groups that have services even if no subdomains
+        for (const [groupKey, groupData] of providerGroups) {
+            // Keep the group if it has subdomains OR if we found a matching email service
+            const hasEmailService = services.some(service => {
+                const serviceName = (service.name || '').toLowerCase();
+                const serviceCategory = (service.category || '').toLowerCase();
+                if (serviceCategory === 'email' || serviceCategory === 'email-service') {
+                    for (const [emailServiceName, providerGroup] of Object.entries(emailServiceToProvider)) {
+                        if (providerGroup === groupKey && serviceName.includes(emailServiceName.toLowerCase())) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            });
+            
+            // Only delete if no subdomains AND no email service
+            if (groupData.subdomains.length === 0 && !hasEmailService) {
+                providerGroups.delete(groupKey);
+            }
+        }
 
         for (const sub of subdomains.slice(0, 100)) { // Limit to 100 nodes for performance
             const subName = sub.subdomain || sub.name || sub;
@@ -104,26 +271,26 @@ class Visualizer {
 
             nodeIds.add(subName);
             
-            // Build tooltip with IP and HTTP status
-            let tooltip = `${subName}\nIP: ${sub.ip || sub.ipAddresses?.[0] || 'N/A'}\nProvider: ${sub.asnInfo?.org || 'Unknown'}`;
-            if (sub.httpStatus) {
-                const status = sub.httpStatus;
-                if (status.https && status.https.reachable) {
-                    tooltip += `\nHTTPS: ✓ ${status.https.status || 'OK'}`;
-                } else if (status.http && status.http.reachable) {
-                    tooltip += `\nHTTP: ✓ ${status.http.status || 'OK'}`;
-                } else if (status.https && status.https.corsBlocked) {
-                    tooltip += `\nHTTPS: ⚠ CORS blocked`;
-                }
+            // Detect provider for this subdomain
+            const provider = detectProvider(sub);
+            
+            // Use default "Other" provider if none detected
+            const displayProvider = provider || { name: 'Other', color: '#6c757d', group: 'other' };
+            
+            // Build tooltip with IP and provider
+            let tooltip = `${subName}\nIP: ${sub.ip || sub.ipAddresses?.[0] || 'N/A'}\nProvider: ${displayProvider.name}`;
+            if (sub.asnInfo?.org) {
+                tooltip += `\nASN: ${sub.asnInfo.org}`;
             }
             
-            // Add subdomain node
+            // Add subdomain node with provider group (only if provider detected, otherwise no group)
             nodes.push({
                 id: subName,
                 label: subName.replace(`.${domain}`, ''),
                 shape: 'dot',
-                color: getNodeColor(sub),
+                color: { background: displayProvider.color, border: displayProvider.color },
                 size: 15,
+                group: provider ? provider.group : undefined, // Only set group if provider detected
                 title: tooltip
             });
 
@@ -131,7 +298,10 @@ class Visualizer {
             edges.push({
                 from: domain,
                 to: subName,
-                color: { color: '#cccccc', opacity: 0.5 },
+                color: { 
+                    color: getCSSVar('--text-secondary', '#cccccc'), 
+                    opacity: 0.5 
+                },
                 width: 1
             });
 
@@ -156,8 +326,11 @@ class Visualizer {
                         id: ipNodeId,
                         label: ip,
                         shape: 'square',
-                        color: { background: '#17a2b8', border: '#138496' },
-                        font: { color: '#ffffff', size: 10 },
+                        color: { 
+                            background: getCSSVar('--accent-blue', '#17a2b8'), 
+                            border: getCSSVar('--accent-blue', '#17a2b8') 
+                        },
+                        font: { color: getCSSVar('--text-primary', '#ffffff'), size: 10 },
                         size: 12,
                         title: ipTooltip
                     });
@@ -168,7 +341,7 @@ class Visualizer {
                     from: subName,
                     to: ipNodeId,
                     arrows: 'to',
-                    color: { color: '#17a2b8' },
+                    color: { color: getCSSVar('--accent-blue', '#17a2b8') },
                     width: 1,
                     label: 'A'
                 });
@@ -183,7 +356,10 @@ class Visualizer {
                                 id: ptrHostname,
                                 label: ptrHostname.length > 20 ? ptrHostname.substring(0, 20) + '...' : ptrHostname,
                                 shape: 'triangle',
-                                color: { background: '#ffc107', border: '#e0a800' },
+                                color: { 
+                                    background: getCSSVar('--accent-yellow', '#ffc107'), 
+                                    border: getCSSVar('--accent-yellow', '#ffc107') 
+                                },
                                 font: { color: '#000000', size: 9 },
                                 size: 10,
                                 title: `PTR: ${ptrHostname}\nReverse DNS for ${ip}`
@@ -195,7 +371,7 @@ class Visualizer {
                             from: ipNodeId,
                             to: ptrHostname,
                             arrows: 'to',
-                            color: { color: '#ffc107' },
+                            color: { color: getCSSVar('--accent-yellow', '#ffc107') },
                             dashes: [5, 5],
                             width: 1,
                             label: 'PTR'
@@ -213,8 +389,11 @@ class Visualizer {
                         id: cnameTarget,
                         label: cnameTarget.substring(0, 20) + '...',
                         shape: 'box',
-                        color: { background: '#28a745', border: '#1e7b34' },
-                        font: { color: '#ffffff', size: 10 },
+                        color: { 
+                            background: getCSSVar('--accent-green', '#28a745'), 
+                            border: getCSSVar('--accent-green', '#28a745') 
+                        },
+                        font: { color: getCSSVar('--text-primary', '#ffffff'), size: 10 },
                         size: 10,
                         title: `CNAME Target: ${cnameTarget}`
                     });
@@ -223,7 +402,7 @@ class Visualizer {
                     from: subName,
                     to: cnameTarget,
                     arrows: 'to',
-                    color: { color: '#28a745' },
+                    color: { color: getCSSVar('--accent-green', '#28a745') },
                     dashes: true,
                     width: 1,
                     label: 'CNAME'
@@ -231,42 +410,266 @@ class Visualizer {
             }
         }
 
+        // Create provider container boxes with structured layout
+        const providerBoxes = [];
+        const subdomainPositions = new Map();
+        const boxWidth = 300;
+        const boxHeight = 400;
+        const subdomainSpacing = 40;
+        const boxSpacing = 50;
+        
+        // Calculate grid layout for provider boxes
+        const boxesPerRow = Math.ceil(Math.sqrt(providerGroups.size));
+        let boxIndex = 0;
+        
+        for (const [groupKey, groupData] of providerGroups) {
+            // Skip only if no subdomains AND it's not an email service provider
+            // Email service providers (like Google Workspace) may have no subdomains but should still show
+            const hasEmailService = services.some(service => {
+                const serviceName = (service.name || '').toLowerCase();
+                const serviceCategory = (service.category || '').toLowerCase();
+                if (serviceCategory === 'email' || serviceCategory === 'email-service') {
+                    const emailServiceToProvider = {
+                        'google workspace': 'google',
+                        'gmail': 'google',
+                        'microsoft 365': 'azure',
+                        'microsoft office 365': 'azure',
+                        'outlook': 'azure'
+                    };
+                    for (const [emailServiceName, providerGroup] of Object.entries(emailServiceToProvider)) {
+                        if (providerGroup === groupKey && serviceName.includes(emailServiceName)) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            });
+            
+            // Skip if no subdomains and no email service
+            if (groupData.subdomains.length === 0 && !hasEmailService) continue;
+            
+            const row = Math.floor(boxIndex / boxesPerRow);
+            const col = boxIndex % boxesPerRow;
+            
+            // Position provider box
+            const boxX = col * (boxWidth + boxSpacing) + boxWidth / 2;
+            const boxY = row * (boxHeight + boxSpacing) + boxHeight / 2 + 100; // Offset for root domain
+            
+            const groupNodeId = `provider_box_${groupKey}`;
+            
+            // Determine label based on whether there are subdomains or just email service
+            let boxLabel = groupData.provider.name;
+            let boxTitle = groupData.provider.name;
+            if (groupData.subdomains.length > 0) {
+                boxLabel += `\n(${groupData.subdomains.length} subdomain${groupData.subdomains.length !== 1 ? 's' : ''})`;
+                boxTitle += `\n${groupData.subdomains.length} subdomain(s)`;
+            } else if (hasEmailService) {
+                boxLabel += '\n(Email Service)';
+                boxTitle += '\nEmail Service';
+            }
+            
+            // Create provider box node (larger, as container)
+            // Use CSS variable for background with opacity
+            const providerColor = groupData.provider.color;
+            providerBoxes.push({
+                id: groupNodeId,
+                label: boxLabel,
+                shape: 'box',
+                color: { 
+                    background: providerColor + '40', // Semi-transparent
+                    border: providerColor,
+                    highlight: { 
+                        background: providerColor + '60', 
+                        border: providerColor 
+                    }
+                },
+                font: { color: providerColor, size: 16, face: 'Arial', bold: true },
+                size: { width: boxWidth, height: boxHeight },
+                x: boxX,
+                y: boxY,
+                fixed: { x: true, y: true },
+                physics: false,
+                title: boxTitle,
+                margin: 10
+            });
+            
+            // Position subdomains within the box (grid layout)
+            const subdomainsInBox = groupData.subdomains.slice(0, 50); // Limit per box
+            const subsPerRow = Math.ceil(Math.sqrt(subdomainsInBox.length));
+            const subBoxWidth = boxWidth - 40; // Padding
+                const subBoxHeight = boxHeight - 60; // Padding for label
+            
+            let subIndex = 0;
+            for (const sub of subdomainsInBox) {
+                const subName = sub.subdomain || sub.name || sub;
+                if (!nodeIds.has(subName)) continue;
+                
+                const subRow = Math.floor(subIndex / subsPerRow);
+                const subCol = subIndex % subsPerRow;
+                
+                const subX = boxX - boxWidth/2 + 20 + (subCol + 0.5) * (subBoxWidth / subsPerRow);
+                const subY = boxY - boxHeight/2 + 40 + (subRow + 0.5) * (subBoxHeight / subsPerRow);
+                
+                // Update subdomain node position
+                const nodeIndex = nodes.findIndex(n => n.id === subName);
+                if (nodeIndex !== -1) {
+                    nodes[nodeIndex].x = subX;
+                    nodes[nodeIndex].y = subY;
+                    nodes[nodeIndex].fixed = { x: true, y: true };
+                    nodes[nodeIndex].physics = false;
+                }
+                
+                subdomainPositions.set(subName, { x: subX, y: subY, provider: groupKey });
+                subIndex++;
+            }
+            
+            boxIndex++;
+        }
+        
+        // Add provider box nodes
+        nodes.push(...providerBoxes);
+
+        // Position root domain node at top center
+        const rootNodeIndex = nodes.findIndex(n => n.id === domain);
+        if (rootNodeIndex !== -1) {
+            const totalWidth = boxesPerRow * (boxWidth + boxSpacing);
+            nodes[rootNodeIndex].x = totalWidth / 2;
+            nodes[rootNodeIndex].y = 50;
+            nodes[rootNodeIndex].fixed = { x: true, y: true };
+            nodes[rootNodeIndex].physics = false;
+        }
+        
+        // Position IP and PTR nodes near their subdomains (or in a separate area)
+        // For now, position them near their connected subdomains
+        for (const edge of edges) {
+            if (edge.label === 'A' && edge.from && edge.to) {
+                const fromNode = nodes.find(n => n.id === edge.from);
+                const toNode = nodes.find(n => n.id === edge.to);
+                if (fromNode && toNode && fromNode.fixed && !toNode.fixed) {
+                    // Position IP node to the right of subdomain
+                    toNode.x = fromNode.x + 60;
+                    toNode.y = fromNode.y;
+                    toNode.fixed = { x: true, y: true };
+                    toNode.physics = false;
+                }
+            }
+        }
+        
         // Create the network
         const graphData = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
         
+        // Define node groups for styling with theme-aware colors
+        const groups = {};
+        for (const [groupKey, groupData] of providerGroups) {
+            groups[groupKey] = {
+                color: { background: groupData.provider.color, border: groupData.provider.color },
+                font: { color: getCSSVar('--text-primary', '#ffffff'), size: 12 }
+            };
+        }
+        groups['other'] = {
+            color: { background: '#6c757d', border: '#545b62' },
+            font: { color: getCSSVar('--text-primary', '#ffffff'), size: 12 }
+        };
+        
         const options = {
             nodes: {
-                font: { size: 12, color: '#333' }
+                font: { size: 11, color: getCSSVar('--text-primary', '#333333') },
+                shapeProperties: {
+                    useBorderWithImage: true,
+                    borderRadius: 4
+                },
+                borderWidth: 2,
+                shadow: {
+                    enabled: true,
+                    color: 'rgba(0,0,0,0.2)',
+                    size: 5,
+                    x: 2,
+                    y: 2
+                }
             },
             edges: {
-                font: { size: 10 },
-                smooth: { type: 'continuous' }
-            },
-            physics: {
-                stabilization: { iterations: 100 },
-                barnesHut: {
-                    gravitationalConstant: -2000,
-                    centralGravity: 0.3,
-                    springLength: 150,
-                    springConstant: 0.04
+                font: { size: 9, color: getCSSVar('--text-secondary', '#8a8f98') },
+                smooth: {
+                    type: 'curvedCW',
+                    roundness: 0.2
+                },
+                selectionWidth: 2,
+                arrows: {
+                    to: {
+                        enabled: true,
+                        scaleFactor: 0.8
+                    }
+                },
+                color: {
+                    color: getCSSVar('--text-secondary', '#cccccc'),
+                    highlight: getCSSVar('--accent-blue', '#466fe0'),
+                    hover: getCSSVar('--accent-blue', '#466fe0')
                 }
+            },
+            groups: groups,
+            physics: {
+                enabled: false // Disable physics for fixed layout
             },
             interaction: {
                 hover: true,
                 tooltipDelay: 200,
                 zoomView: true,
-                dragView: true
+                dragView: true,
+                selectConnectedEdges: true,
+                dragNodes: false // Prevent dragging since positions are fixed
+            },
+            layout: {
+                improvedLayout: false,
+                hierarchical: {
+                    enabled: false
+                }
+            },
+            configure: {
+                enabled: false
             }
         };
 
-        container.style.height = '500px';
-        container.style.border = '1px solid var(--border-color)';
+        // Calculate container size based on layout
+        const totalRows = Math.ceil(providerGroups.size / boxesPerRow);
+        const containerHeight = Math.max(600, totalRows * (boxHeight + boxSpacing) + 150);
+        const containerWidth = Math.max(800, boxesPerRow * (boxWidth + boxSpacing) + 100);
+        
+        container.style.height = `${containerHeight}px`;
+        container.style.width = '100%';
+        container.style.border = `1px solid ${getCSSVar('--border-color', 'rgba(80, 200, 120, 0.2)')}`;
         container.style.borderRadius = '8px';
-        container.style.background = 'var(--card-bg)';
+        container.style.background = getCSSVar('--card-bg', '#1e1e1e');
+        container.style.position = 'relative';
+        container.style.overflow = 'auto';
+
+        // Add provider legend (CSS variables handle theme automatically)
+        const legendHtml = `
+            <div style="position: absolute; top: 10px; right: 10px; background: var(--card-bg); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); z-index: 1000; font-size: 0.85em; max-width: 200px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <div style="font-weight: bold; margin-bottom: 8px; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 5px;">Cloud Providers</div>
+                ${Array.from(providerGroups.values()).map(groupData => `
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                        <div style="width: 12px; height: 12px; background: ${groupData.provider.color}; border-radius: 2px; flex-shrink: 0;"></div>
+                        <span style="color: var(--text-primary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${groupData.provider.name}</span>
+                        <span style="color: var(--text-secondary); font-size: 0.9em; flex-shrink: 0;">(${groupData.subdomains.length})</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', legendHtml);
 
         this.networkGraph = new vis.Network(container, graphData, options);
         
-        console.log(`✅ Network graph created with ${nodes.length} nodes and ${edges.length} edges`);
+        // Fit to viewport after a short delay
+        setTimeout(() => {
+            this.networkGraph.fit({
+                animation: {
+                    duration: 500,
+                    easingFunction: 'easeInOutQuad'
+                }
+            });
+        }, 100);
+        
+        console.log(`✅ Network graph created with ${nodes.length} nodes, ${edges.length} edges, and ${providerGroups.size} provider boxes in structured layout`);
     }
 
     // ==========================================
@@ -391,7 +794,7 @@ class Visualizer {
     // L5: Certificate Timeline
     // ==========================================
 
-    // Display certificate issuance timeline
+    // Display certificate timeline as monthly Gantt chart
     showCertificateTimeline(containerId = 'certTimelineContainer') {
         if (!this.analysisData?.processedData) {
             console.warn('No analysis data available for certificate timeline');
@@ -407,67 +810,266 @@ class Visualizer {
         const data = this.analysisData.processedData;
         
         // Extract historical records with timestamps
-        const historicalRecords = data.historicalRecords || [];
+        // Check multiple possible locations for historicalRecords
+        let historicalRecords = data.historicalRecords || [];
+        if (historicalRecords.length === 0 && data.dataProcessor?.processedData?.historicalRecords) {
+            historicalRecords = data.dataProcessor.processedData.historicalRecords;
+        }
+        if (historicalRecords.length === 0 && data.processedData?.historicalRecords) {
+            historicalRecords = data.processedData.historicalRecords;
+        }
+        
+        console.log(`📅 Certificate timeline: Found ${historicalRecords.length} historical records`);
         
         if (historicalRecords.length === 0) {
             container.innerHTML = '<div style="padding: 20px; color: var(--text-secondary);">No certificate timeline data available.</div>';
             return;
         }
 
-        // Group by date
-        const byDate = new Map();
+        // Group records by subdomain and collect ALL certificates
+        const subdomainData = new Map();
+        
+        // First pass: Collect all certificates for each subdomain
         for (const record of historicalRecords) {
-            const date = record.lastSeen || record.firstSeen || 'Unknown';
-            if (date === 'Unknown') continue;
+            const subdomain = record.subdomain || record.name;
+            if (!subdomain) continue;
             
-            const dateKey = date.split('T')[0];
-            if (!byDate.has(dateKey)) {
-                byDate.set(dateKey, []);
+            if (!subdomainData.has(subdomain)) {
+                subdomainData.set(subdomain, {
+                    subdomain: subdomain,
+                    certificates: [],
+                    discoveryDates: [] // Track discovery dates as fallback
+                });
             }
-            byDate.get(dateKey).push(record);
+            
+            const subData = subdomainData.get(subdomain);
+            const certInfo = record.certificateInfo || {};
+            
+            // Collect certificate if it has dates
+            if (certInfo.notBefore || certInfo.notAfter) {
+                subData.certificates.push({
+                    notBefore: certInfo.notBefore ? new Date(certInfo.notBefore) : null,
+                    notAfter: certInfo.notAfter ? new Date(certInfo.notAfter) : null,
+                    issuer: certInfo.issuer || 'Unknown',
+                    certificateId: certInfo.certificateId || null
+                });
+            }
+            
+            // Track discovery dates as fallback
+            if (record.discoveredAt) {
+                subData.discoveryDates.push(new Date(record.discoveredAt));
+            }
+        }
+        
+        // Second pass: Calculate firstSeen and lastSeen from ALL certificates
+        for (const [subdomain, subData] of subdomainData) {
+            // Find the OLDEST certificate's notBefore date (earliest appearance)
+            let oldestNotBefore = null;
+            // Find the LATEST certificate's notAfter date (most recent expiration)
+            let latestNotAfter = null;
+            
+            // Process all certificates to find oldest notBefore and latest notAfter
+            for (const cert of subData.certificates) {
+                if (cert.notBefore) {
+                    if (!oldestNotBefore || cert.notBefore < oldestNotBefore) {
+                        oldestNotBefore = cert.notBefore;
+                    }
+                }
+                if (cert.notAfter) {
+                    if (!latestNotAfter || cert.notAfter > latestNotAfter) {
+                        latestNotAfter = cert.notAfter;
+                    }
+                }
+            }
+            
+            // Set firstSeen: use oldest certificate notBefore, or earliest discovery date as fallback
+            if (oldestNotBefore) {
+                subData.firstSeen = oldestNotBefore;
+            } else if (subData.discoveryDates.length > 0) {
+                subData.firstSeen = new Date(Math.min(...subData.discoveryDates.map(d => d.getTime())));
+            }
+            
+            // Set lastSeen: use latest certificate notAfter, or latest discovery date as fallback
+            if (latestNotAfter) {
+                subData.lastSeen = latestNotAfter;
+            } else if (subData.discoveryDates.length > 0) {
+                subData.lastSeen = new Date(Math.max(...subData.discoveryDates.map(d => d.getTime())));
+            }
         }
 
-        // Sort dates
-        const sortedDates = Array.from(byDate.keys()).sort().reverse();
-
-        if (sortedDates.length === 0) {
+        // Filter out subdomains without valid dates
+        const validSubdomains = Array.from(subdomainData.values()).filter(s => s.firstSeen && s.lastSeen);
+        
+        console.log(`📅 Certificate timeline: ${subdomainData.size} unique subdomains found, ${validSubdomains.length} with valid dates`);
+        if (subdomainData.size > validSubdomains.length) {
+            const invalidSubdomains = Array.from(subdomainData.values()).filter(s => !s.firstSeen || !s.lastSeen);
+            console.log(`📅 Certificate timeline: ${invalidSubdomains.length} subdomains filtered out (missing dates):`, invalidSubdomains.map(s => s.subdomain));
+        }
+        
+        if (validSubdomains.length === 0) {
             container.innerHTML = '<div style="padding: 20px; color: var(--text-secondary);">No dated records available for timeline.</div>';
             return;
         }
 
-        // Build timeline HTML
-        let html = '<div class="cert-timeline" style="padding: 10px;">';
-        
-        for (const date of sortedDates.slice(0, 20)) {
-            const records = byDate.get(date);
-            const formattedDate = new Date(date).toLocaleDateString('en-US', { 
-                year: 'numeric', month: 'short', day: 'numeric' 
-            });
+        // Sort by first seen date (oldest first)
+        validSubdomains.sort((a, b) => a.firstSeen - b.firstSeen);
 
+        // Calculate date range for the chart
+        const allDates = validSubdomains.flatMap(s => [s.firstSeen, s.lastSeen]);
+        let minDate = new Date(Math.min(...allDates));
+        let maxDate = new Date(Math.max(...allDates));
+        
+        // Expand date range for better visualization (at least 6 months before and after)
+        const now = new Date();
+        const sixMonthsAgo = new Date(now);
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        const sixMonthsAhead = new Date(now);
+        sixMonthsAhead.setMonth(sixMonthsAhead.getMonth() + 6);
+        
+        // If all dates are the same (e.g., all discovered today), show a wider range
+        if (minDate.getTime() === maxDate.getTime()) {
+            // Show 12 months before and 6 months after the discovery date
+            minDate = new Date(minDate);
+            minDate.setMonth(minDate.getMonth() - 12);
+            maxDate = new Date(maxDate);
+            maxDate.setMonth(maxDate.getMonth() + 6);
+        } else {
+            // Expand range by at least 3 months on each side
+            const rangeMonths = Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24 * 30));
+            const paddingMonths = Math.max(3, Math.ceil(rangeMonths * 0.2));
+            
+            minDate = new Date(minDate);
+            minDate.setMonth(minDate.getMonth() - paddingMonths);
+            maxDate = new Date(maxDate);
+            maxDate.setMonth(maxDate.getMonth() + paddingMonths);
+        }
+        
+        // Ensure we don't go too far into the past (limit to 5 years)
+        const fiveYearsAgo = new Date(now);
+        fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+        if (minDate < fiveYearsAgo) {
+            minDate = fiveYearsAgo;
+        }
+        
+        // Ensure we don't go too far into the future (limit to 2 years)
+        const twoYearsAhead = new Date(now);
+        twoYearsAhead.setFullYear(twoYearsAhead.getFullYear() + 2);
+        if (maxDate > twoYearsAhead) {
+            maxDate = twoYearsAhead;
+        }
+        
+        // Generate monthly buckets
+        const months = [];
+        const current = new Date(minDate);
+        current.setDate(1); // Start of month
+        
+        while (current <= maxDate) {
+            months.push(new Date(current));
+            current.setMonth(current.getMonth() + 1);
+        }
+
+        // Build Gantt chart HTML
+        const monthWidth = 60; // pixels per month
+        const rowHeight = 35; // pixels per subdomain row
+        const maxSubdomains = 50; // Limit display to prevent overwhelming UI
+        const displaySubdomains = validSubdomains.slice(0, maxSubdomains);
+        
+        let html = `
+            <div style="padding: 15px; overflow-x: auto;">
+                <div style="margin-bottom: 15px; color: var(--text-color);">
+                    <strong>Subdomain Timeline (${displaySubdomains.length}${validSubdomains.length > maxSubdomains ? ` of ${validSubdomains.length}` : ''} subdomains)</strong>
+                    <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 5px;">
+                        Showing when subdomains first appeared (from certificate dates)
+                    </div>
+                </div>
+                <div style="position: relative; min-width: ${months.length * monthWidth + 200}px;">
+                    <!-- Month headers -->
+                    <div style="display: flex; margin-left: 200px; margin-bottom: 5px; border-bottom: 2px solid var(--border-color);">
+        `;
+        
+        for (const month of months) {
+            const monthLabel = month.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+            html += `<div style="width: ${monthWidth}px; text-align: center; font-size: 0.75em; color: var(--text-secondary); padding: 5px;">${monthLabel}</div>`;
+        }
+        
+        html += `
+                    </div>
+                    <!-- Subdomain rows -->
+        `;
+        
+        for (const subData of displaySubdomains) {
+            const subdomain = subData.subdomain;
+            const escapedSubdomain = window.CommonUtils ? window.CommonUtils.escapeHtml(subdomain) : subdomain.replace(/[<>&"']/g, m => ({'<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;'}[m]));
+            
+            // Calculate position and width of the bar
+            // Find the month that contains firstSeen (month where firstSeen falls)
+            const startMonthIndex = months.findIndex(m => {
+                const monthStart = new Date(m);
+                const monthEnd = new Date(m);
+                monthEnd.setMonth(monthEnd.getMonth() + 1);
+                return subData.firstSeen >= monthStart && subData.firstSeen < monthEnd;
+            });
+            
+            // Find the first month after lastSeen
+            const endMonthIndex = months.findIndex(m => {
+                const monthStart = new Date(m);
+                return monthStart > subData.lastSeen;
+            });
+            const actualEndIndex = endMonthIndex === -1 ? months.length : endMonthIndex;
+            
+            if (startMonthIndex === -1) continue;
+            
+            const barStart = startMonthIndex * monthWidth;
+            const barWidth = (actualEndIndex - startMonthIndex) * monthWidth;
+            
             html += `
-                <div class="timeline-item" style="display: flex; margin-bottom: 15px; padding-left: 20px; border-left: 3px solid var(--accent-blue); position: relative;">
-                    <div class="timeline-dot" style="position: absolute; left: -8px; top: 0; width: 12px; height: 12px; background: var(--accent-blue); border-radius: 50%;"></div>
-                    <div style="flex: 1;">
-                        <div style="font-weight: bold; color: var(--text-color); margin-bottom: 5px;">${formattedDate}</div>
-                        <div style="font-size: 0.85em; color: var(--text-secondary);">
-                            ${records.length} certificate${records.length !== 1 ? 's' : ''} observed
+                <div style="display: flex; align-items: center; height: ${rowHeight}px; margin-bottom: 2px; border-bottom: 1px solid var(--border-color);">
+                    <!-- Subdomain label -->
+                    <div style="width: 200px; padding: 5px 10px; font-size: 0.85em; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0;" title="${escapedSubdomain}">
+                        ${escapedSubdomain}
+                    </div>
+                    <!-- Timeline bar area -->
+                    <div style="position: relative; flex: 1; height: 100%;">
+                        <!-- Background grid -->
+                        <div style="display: flex; height: 100%;">
+            `;
+            
+            for (let i = 0; i < months.length; i++) {
+                const isEven = i % 2 === 0;
+                html += `<div style="width: ${monthWidth}px; height: 100%; background: ${isEven ? 'transparent' : 'rgba(0,0,0,0.02)'}; border-right: 1px solid var(--border-color);"></div>`;
+            }
+            
+            html += `
                         </div>
-                        <div style="font-size: 0.8em; color: var(--text-secondary); margin-top: 3px;">
-                            ${records.slice(0, 3).map(r => {
-                                const text = r.subdomain || r.name || '';
-                                return window.CommonUtils ? window.CommonUtils.escapeHtml(text) : text.replace(/[<>&"']/g, m => ({'<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;'}[m]));
-                            }).join(', ')}
-                            ${records.length > 3 ? ` +${records.length - 3} more` : ''}
+                        <!-- Existence bar -->
+                        <div style="position: absolute; left: ${barStart}px; top: 5px; width: ${barWidth}px; height: ${rowHeight - 10}px; background: var(--accent-blue); opacity: 0.6; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7em; font-weight: bold;" title="First appeared: ${subData.firstSeen.toLocaleDateString()} | Last seen: ${subData.lastSeen.toLocaleDateString()} | ${subData.certificates.length} certificate(s) found">
+                            ${subData.certificates.length > 0 ? subData.certificates.length : ''}
                         </div>
+            `;
+            
+            html += `
                     </div>
                 </div>
             `;
         }
-
-        html += '</div>';
+        
+        html += `
+                </div>
+                <!-- Legend -->
+                <div style="margin-top: 20px; padding: 10px; background: var(--card-bg); border-radius: 8px; font-size: 0.85em; color: var(--text-color);">
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 20px; height: 15px; background: var(--accent-blue); opacity: 0.6; border-radius: 4px;"></div>
+                            <span>Subdomain existence period</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
         container.innerHTML = html;
 
-        console.log(`✅ Certificate timeline created with ${sortedDates.length} dates`);
+        console.log(`✅ Certificate timeline Gantt chart created with ${displaySubdomains.length} subdomains across ${months.length} months`);
     }
 
     // ==========================================

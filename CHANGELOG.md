@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Wildcard DNS detection** - Automatically detects wildcard DNS configurations that cause all subdomains to resolve to the same IP addresses. Helps identify false positives in subdomain discovery and warns users about wildcard configurations.
+- **Wildcard certificate detection** - Identifies wildcard certificates (e.g., `*.example.com`) from Certificate Transparency logs and reports them as security findings with certificate details.
+- **SOA record parsing and DNS hosting detection** - Parses SOA (Start of Authority) records and detects DNS hosting providers (GoDaddy, Namecheap, Cloudflare, AWS Route 53, etc.) based on SOA record patterns.
+- **IPv6 (AAAA) record support** - Added full support for IPv6 addresses in subdomain analysis, including AAAA record queries and IPv6 address resolution.
+- **Visualizer module** - New `visualizer.js` module for interactive network graphs, geographic distribution maps, and certificate timeline visualizations (L1, L2, L5 features).
+- **Sponsor links** - Added GitHub Sponsors and Buy Me a Coffee links in the header for supporting the project.
+
+### Fixed
+- **HTML escaping** - Fixed HTML escaping issues in various components to prevent XSS vulnerabilities and ensure proper display of special characters.
+- **Duplicate Network Graph section** - Removed redundant standalone "Network Graph" section that was duplicating the network graph already shown in the "Visual Analytics" section. Network graph is now only displayed in the Visual Analytics section with tabs for Network Graph, Geographic Map, and Certificate Timeline.
+
+### Changed
+- **PDF export improvements** - Enhanced PDF export logic and space management for better layout and readability.
+
 ## [1.0.5] - 2025-12-24
 
 ### Added

@@ -335,11 +335,7 @@ class AnalysisController {
             this.uiRenderer.updateProgress(70, 'Getting network information...');
             await this.enrichWithASNInfo(subdomainResults);
             
-            // Phase 6: Test HTTP connections
-            this.uiRenderer.updateProgress(75, 'Testing HTTP connections...');
-            await this.enrichWithHTTPTesting(subdomainResults);
-            
-            // Phase 7: Security analysis
+            // Phase 6: Security analysis
             this.uiRenderer.updateProgress(85, 'Performing security analysis...');
             const securityResults = await this.performSecurityAnalysis(mainDomainResults, subdomainResults);
             
@@ -583,33 +579,6 @@ class AnalysisController {
     }
 
     // Enrich subdomain results with HTTP connection testing
-    async enrichWithHTTPTesting(subdomainResults) {
-        console.log(`🌐 Testing HTTP connections for subdomains...`);
-        
-        const subdomainsToTest = subdomainResults
-            .filter(s => s.subdomain && !s.isRedirectToMain)
-            .map(s => s.subdomain);
-
-        if (subdomainsToTest.length === 0) {
-            console.log(`ℹ️  No subdomains to test HTTP connections`);
-            return;
-        }
-
-        try {
-            const httpResults = await this.dnsAnalyzer.testHTTPConnections(subdomainsToTest, 5);
-            
-            // Add HTTP results to subdomain data
-            for (const subdomain of subdomainResults) {
-                if (httpResults.has(subdomain.subdomain)) {
-                    subdomain.httpStatus = httpResults.get(subdomain.subdomain);
-                }
-            }
-
-            console.log(`✅ HTTP connection testing complete`);
-        } catch (error) {
-            console.warn(`⚠️ HTTP connection testing failed:`, error.message);
-        }
-    }
 
     // Detect wildcard DNS for main domain
     async detectWildcardDNS(domain) {

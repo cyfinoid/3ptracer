@@ -239,32 +239,8 @@ class UIRenderer {
             this.displaySubdomains(processedData);
         }, true, processedData.stats.totalSubdomains || 0);
         
-        // NEW: Display Network Graph Visualization (only for complete analysis with subdomains)
-        if (!isProgressive && processedData.stats.totalSubdomains > 0) {
-            this.displayCollapsibleSection('Network Graph', () => {
-                const containerId = `networkGraphContainer-${Date.now()}`;
-                const container = document.createElement('div');
-                container.id = containerId;
-                container.style.height = '500px';
-                container.style.width = '100%';
-                container.style.minHeight = '400px';
-                container.style.border = '1px solid var(--border-color)';
-                container.style.borderRadius = '8px';
-                container.style.background = 'var(--card-bg)';
-                
-                this.dynamicContainer.appendChild(container);
-                
-                // Initialize graph after DOM is ready
-                setTimeout(() => {
-                    if (window.visualizer) {
-                        window.visualizer.setData(processedData, securityResults);
-                        window.visualizer.showNetworkGraph(containerId);
-                    } else {
-                        container.innerHTML = '<div style="padding: 20px; color: var(--text-secondary);">Network visualization library not loaded.</div>';
-                    }
-                }, 100);
-            }, false);
-        }
+        // Note: Network Graph is now part of Visual Analytics section (created by visualizer.js)
+        // which includes Network Graph, Geographic Map, and Certificate Timeline tabs
         
         this.displayCollapsibleSection('Historical Records', () => {
             this.displayHistoricalRecords(processedData.historicalRecords);
@@ -2012,19 +1988,6 @@ class UIRenderer {
                                 }
                             }
                             
-                            // Add HTTP status indicator
-                            let httpStatus = '';
-                            if (sub.httpStatus) {
-                                const status = sub.httpStatus;
-                                if (status.https && status.https.reachable) {
-                                    httpStatus = ` <span style="color: #28a745; font-size: 0.85em;">✓ HTTPS</span>`;
-                                } else if (status.http && status.http.reachable) {
-                                    httpStatus = ` <span style="color: #ffc107; font-size: 0.85em;">✓ HTTP</span>`;
-                                } else if (status.https && status.https.corsBlocked) {
-                                    httpStatus = ` <span style="color: #17a2b8; font-size: 0.85em;">⚠ CORS</span>`;
-                                }
-                            }
-                            
                             // Add PTR records if available
                             let ptrInfo = '';
                             if (sub.records && sub.records.PTR && sub.records.PTR.length > 0) {
@@ -2032,7 +1995,7 @@ class UIRenderer {
                                 ptrInfo = ` <span style="color: #6c757d; font-size: 0.85em;" title="PTR: ${window.CommonUtils.escapeHtml(ptrHostnames)}">🔗 PTR</span>`;
                             }
                             
-                            return `• ${this.createSubdomainLink(sub.subdomain)} (${info})${httpStatus}${ptrInfo}`;
+                            return `• ${this.createSubdomainLink(sub.subdomain)} (${info})${ptrInfo}`;
                         }).join('<br>')}
                         ${provider.uniqueIPs > 1 ? `<br><br><strong>IPs:</strong><br>${provider.ips.join(', ')}` : ''}
                     </div>
