@@ -60,10 +60,16 @@ class UIRenderer {
         `;
     }
 
-    // Add Collapse/Expand All controls
+    // Add Collapse/Expand All controls (after export section, before visual analytics)
     addCollapseControls() {
+        // Remove existing controls if any
+        const existingControls = document.getElementById('collapseControlsContainer');
+        if (existingControls) {
+            existingControls.remove();
+        }
+        
         const controlsHTML = `
-            <div class="collapse-controls" style="display: flex; gap: 10px; margin-bottom: 15px; justify-content: flex-end;">
+            <div id="collapseControlsContainer" class="collapse-controls" style="display: flex; gap: 10px; margin-bottom: 15px; justify-content: flex-end;">
                 <button onclick="window.uiRenderer.collapseAll()" class="collapse-control-btn" style="padding: 6px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; font-size: 0.85em; color: var(--text-color);">
                     Collapse All
                 </button>
@@ -72,8 +78,24 @@ class UIRenderer {
                 </button>
             </div>
         `;
-        if (this.dynamicContainer) {
-            this.dynamicContainer.innerHTML += controlsHTML;
+        
+        // Insert after export section, before visual analytics
+        const exportSection = document.getElementById('exportSection');
+        const visualizationsSection = document.getElementById('visualizations');
+        const results = document.getElementById('results');
+        
+        if (exportSection && exportSection.style.display !== 'none') {
+            // Insert after export section
+            exportSection.insertAdjacentHTML('afterend', controlsHTML);
+        } else if (visualizationsSection) {
+            // If no export section visible, insert before visualizations
+            visualizationsSection.insertAdjacentHTML('beforebegin', controlsHTML);
+        } else if (results) {
+            // Fallback: insert after stats
+            const statsDiv = document.getElementById('stats');
+            if (statsDiv) {
+                statsDiv.insertAdjacentHTML('afterend', controlsHTML);
+            }
         }
     }
     
@@ -197,8 +219,11 @@ class UIRenderer {
             this.displayRawDNSInExportSection(rawRecords);
         }
         
-        // Add Collapse/Expand All controls
+        // Add Collapse/Expand All controls (after export section)
         this.addCollapseControls();
+        
+        // Display API Issues as first collapsible section (after collapse controls)
+        this.displayAPIIssuesSection(apiNotifications);
         
         // Calculate DNS record count for services
         const dnsRecordCount = processedData.dnsRecords?.length || 0;
@@ -245,6 +270,94 @@ class UIRenderer {
         this.displayCollapsibleSection('Historical Records', () => {
             this.displayHistoricalRecords(processedData.historicalRecords);
         }, false, processedData.historicalRecords?.length || 0);
+        
+        // Make all service-category sections collapsible (expanded by default, except raw DNS)
+        this.makeServiceCategoriesCollapsible();
+    }
+
+    // Make all service-category sections collapsible
+    makeServiceCategoriesCollapsible() {
+        // Find all service-category sections that are not already collapsible
+        const serviceCategories = document.querySelectorAll('.service-category:not(.collapsible-section)');
+        
+        serviceCategories.forEach((section) => {
+            // Skip if already converted or if it's the raw DNS wrapper
+            if (section.classList.contains('collapsible-section') || section.id === 'rawDNSWrapper') {
+                return;
+            }
+            
+            // Get the category header
+            const categoryHeader = section.querySelector('.category-header');
+            if (!categoryHeader) {
+                // Check if it's the Visual Analytics section (has h2 instead)
+                const h2 = section.querySelector('h2');
+                if (!h2) return;
+                
+                // Convert Visual Analytics section
+                this.convertToCollapsible(section, h2.textContent.trim(), true);
+                return;
+            }
+            
+            const title = categoryHeader.textContent.trim();
+            
+            // Check if this is raw DNS section (should be collapsed)
+            const isRawDNS = section.id === 'rawDNSWrapper' || title.includes('Raw DNS');
+            
+            // Convert to collapsible
+            this.convertToCollapsible(section, title, !isRawDNS);
+        });
+    }
+
+    // Convert a service-category section to collapsible format
+    convertToCollapsible(section, title, isExpanded = true) {
+        // Skip if already collapsible
+        if (section.classList.contains('collapsible-section')) {
+            return;
+        }
+        
+        // Generate unique section ID
+        const sectionId = `section-${++this.sectionCounter}`;
+        const expandedClass = isExpanded ? 'expanded' : '';
+        const displayStyle = isExpanded ? 'block' : 'none';
+        const icon = isExpanded ? '▼' : '▶';
+        
+        // Get the content (everything except the header)
+        const categoryHeader = section.querySelector('.category-header');
+        const h2 = section.querySelector('h2');
+        let content = '';
+        
+        if (categoryHeader) {
+            // For sections with category-header, get everything after it
+            const headerParent = categoryHeader.parentElement;
+            const children = Array.from(headerParent.children);
+            const headerIndex = children.indexOf(categoryHeader);
+            const contentElements = children.slice(headerIndex + 1);
+            content = contentElements.map(el => el.outerHTML).join('');
+        } else if (h2) {
+            // For sections with h2 (like Visual Analytics), get everything after h2
+            const children = Array.from(section.children);
+            const h2Index = children.findIndex(el => el.tagName === 'H2' || el.querySelector('h2'));
+            const contentElements = children.slice(h2Index + 1);
+            content = contentElements.map(el => el.outerHTML).join('');
+        } else {
+            // Fallback: get all children except first (assuming first is header)
+            const children = Array.from(section.children);
+            content = children.slice(1).map(el => el.outerHTML).join('');
+        }
+        
+        // Replace the section with collapsible structure
+        section.className = 'collapsible-section ' + expandedClass;
+        section.innerHTML = `
+            <div class="section-header" onclick="toggleSection('${sectionId}')">
+                <div class="section-title">
+                    <span class="toggle-icon">${icon}</span>
+                    <h2>${title}</h2>
+                </div>
+            </div>
+            <div id="${sectionId}" class="section-content" style="display: ${displayStyle};">
+                ${content}
+            </div>
+        `;
     }
 
     // Display statistics based on analysis mode
@@ -2332,8 +2445,20 @@ class UIRenderer {
             </div>
         `;
         
-        // Insert right after the export section
-        exportSection.insertAdjacentHTML('afterend', sectionHTML);
+        // Insert after API Issues section (or after collapse controls if no API Issues)
+        const apiIssuesSection = document.querySelector('.collapsible-section h2')?.textContent?.includes('API Issues') 
+            ? document.querySelector('.collapsible-section h2')?.closest('.collapsible-section')
+            : null;
+        const collapseControls = document.getElementById('collapseControlsContainer');
+        
+        if (apiIssuesSection) {
+            apiIssuesSection.insertAdjacentHTML('afterend', sectionHTML);
+        } else if (collapseControls) {
+            collapseControls.insertAdjacentHTML('afterend', sectionHTML);
+        } else {
+            // Fallback: insert after export section
+            exportSection.insertAdjacentHTML('afterend', sectionHTML);
+        }
     }
 
     // Display API notifications - consolidated to show only one per service/API
@@ -2396,6 +2521,85 @@ class UIRenderer {
         });
         
         container.innerHTML = html;
+    }
+
+    // Display API Issues as collapsible section (first in the list, after collapse controls)
+    displayAPIIssuesSection(apiNotifications) {
+        const errorNotifications = apiNotifications.filter(n => n.status === 'error' || n.status === 'warning');
+        
+        if (errorNotifications.length === 0) {
+            return;
+        }
+        
+        // Consolidate notifications by API name
+        const statusPriority = { 'error': 3, 'warning': 2, 'info': 1, 'success': 0 };
+        const consolidated = new Map();
+        
+        errorNotifications.forEach(notification => {
+            const apiName = notification.api;
+            const existing = consolidated.get(apiName);
+            
+            if (!existing) {
+                consolidated.set(apiName, notification);
+            } else {
+                const existingPriority = statusPriority[existing.status] || 0;
+                const newPriority = statusPriority[notification.status] || 0;
+                
+                if (newPriority > existingPriority) {
+                    consolidated.set(apiName, notification);
+                } else if (newPriority === existingPriority && notification.status === 'error') {
+                    consolidated.set(apiName, notification);
+                }
+            }
+        });
+        
+        const uniqueNotifications = Array.from(consolidated.values());
+        
+        let html = '';
+        uniqueNotifications.forEach(notification => {
+            const statusIcon = notification.status === 'warning' ? '⚠️' : '❌';
+            const statusClass = notification.status === 'warning' ? 'warning' : 'error';
+            
+            html += `
+                <div class="api-notification ${statusClass}">
+                    <span class="api-name">${statusIcon} ${window.CommonUtils.escapeHtml(notification.api)}</span>
+                    <span class="api-message">${window.CommonUtils.escapeHtml(notification.message)}</span>
+                    <span class="api-time">${window.CommonUtils.escapeHtml(notification.timestamp)}</span>
+                </div>
+            `;
+        });
+        
+        // Create collapsible section HTML
+        const sectionId = `section-api-issues`;
+        const sectionHTML = `
+            <div class="collapsible-section expanded">
+                <div class="section-header" onclick="toggleSection('${sectionId}')">
+                    <div class="section-title">
+                        <span class="toggle-icon">▼</span>
+                        <h2>⚠️ API Issues (${uniqueNotifications.length})</h2>
+                    </div>
+                </div>
+                <div id="${sectionId}" class="section-content" style="display: block;">
+                    <div class="service-list">${html}</div>
+                </div>
+            </div>
+        `;
+        
+        // Insert after collapse controls, before visual analytics
+        const collapseControls = document.getElementById('collapseControlsContainer');
+        const visualizationsSection = document.getElementById('visualizations');
+        const results = document.getElementById('results');
+        
+        if (collapseControls) {
+            collapseControls.insertAdjacentHTML('afterend', sectionHTML);
+        } else if (visualizationsSection) {
+            visualizationsSection.insertAdjacentHTML('beforebegin', sectionHTML);
+        } else if (results) {
+            const statsDiv = document.getElementById('stats');
+            if (statsDiv) {
+                statsDiv.insertAdjacentHTML('afterend', sectionHTML);
+            }
+        }
     }
 
     // Create subdomain link (for consistent linking behavior)

@@ -1118,19 +1118,54 @@ class Visualizer {
 
             section = document.createElement('div');
             section.id = targetSection;
-            section.className = 'service-category';
+            
+            // Create collapsible structure for Visual Analytics (collapsed by default)
+            const sectionId = `section-visualizations`;
+            section.className = 'collapsible-section';
             section.innerHTML = `
-                <h2>📊 Visual Analytics</h2>
-                <div class="viz-tabs" style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-                    <button class="viz-tab active" data-viz="network" onclick="window.visualizer.switchTab('network')">🕸️ Network Graph</button>
-                    <button class="viz-tab" data-viz="map" onclick="window.visualizer.switchTab('map')">🗺️ Geographic Map</button>
-                    <button class="viz-tab" data-viz="timeline" onclick="window.visualizer.switchTab('timeline')">📅 Certificate Timeline</button>
+                <div class="section-header" onclick="toggleSection('${sectionId}')">
+                    <div class="section-title">
+                        <span class="toggle-icon">▶</span>
+                        <h2>📊 Visual Analytics</h2>
+                    </div>
                 </div>
-                <div id="networkGraphContainer" class="viz-content" style="display: block;"></div>
-                <div id="geoMapContainer" class="viz-content" style="display: none;"></div>
-                <div id="certTimelineContainer" class="viz-content" style="display: none;"></div>
+                <div id="${sectionId}" class="section-content" style="display: none;">
+                    <div class="viz-tabs" style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                        <button class="viz-tab active" data-viz="network" onclick="window.visualizer.switchTab('network')">🕸️ Network Graph</button>
+                        <button class="viz-tab" data-viz="map" onclick="window.visualizer.switchTab('map')">🗺️ Geographic Map</button>
+                        <button class="viz-tab" data-viz="timeline" onclick="window.visualizer.switchTab('timeline')">📅 Certificate Timeline</button>
+                    </div>
+                    <div id="networkGraphContainer" class="viz-content" style="display: block;"></div>
+                    <div id="geoMapContainer" class="viz-content" style="display: none;"></div>
+                    <div id="certTimelineContainer" class="viz-content" style="display: none;"></div>
+                </div>
             `;
-            results.insertBefore(section, results.firstChild);
+            
+            // Insert after RAW DNS Records section (or after API Issues if no RAW DNS)
+            const rawDNSSection = document.getElementById('rawDNSWrapper');
+            const apiIssuesSection = document.querySelector('.collapsible-section h2')?.textContent?.includes('API Issues') 
+                ? document.querySelector('.collapsible-section h2')?.closest('.collapsible-section')
+                : null;
+            const collapseControls = document.getElementById('collapseControlsContainer');
+            
+            if (rawDNSSection) {
+                // Insert after RAW DNS section
+                rawDNSSection.insertAdjacentElement('afterend', section);
+            } else if (apiIssuesSection) {
+                // If no RAW DNS, insert after API Issues
+                apiIssuesSection.insertAdjacentElement('afterend', section);
+            } else if (collapseControls) {
+                // If no API Issues, insert after collapse controls
+                collapseControls.insertAdjacentElement('afterend', section);
+            } else {
+                // Fallback: insert after stats
+                const statsDiv = document.getElementById('stats');
+                if (statsDiv) {
+                    statsDiv.insertAdjacentElement('afterend', section);
+                } else {
+                    results.insertBefore(section, results.firstChild);
+                }
+            }
         }
 
         // Show the first visualization
