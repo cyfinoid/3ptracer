@@ -16,17 +16,24 @@
     <!-- L9: Skip to main content link for accessibility -->
     <a href="#main-content" class="skip-link">Skip to main content</a>
     
-    <!-- Theme Toggle Button -->
-    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme" id="themeToggle">
-        <span class="theme-toggle-icon" id="themeIcon">🌙</span>
-        <span id="themeText">Light Mode</span>
-    </button>
     <div class="container">
+        <div class="theme-toggle-container">
+            <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme" id="themeToggle">
+                <span class="theme-toggle-icon" id="themeIcon">🌙</span>
+                <span id="themeText">Light Mode</span>
+            </button>
+        </div>
         <div class="header">
             <h1><a href="index.html" class="header-title-link">3rd Party Tracer</a></h1>
             <p>Identify third-party services associated with any domain via DNS analysis</p>
-            <div style="margin-top: 20px;">
+            <div style="margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; align-items: center;">
                 <a href="about.html" class="header-nav-link">About</a>
+                <a href="https://github.com/sponsors/anantshri" target="_blank" rel="noopener noreferrer" class="header-nav-link sponsor-link" title="Support us on GitHub Sponsors">
+                    <span style="margin-right: 4px;">💖</span> Sponsor
+                </a>
+                <a href="https://buymeacoffee.com/anantshri" target="_blank" rel="noopener noreferrer" class="header-nav-link sponsor-link" title="Buy us a coffee">
+                    <span style="margin-right: 4px;">☕</span> Buy Me a Coffee
+                </a>
             </div>
         </div>
 

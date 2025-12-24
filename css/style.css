@@ -84,10 +84,6 @@ body {
 
 /* Theme Toggle Button */
 .theme-toggle {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 1000;
     background: var(--card-bg);
     border: 2px solid var(--border-color);
     border-radius: 50px;
@@ -101,23 +97,30 @@ body {
     font-weight: 600;
     color: var(--text-primary);
     transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    flex-shrink: 0;
 }
 
 .theme-toggle:hover {
     background: var(--hover-bg);
     transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 
 .theme-toggle-icon {
     font-size: 18px;
 }
 
+.theme-toggle-container {
+    display: flex;
+    justify-content: flex-end;
+    padding: 15px 20px 0 20px;
+}
+
 .header {
     background: var(--bg-secondary);
     color: var(--text-heading);
-    padding: 40px;
+    padding-bottom: 40px;
     text-align: center;
     border-bottom: 2px solid var(--border-color);
 }
@@ -132,7 +135,6 @@ body {
 .header p {
     font-size: 20px;
     color: var(--text-secondary);
-    max-width: 600px;
     margin: 0 auto;
 }
 
@@ -161,6 +163,15 @@ body {
     background: var(--hover-bg);
     border-color: var(--accent-blue);
     color: var(--accent-blue);
+}
+
+.sponsor-link {
+    font-weight: 500;
+}
+
+.sponsor-link:hover {
+    border-color: var(--accent-yellow);
+    color: var(--accent-yellow);
 }
 
 .content {
@@ -1162,6 +1173,14 @@ a[aria-label] {
 }
 
 @media (max-width: 768px) {
+    .theme-toggle-container {
+        padding: 10px 15px 0 15px;
+    }
+    
+    .header {
+        padding: 20px;
+    }
+    
     .header h1 {
         font-size: 2rem;
     }
@@ -1763,7 +1782,6 @@ a[aria-label] {
 
 /* About Page Styles */
 .about-content {
-    max-width: 800px;
     margin: 0 auto;
     padding: 40px;
     color: var(--text-primary);

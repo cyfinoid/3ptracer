@@ -7,15 +7,25 @@
     <link rel="stylesheet" href="css/style.css?v=1.0.5">
 </head>
 <body>
-    <!-- Theme Toggle Button -->
-    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
-        <span class="theme-toggle-icon" id="themeIcon">🌙</span>
-        <span id="themeText">Light Mode</span>
-    </button>
     <div class="container">
+        <div class="theme-toggle-container">
+            <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme" id="themeToggle">
+                <span class="theme-toggle-icon" id="themeIcon">🌙</span>
+                <span id="themeText">Light Mode</span>
+            </button>
+        </div>
         <div class="header">
             <h1><a href="index.html" class="header-title-link">About 3rd Party Tracer</a></h1>
             <p>Advanced Third-Party Service Discovery Tool</p>
+            <div style="margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; align-items: center;">
+                <a href="index.html" class="header-nav-link">Back to App</a>
+                <a href="https://github.com/sponsors/anantshri" target="_blank" rel="noopener noreferrer" class="header-nav-link sponsor-link" title="Support us on GitHub Sponsors">
+                    <span style="margin-right: 4px;">💖</span> Sponsor
+                </a>
+                <a href="https://buymeacoffee.com/anantshri" target="_blank" rel="noopener noreferrer" class="header-nav-link sponsor-link" title="Buy us a coffee">
+                    <span style="margin-right: 4px;">☕</span> Buy Me a Coffee
+                </a>
+            </div>
         </div>
 
         <div class="content">
@@ -168,6 +178,147 @@
                         <li><strong>Open Source:</strong> Transparent code available for security review</li>
                         <li><strong>No API Keys Required:</strong> Uses only public APIs and services</li>
                     </ul>
+                </div>
+
+                <div class="about-section">
+                    <h2>🔐 Paranoid Self-Host / Airgapped Deployment</h2>
+                    <p>For security-conscious environments, airgapped networks, or self-hosted deployments, the following domains must be allowed through your firewall or proxy. Domains are grouped by functionality and criticality.</p>
+                    
+                    <h3>DNS over HTTPS Providers (Core Functionality)</h3>
+                    <p>Required for DNS record queries. The tool uses multiple providers for redundancy:</p>
+                    <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                        <thead>
+                            <tr style="background: var(--bg-tertiary);">
+                                <th style="padding: 10px; text-align: left; border: 1px solid var(--border-color);">Domain</th>
+                                <th style="padding: 10px; text-align: left; border: 1px solid var(--border-color);">Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>dns.google</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">Google DNS over HTTPS (primary)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>cloudflare-dns.com</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">Cloudflare DNS over HTTPS (primary)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>doh.powerdns.org</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">PowerDNS DoH (fallback)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>dns.alidns.com</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">Alibaba Cloud DNS (fallback)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3>Certificate Transparency Logs (Subdomain Discovery)</h3>
+                    <p>Required for subdomain discovery via SSL certificate data:</p>
+                    <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                        <thead>
+                            <tr style="background: var(--bg-tertiary);">
+                                <th style="padding: 10px; text-align: left; border: 1px solid var(--border-color);">Domain</th>
+                                <th style="padding: 10px; text-align: left; border: 1px solid var(--border-color);">Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>crt.sh</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">Certificate Transparency log search (Comodo)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>api.certspotter.com</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">SSLMate CT Search API (formerly Cert Spotter)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3>Subdomain Discovery APIs</h3>
+                    <p>Additional sources for subdomain enumeration:</p>
+                    <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                        <thead>
+                            <tr style="background: var(--bg-tertiary);">
+                                <th style="padding: 10px; text-align: left; border: 1px solid var(--border-color);">Domain</th>
+                                <th style="padding: 10px; text-align: left; border: 1px solid var(--border-color);">Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>api.hackertarget.com</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">HackerTarget DNS enumeration service</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>ip.thc.org</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">THC reverse DNS database API</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3>IP Geolocation (Service Classification)</h3>
+                    <p>Used for IP-to-location mapping and ASN data for service classification:</p>
+                    <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                        <thead>
+                            <tr style="background: var(--bg-tertiary);">
+                                <th style="padding: 10px; text-align: left; border: 1px solid var(--border-color);">Domain</th>
+                                <th style="padding: 10px; text-align: left; border: 1px solid var(--border-color);">Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>ipinfo.io</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">IP geolocation and ASN data service</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3>DNS-Based Blocklists (Threat Detection)</h3>
+                    <p>Blocklist checking via DNS queries (no HTTP required, uses DoH):</p>
+                    <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                        <thead>
+                            <tr style="background: var(--bg-tertiary);">
+                                <th style="padding: 10px; text-align: left; border: 1px solid var(--border-color);">Domain</th>
+                                <th style="padding: 10px; text-align: left; border: 1px solid var(--border-color);">Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>dbl.spamhaus.org</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">Spamhaus Domain Block List (via DNS)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>zen.spamhaus.org</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">Spamhaus ZEN IP Block List (via DNS)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>multi.surbl.org</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">SURBL multi-list blocklist (via DNS)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>multi.uribl.com</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">URIBL multi-list blocklist (via DNS)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3>Analytics (Optional - Can Be Blocked)</h3>
+                    <p>Privacy-focused analytics service (optional, can be blocked without affecting functionality):</p>
+                    <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                        <thead>
+                            <tr style="background: var(--bg-tertiary);">
+                                <th style="padding: 10px; text-align: left; border: 1px solid var(--border-color);">Domain</th>
+                                <th style="padding: 10px; text-align: left; border: 1px solid var(--border-color);">Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);"><code>plausible.io</code></td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color);">Privacy-focused analytics (optional)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <p><strong>Fully Airgapped Environments:</strong> For complete network isolation, DNS queries can be routed through an internal DNS resolver that supports DNS over HTTPS. Subdomain discovery features will be limited without Certificate Transparency and discovery API access, but core DNS analysis functionality will continue to work.</p>
                 </div>
 
                 <div class="about-section">
