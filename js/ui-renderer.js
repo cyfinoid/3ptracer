@@ -1538,6 +1538,79 @@ class UIRenderer {
         return html;
     }
 
+    // Format details object for display
+    formatDetails(details) {
+        if (!details) return '';
+        
+        // If details is a string, return it escaped
+        if (typeof details === 'string') {
+            return window.CommonUtils.escapeHtml(details);
+        }
+        
+        // If details is an object, format it appropriately
+        if (typeof details === 'object') {
+            // Handle wildcard certificate details with certificates array
+            if (details.certificateCount !== undefined && details.certificates && Array.isArray(details.certificates)) {
+                let formatted = `${details.certificateCount} certificate${details.certificateCount !== 1 ? 's' : ''} found`;
+                
+                // Show first few certificates as examples
+                if (details.certificates.length > 0) {
+                    const maxShow = 5;
+                    const certsToShow = details.certificates.slice(0, maxShow);
+                    formatted += '<ul style="margin: 8px 0; padding-left: 20px; color: var(--text-secondary); font-size: 0.9em;">';
+                    
+                    certsToShow.forEach(cert => {
+                        const domain = window.CommonUtils.escapeHtml(cert.domain || 'Unknown');
+                        const issuer = window.CommonUtils.escapeHtml(cert.issuer || 'Unknown');
+                        formatted += `<li><strong>${domain}</strong> - Issuer: ${issuer}`;
+                        if (cert.validTo) {
+                            const expiryDate = new Date(cert.validTo).toLocaleDateString();
+                            formatted += ` (Expires: ${expiryDate})`;
+                        }
+                        formatted += '</li>';
+                    });
+                    
+                    formatted += '</ul>';
+                    
+                    if (details.certificates.length > maxShow) {
+                        formatted += `<em style="color: var(--text-secondary); font-size: 0.85em;">... and ${details.certificates.length - maxShow} more</em>`;
+                    }
+                }
+                
+                return formatted;
+            }
+            
+            // Handle simple count objects (e.g., certificateCount, topLevelCount, subdomainCount)
+            if (details.certificateCount !== undefined) {
+                const counts = [];
+                if (details.certificateCount !== undefined) {
+                    counts.push(`Total: ${details.certificateCount}`);
+                }
+                if (details.topLevelCount !== undefined) {
+                    counts.push(`Top-level: ${details.topLevelCount}`);
+                }
+                if (details.subdomainCount !== undefined) {
+                    counts.push(`Subdomain: ${details.subdomainCount}`);
+                }
+                if (counts.length > 0) {
+                    return counts.join(' • ');
+                }
+            }
+            
+            // Handle other object types - convert to formatted JSON
+            try {
+                return '<pre style="margin: 8px 0; padding: 8px; background: var(--bg-tertiary); border-radius: 4px; font-size: 0.85em; overflow-x: auto;">' + 
+                       window.CommonUtils.escapeHtml(JSON.stringify(details, null, 2)) + 
+                       '</pre>';
+            } catch (e) {
+                return window.CommonUtils.escapeHtml(String(details));
+            }
+        }
+        
+        // Fallback for other types
+        return window.CommonUtils.escapeHtml(String(details));
+    }
+
     // Format security issue
     formatSecurityIssue(issue) {
         const riskColors = {
@@ -1571,7 +1644,9 @@ class UIRenderer {
         if (issue.ipRange) html += `<strong>IP Range:</strong> ${window.CommonUtils.escapeHtml(issue.ipRange)}<br>`;
         if (issue.record) html += `<strong>Record:</strong> ${window.CommonUtils.escapeHtml(issue.record)}<br>`;
         if (issue.pattern) html += `<strong>Pattern:</strong> ${window.CommonUtils.escapeHtml(issue.pattern)}<br>`;
-        if (issue.details) html += `<strong>Details:</strong> ${window.CommonUtils.escapeHtml(issue.details)}<br>`;
+        if (issue.details) {
+            html += `<strong>Details:</strong> ${this.formatDetails(issue.details)}<br>`;
+        }
         
         html += '</div></div>';
         return html;
