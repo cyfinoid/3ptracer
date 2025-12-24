@@ -42,18 +42,20 @@
                 </div>
                 
                 <div class="scan-buttons-container">
-                    <button class="analyze-btn analyze-btn-primary" onclick="analyzeStandard()" id="analyzeStandardBtn">
-                        <span class="btn-icon">🔍</span>
-                        <span class="btn-text">Analyze Domain</span>
-                    </button>
-                    <button class="analyze-btn analyze-btn-secondary" onclick="analyzeQuickEmail()" id="analyzeQuickEmailBtn">
-                        <span class="btn-icon">⚡</span>
-                        <span class="btn-text">Quick + Email Checks</span>
-                    </button>
-                </div>
-                <div class="scan-descriptions">
-                    <small class="scan-desc-primary">Full analysis with subdomain discovery</small>
-                    <small class="scan-desc-secondary">Fast checks: DNS, email security (MX, SPF, DKIM, DMARC)</small>
+                    <div class="scan-button-group">
+                        <button class="analyze-btn analyze-btn-primary" onclick="analyzeStandard()" id="analyzeStandardBtn">
+                            <span class="btn-icon">🔍</span>
+                            <span class="btn-text">Analyze Domain</span>
+                        </button>
+                        <small class="scan-desc-primary">Full analysis with subdomain discovery</small>
+                    </div>
+                    <div class="scan-button-group">
+                        <button class="analyze-btn analyze-btn-secondary" onclick="analyzeQuickEmail()" id="analyzeQuickEmailBtn">
+                            <span class="btn-icon">⚡</span>
+                            <span class="btn-text">Quick + Email Checks</span>
+                        </button>
+                        <small class="scan-desc-secondary">Fast checks: DNS, email security (MX, SPF, DKIM, DMARC)</small>
+                    </div>
                 </div>
             </div>
 
