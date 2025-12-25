@@ -21,6 +21,7 @@ class App {
 
 // Global app instance
 const app = new App();
+window.app = app; // Expose globally for import functionality
 
 // Standard analysis function - Full analysis with subdomain discovery (called from HTML)
 async function analyzeStandard() {
@@ -635,4 +636,266 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         observer.observe(exportSection, { attributes: true, attributeFilter: ['style'] });
     }
-}); 
+    
+    // Initialize collapsible service categories
+    initializeCollapsibleCategories();
+});
+
+// ==========================================
+// JSON Import Functionality
+// ==========================================
+
+// Handle file import
+async function handleFileImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    if (!file.name.endsWith('.json')) {
+        alert('Please select a valid JSON file');
+        return;
+    }
+    
+    try {
+        const text = await file.text();
+        const importData = JSON.parse(text);
+        
+        // Validate import data structure
+        if (!importData.meta || !importData.processedData) {
+            alert('Invalid JSON file format. Please import a file exported from 3rd Party Tracer.');
+            return;
+        }
+        
+        // Import and display the data
+        await importAnalysisData(importData);
+        
+        // Reset file input
+        event.target.value = '';
+        
+    } catch (error) {
+        console.error('❌ Import failed:', error);
+        alert('Failed to import JSON file. Please check the file format and try again.');
+    }
+}
+
+// Import and display analysis data
+async function importAnalysisData(importData) {
+    console.log('📥 Importing analysis data...');
+    
+    try {
+        // Convert serialized data back to Maps
+        const processedData = deserializeImportedData(importData.processedData);
+        
+        // Get security results and interesting findings
+        const securityResults = importData.securityResults || null;
+        const interestingFindings = importData.interestingFindings || [];
+        
+        // Hide progress section
+        const progressSection = document.getElementById('progressSection');
+        if (progressSection) {
+            progressSection.style.display = 'none';
+        }
+        
+        // Show results section
+        const resultsDiv = document.getElementById('results');
+        if (resultsDiv) {
+            resultsDiv.style.display = 'block';
+        }
+        
+        // Get UI renderer instance
+        // Try window.app first, fallback to global app constant
+        const appInstance = window.app || (typeof app !== 'undefined' ? app : null);
+        const analysisController = appInstance?.analysisController;
+        
+        if (!analysisController || !analysisController.uiRenderer) {
+            console.error('❌ AnalysisController or UIRenderer not available', {
+                hasWindowApp: !!window.app,
+                hasApp: typeof app !== 'undefined',
+                hasAnalysisController: !!analysisController,
+                hasUIRenderer: !!analysisController?.uiRenderer
+            });
+            alert('Error: Unable to display imported data. Please refresh the page and try again.');
+            return;
+        }
+        
+        // Add dataProcessor reference to processedData (required by UI renderer)
+        // This allows the UI to access methods like getRawDNSRecords() even for imported data
+        if (analysisController.dataProcessor) {
+            processedData.dataProcessor = analysisController.dataProcessor;
+        }
+        
+        // Ensure window.uiRenderer is set for button onclick handlers
+        if (!window.uiRenderer) {
+            window.uiRenderer = analysisController.uiRenderer;
+        }
+        
+        // Display the imported results
+        analysisController.uiRenderer.displayResults(
+            processedData,
+            securityResults,
+            interestingFindings,
+            [] // No API notifications for imported data
+        );
+        
+        // Update export manager with imported data
+        if (window.exportManager) {
+            // Export manager will serialize the data internally
+            // Signature: setAnalysisData(processedData, securityResults, domain, interestingFindings)
+            window.exportManager.setAnalysisData(
+                processedData,
+                securityResults,
+                importData.meta.domain,
+                interestingFindings
+            );
+        } else {
+            console.warn('⚠️ Export manager not available. Export options may not be shown.');
+        }
+        
+        // Set domain input to imported domain
+        const domainInput = document.getElementById('domain');
+        if (domainInput && importData.meta.domain) {
+            domainInput.value = importData.meta.domain;
+        }
+        
+        console.log('✅ Import completed successfully');
+        console.log('📊 Imported data summary:', {
+            domain: importData.meta.domain,
+            servicesCount: processedData.services instanceof Map ? processedData.services.size : Object.keys(processedData.services || {}).length,
+            subdomainsCount: processedData.subdomains instanceof Map ? processedData.subdomains.size : Object.keys(processedData.subdomains || {}).length,
+            hasSecurityResults: !!securityResults
+        });
+        
+    } catch (error) {
+        console.error('❌ Failed to import analysis data:', error);
+        alert('Failed to process imported data. Please check the file format.');
+    }
+}
+
+// Deserialize imported data (convert objects back to Maps)
+function deserializeImportedData(processedData) {
+    if (!processedData) return null;
+    
+    const deserialized = { ...processedData };
+    
+    // Convert services object back to Map
+    if (processedData.services && !(processedData.services instanceof Map)) {
+        const servicesMap = new Map();
+        
+        // Handle serialized format (service_0, service_1, etc.)
+        if (typeof processedData.services === 'object') {
+            for (const [key, value] of Object.entries(processedData.services)) {
+                if (value && value.originalKey) {
+                    // Restore original key
+                    servicesMap.set(value.originalKey, { ...value });
+                    delete value.originalKey;
+                } else if (value && value.name) {
+                    // Use service name as key
+                    servicesMap.set(value.name, value);
+                } else {
+                    // Fallback: use the object key
+                    servicesMap.set(key, value);
+                }
+            }
+        }
+        
+        deserialized.services = servicesMap;
+        console.log('📊 Converted services object to Map:', servicesMap.size, 'services');
+    }
+    
+    // Convert subdomains object back to Map (if it exists and is an object)
+    if (processedData.subdomains && !(processedData.subdomains instanceof Map)) {
+        const subdomainsMap = new Map();
+        
+        if (typeof processedData.subdomains === 'object') {
+            for (const [key, value] of Object.entries(processedData.subdomains)) {
+                if (value && value.subdomain) {
+                    subdomainsMap.set(value.subdomain, value);
+                } else {
+                    subdomainsMap.set(key, value);
+                }
+            }
+        }
+        
+        deserialized.subdomains = subdomainsMap;
+        console.log('📊 Converted subdomains object to Map:', subdomainsMap.size, 'subdomains');
+    } else if (!processedData.subdomains) {
+        // Initialize empty Map if subdomains don't exist
+        deserialized.subdomains = new Map();
+    }
+    
+    // Convert sovereigntyAnalysis objects back to Maps and Sets
+    if (processedData.sovereigntyAnalysis && typeof processedData.sovereigntyAnalysis === 'object') {
+        console.log('📊 Converting sovereigntyAnalysis objects back to Maps and Sets');
+        const sovereignty = { ...processedData.sovereigntyAnalysis };
+        
+        // Convert countryDistribution object back to Map
+        if (sovereignty.countryDistribution && !(sovereignty.countryDistribution instanceof Map)) {
+            const countryDistMap = new Map();
+            if (typeof sovereignty.countryDistribution === 'object') {
+                for (const [key, value] of Object.entries(sovereignty.countryDistribution)) {
+                    const countryData = { ...value };
+                    // Convert providers array back to Set
+                    if (Array.isArray(value.providers)) {
+                        countryData.providers = new Set(value.providers);
+                    } else if (!(value.providers instanceof Set)) {
+                        countryData.providers = new Set();
+                    }
+                    countryDistMap.set(key, countryData);
+                }
+            }
+            sovereignty.countryDistribution = countryDistMap;
+            console.log('📊 Converted countryDistribution to Map:', countryDistMap.size, 'countries');
+        }
+        
+        // Convert services Map in sovereignty
+        if (sovereignty.services && !(sovereignty.services instanceof Map)) {
+            const servicesMap = new Map();
+            if (typeof sovereignty.services === 'object') {
+                for (const [key, value] of Object.entries(sovereignty.services)) {
+                    servicesMap.set(key, value);
+                }
+            }
+            sovereignty.services = servicesMap;
+        }
+        
+        // Convert subdomains Map in sovereignty
+        if (sovereignty.subdomains && !(sovereignty.subdomains instanceof Map)) {
+            const subdomainsMap = new Map();
+            if (typeof sovereignty.subdomains === 'object') {
+                for (const [key, value] of Object.entries(sovereignty.subdomains)) {
+                    subdomainsMap.set(key, value);
+                }
+            }
+            sovereignty.subdomains = subdomainsMap;
+        }
+        
+        deserialized.sovereigntyAnalysis = sovereignty;
+        console.log('📊 Converted sovereigntyAnalysis');
+    }
+    
+    return deserialized;
+}
+
+
+// Initialize collapsible functionality for service categories
+function initializeCollapsibleCategories() {
+    // Use event delegation to handle clicks on category headers
+    document.addEventListener('click', function(e) {
+        const categoryHeader = e.target.closest('.category-header, .service-category > h2');
+        if (categoryHeader) {
+            const serviceCategory = categoryHeader.closest('.service-category');
+            if (serviceCategory) {
+                serviceCategory.classList.toggle('collapsed');
+            }
+        }
+    });
+    
+    // Initialize existing categories (set all to expanded by default)
+    const categories = document.querySelectorAll('.service-category');
+    categories.forEach(category => {
+        // Only collapse if it's empty or has display:none
+        const serviceList = category.querySelector('.service-list');
+        if (!serviceList || serviceList.children.length === 0) {
+            // Don't auto-collapse, let user control it
+        }
+    });
+} 

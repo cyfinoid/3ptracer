@@ -79,6 +79,7 @@ class UIRenderer {
     
     // Collapse all sections
     collapseAll() {
+        // Collapse collapsible sections
         const sections = document.querySelectorAll('.collapsible-section');
         sections.forEach(section => {
             section.classList.remove('expanded');
@@ -87,10 +88,17 @@ class UIRenderer {
             if (content) content.style.display = 'none';
             if (icon) icon.textContent = '▶';
         });
+        
+        // Collapse service categories
+        const serviceCategories = document.querySelectorAll('.service-category');
+        serviceCategories.forEach(category => {
+            category.classList.add('collapsed');
+        });
     }
     
     // Expand all sections
     expandAll() {
+        // Expand collapsible sections
         const sections = document.querySelectorAll('.collapsible-section');
         sections.forEach(section => {
             section.classList.add('expanded');
@@ -98,6 +106,12 @@ class UIRenderer {
             const icon = section.querySelector('.toggle-icon');
             if (content) content.style.display = 'block';
             if (icon) icon.textContent = '▼';
+        });
+        
+        // Expand service categories
+        const serviceCategories = document.querySelectorAll('.service-category');
+        serviceCategories.forEach(category => {
+            category.classList.remove('collapsed');
         });
     }
 
@@ -192,7 +206,7 @@ class UIRenderer {
         this.displayAPINotifications(apiNotifications);
         
         // NEW: Display Raw DNS Records in Zone File Format inside export section (only for complete analysis)
-        if (!isProgressive && processedData.dataProcessor) {
+        if (!isProgressive && processedData.dataProcessor && typeof processedData.dataProcessor.getRawDNSRecords === 'function') {
             const rawRecords = processedData.dataProcessor.getRawDNSRecords();
             this.displayRawDNSInExportSection(rawRecords);
         }
@@ -794,14 +808,16 @@ class UIRenderer {
             emailSecurityHtml += this.renderDKIMSelectors(securityResults.emailSecurity.dkimSelectors);
         }
         
-        // M1: Add DNSSEC visualization
-        if (securityResults.dnssec) {
-            emailSecurityHtml += this.renderDNSSECStatus(securityResults.dnssec);
-        }
-        
-        // L10: Add DANE/TLSA visualization
-        if (securityResults.daneTLSA) {
-            emailSecurityHtml += this.renderDANETLSAStatus(securityResults.daneTLSA);
+        // M1 & L10: Add DNSSEC and DANE/TLSA visualizations side by side
+        if (securityResults.dnssec || securityResults.daneTLSA) {
+            emailSecurityHtml += '<div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px;">';
+            if (securityResults.dnssec) {
+                emailSecurityHtml += this.renderDNSSECStatus(securityResults.dnssec, true); // true = inline mode
+            }
+            if (securityResults.daneTLSA) {
+                emailSecurityHtml += this.renderDANETLSAStatus(securityResults.daneTLSA, true); // true = inline mode
+            }
+            emailSecurityHtml += '</div>';
         }
         
         container.innerHTML = html + emailSecurityHtml;
@@ -1313,15 +1329,19 @@ class UIRenderer {
     }
 
     // L10: Render DANE/TLSA status
-    renderDANETLSAStatus(dane) {
+    renderDANETLSAStatus(dane, inline = false) {
         if (!dane) return '';
         
         const statusColor = dane.enabled ? '#28a745' : '#6c757d';
         const statusIcon = dane.enabled ? '✅' : '❌';
         const statusText = dane.enabled ? 'Enabled' : 'Not Configured';
         
+        const marginTop = inline ? '0' : '20px';
+        const flexBasis = inline ? '1' : 'auto';
+        const minWidth = inline ? '300px' : 'auto';
+        
         let html = `
-            <div class="dane-status" style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
+            <div class="dane-status" style="margin-top: ${marginTop}; flex: ${flexBasis}; min-width: ${minWidth}; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
                 <h4 style="margin-top: 0; color: var(--text-color);">🔐 DANE/TLSA Status</h4>
                 
                 <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
@@ -1367,7 +1387,7 @@ class UIRenderer {
     }
 
     // M1: Render DNSSEC validation status
-    renderDNSSECStatus(dnssec) {
+    renderDNSSECStatus(dnssec, inline = false) {
         if (!dnssec) return '';
         
         const statusColors = {
@@ -1398,8 +1418,12 @@ class UIRenderer {
         const icon = statusIcons[dnssec.status] || statusIcons['unknown'];
         const label = statusLabels[dnssec.status] || statusLabels['unknown'];
         
+        const marginTop = inline ? '0' : '20px';
+        const flexBasis = inline ? '1' : 'auto';
+        const minWidth = inline ? '300px' : 'auto';
+        
         let html = `
-            <div class="dnssec-status" style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
+            <div class="dnssec-status" style="margin-top: ${marginTop}; flex: ${flexBasis}; min-width: ${minWidth}; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
                 <h4 style="margin-top: 0; color: var(--text-color);">🔐 DNSSEC Status</h4>
                 
                 <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
@@ -1810,7 +1834,7 @@ class UIRenderer {
         if (!container) return;
         
         // Get properly filtered CNAME mappings from data processor
-        const cnameSubdomains = processedData.dataProcessor ? 
+        const cnameSubdomains = (processedData.dataProcessor && typeof processedData.dataProcessor.getCNAMEMappings === 'function') ? 
             processedData.dataProcessor.getCNAMEMappings() : [];
         
         if (cnameSubdomains.length === 0) {
@@ -1911,7 +1935,7 @@ class UIRenderer {
         
         // Use DataProcessor to get properly filtered unclassified subdomains
         // This ensures no duplicates with other sections
-        const unclassifiedSubdomains = processedData.dataProcessor ? 
+        const unclassifiedSubdomains = (processedData.dataProcessor && typeof processedData.dataProcessor.getUnclassifiedSubdomains === 'function') ? 
             processedData.dataProcessor.getUnclassifiedSubdomains() :
             []; // Fallback to empty array if dataProcessor not available
         
@@ -1923,7 +1947,7 @@ class UIRenderer {
         if (section) section.style.display = 'block';
         
         // Group by provider (delegate to DataProcessor)
-        const providerGroups = processedData.dataProcessor ? 
+        const providerGroups = (processedData.dataProcessor && typeof processedData.dataProcessor.groupSubdomainsByProvider === 'function') ? 
             processedData.dataProcessor.groupSubdomainsByProvider(unclassifiedSubdomains) :
             [];
         

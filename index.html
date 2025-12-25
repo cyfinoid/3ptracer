@@ -64,6 +64,17 @@
                         <small class="scan-desc-secondary">Fast checks: DNS, email security (MX, SPF, DKIM, DMARC)</small>
                     </div>
                 </div>
+                
+                <div class="import-section" style="margin-top: 20px; text-align: center;">
+                    <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="handleFileImport(event)">
+                    <button class="analyze-btn" onclick="document.getElementById('importFileInput').click()" style="background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-color);">
+                        <span class="btn-icon">📥</span>
+                        <span class="btn-text">Import JSON Results</span>
+                    </button>
+                    <small style="display: block; margin-top: 5px; color: var(--text-secondary); font-size: 0.85rem;">
+                        Import previously exported analysis results
+                    </small>
+                </div>
             </div>
 
             <div class="progress-section" id="progressSection">

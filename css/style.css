@@ -380,11 +380,107 @@ input[type="checkbox"] {
     font-weight: 600;
     font-size: 20px;
     color: var(--text-heading);
+    cursor: pointer;
+    position: relative;
+    user-select: none;
+    transition: background-color 0.2s ease;
+}
+
+.category-header:hover {
+    background: var(--bg-secondary);
+}
+
+.category-header::after {
+    content: '▼';
+    position: absolute;
+    right: 20px;
+    font-size: 0.8em;
+    transition: transform 0.3s ease;
+    color: var(--text-secondary);
+}
+
+.service-category.collapsed .category-header::after {
+    transform: rotate(-90deg);
+}
+
+.service-category h2 {
+    cursor: pointer;
+    position: relative;
+    user-select: none;
+    padding: 20px;
+    margin: 0;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    font-weight: 600;
+    font-size: 20px;
+    color: var(--text-heading);
+    transition: background-color 0.2s ease;
+}
+
+.service-category h2:hover {
+    background: var(--bg-secondary);
+}
+
+.service-category h2::after {
+    content: '▼';
+    position: absolute;
+    right: 20px;
+    font-size: 0.8em;
+    transition: transform 0.3s ease;
+    color: var(--text-secondary);
+}
+
+.service-category.collapsed h2::after {
+    transform: rotate(-90deg);
 }
 
 .service-list {
     padding: 20px;
     background: var(--card-bg);
+    transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease;
+    overflow: hidden;
+}
+
+.service-category.collapsed .service-list {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+}
+
+.service-category:not(.collapsed) .service-list {
+    max-height: 10000px;
+    opacity: 1;
+}
+
+/* Collapse all content after header (for visualizer and other dynamic content) */
+.service-category.collapsed > *:not(.category-header):not(h2) {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease;
+}
+
+.service-category:not(.collapsed) > *:not(.category-header):not(h2) {
+    max-height: 10000px;
+    opacity: 1;
+}
+
+/* Specific handling for visualizer content */
+.viz-tabs,
+.viz-content {
+    transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease, display 0.3s ease;
+}
+
+.service-category.collapsed .viz-tabs,
+.service-category.collapsed .viz-content {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+    overflow: hidden;
 }
 
 .service-item {
@@ -750,27 +846,20 @@ input[type="checkbox"] {
         justify-content: center;
     }
     
-    /* Collapsible sections on mobile */
+    /* Service category adjustments on mobile */
     .service-category {
         padding: 12px;
     }
     
-    .service-category h2 {
+    .service-category h2,
+    .category-header {
         font-size: 1.1em;
-        cursor: pointer;
-        position: relative;
+        padding: 15px;
     }
     
-    .service-category h2::after {
-        content: '▼';
-        position: absolute;
-        right: 0;
-        font-size: 0.8em;
-        transition: transform 0.3s;
-    }
-    
-    .service-category.collapsed h2::after {
-        transform: rotate(-90deg);
+    .service-category h2::after,
+    .category-header::after {
+        right: 15px;
     }
     
     /* Responsive tables */
