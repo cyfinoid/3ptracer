@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **HTML escaping** - Fixed HTML escaping issues in exports and display that could cause rendering problems
 - **JSON import/export compatibility** - Fixed data serialization and deserialization to ensure imported results match original analysis
 
+### Security
+- **Service worker message origin validation** - Added origin check to service worker postMessage handler to prevent untrusted windows from sending messages. Messages are now validated against the service worker registration scope before processing
+
 ## [1.0.5] - 2025-12-24
 
 ### Added
