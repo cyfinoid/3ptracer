@@ -148,6 +148,44 @@ async function networkFirst(request) {
 
 // Listen for messages from the main thread
 self.addEventListener('message', (event) => {
+    // Security: Verify message origin matches service worker scope
+    // Only accept messages from the same origin (the app itself)
+    let messageOrigin = null;
+    let expectedOrigin = null;
+    
+    // Get origin from event.origin (if available)
+    if (event.origin) {
+        messageOrigin = event.origin;
+    } else if (event.source && event.source.url) {
+        // Fallback: extract origin from source URL
+        try {
+            messageOrigin = new URL(event.source.url).origin;
+        } catch (e) {
+            console.warn('[SW] Could not parse source URL:', event.source.url);
+        }
+    }
+    
+    // Get expected origin from service worker registration scope
+    if (self.registration && self.registration.scope) {
+        try {
+            expectedOrigin = new URL(self.registration.scope).origin;
+        } catch (e) {
+            console.warn('[SW] Could not parse registration scope:', self.registration.scope);
+        }
+    }
+    
+    // Verify origin if we have both message and expected origins
+    if (messageOrigin && expectedOrigin) {
+        if (messageOrigin !== expectedOrigin) {
+            console.warn('[SW] Rejected message from untrusted origin:', messageOrigin, 'expected:', expectedOrigin);
+            return;
+        }
+    } else if (messageOrigin && !expectedOrigin) {
+        // If we have message origin but can't determine expected origin, log warning but allow
+        // (This handles edge cases during service worker initialization)
+        console.warn('[SW] Could not verify origin - registration scope not available');
+    }
+    
     if (event.data === 'skipWaiting') {
         self.skipWaiting();
     }
