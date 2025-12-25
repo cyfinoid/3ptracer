@@ -84,10 +84,6 @@ body {
 
 /* Theme Toggle Button */
 .theme-toggle {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 1000;
     background: var(--card-bg);
     border: 2px solid var(--border-color);
     border-radius: 50px;
@@ -101,23 +97,30 @@ body {
     font-weight: 600;
     color: var(--text-primary);
     transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    flex-shrink: 0;
 }
 
 .theme-toggle:hover {
     background: var(--hover-bg);
     transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 
 .theme-toggle-icon {
     font-size: 18px;
 }
 
+.theme-toggle-container {
+    display: flex;
+    justify-content: flex-end;
+    padding: 15px 20px 0 20px;
+}
+
 .header {
     background: var(--bg-secondary);
     color: var(--text-heading);
-    padding: 40px;
+    padding-bottom: 40px;
     text-align: center;
     border-bottom: 2px solid var(--border-color);
 }
@@ -132,7 +135,6 @@ body {
 .header p {
     font-size: 20px;
     color: var(--text-secondary);
-    max-width: 600px;
     margin: 0 auto;
 }
 
@@ -161,6 +163,15 @@ body {
     background: var(--hover-bg);
     border-color: var(--accent-blue);
     color: var(--accent-blue);
+}
+
+.sponsor-link {
+    font-weight: 500;
+}
+
+.sponsor-link:hover {
+    border-color: var(--accent-yellow);
+    color: var(--accent-yellow);
 }
 
 .content {
@@ -369,11 +380,107 @@ input[type="checkbox"] {
     font-weight: 600;
     font-size: 20px;
     color: var(--text-heading);
+    cursor: pointer;
+    position: relative;
+    user-select: none;
+    transition: background-color 0.2s ease;
+}
+
+.category-header:hover {
+    background: var(--bg-secondary);
+}
+
+.category-header::after {
+    content: '▼';
+    position: absolute;
+    right: 20px;
+    font-size: 0.8em;
+    transition: transform 0.3s ease;
+    color: var(--text-secondary);
+}
+
+.service-category.collapsed .category-header::after {
+    transform: rotate(-90deg);
+}
+
+.service-category h2 {
+    cursor: pointer;
+    position: relative;
+    user-select: none;
+    padding: 20px;
+    margin: 0;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    font-weight: 600;
+    font-size: 20px;
+    color: var(--text-heading);
+    transition: background-color 0.2s ease;
+}
+
+.service-category h2:hover {
+    background: var(--bg-secondary);
+}
+
+.service-category h2::after {
+    content: '▼';
+    position: absolute;
+    right: 20px;
+    font-size: 0.8em;
+    transition: transform 0.3s ease;
+    color: var(--text-secondary);
+}
+
+.service-category.collapsed h2::after {
+    transform: rotate(-90deg);
 }
 
 .service-list {
     padding: 20px;
     background: var(--card-bg);
+    transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease;
+    overflow: hidden;
+}
+
+.service-category.collapsed .service-list {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+}
+
+.service-category:not(.collapsed) .service-list {
+    max-height: 10000px;
+    opacity: 1;
+}
+
+/* Collapse all content after header (for visualizer and other dynamic content) */
+.service-category.collapsed > *:not(.category-header):not(h2) {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease;
+}
+
+.service-category:not(.collapsed) > *:not(.category-header):not(h2) {
+    max-height: 10000px;
+    opacity: 1;
+}
+
+/* Specific handling for visualizer content */
+.viz-tabs,
+.viz-content {
+    transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease, display 0.3s ease;
+}
+
+.service-category.collapsed .viz-tabs,
+.service-category.collapsed .viz-content {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+    overflow: hidden;
 }
 
 .service-item {
@@ -739,27 +846,20 @@ input[type="checkbox"] {
         justify-content: center;
     }
     
-    /* Collapsible sections on mobile */
+    /* Service category adjustments on mobile */
     .service-category {
         padding: 12px;
     }
     
-    .service-category h2 {
+    .service-category h2,
+    .category-header {
         font-size: 1.1em;
-        cursor: pointer;
-        position: relative;
+        padding: 15px;
     }
     
-    .service-category h2::after {
-        content: '▼';
-        position: absolute;
-        right: 0;
-        font-size: 0.8em;
-        transition: transform 0.3s;
-    }
-    
-    .service-category.collapsed h2::after {
-        transform: rotate(-90deg);
+    .service-category h2::after,
+    .category-header::after {
+        right: 15px;
     }
     
     /* Responsive tables */
@@ -1162,6 +1262,14 @@ a[aria-label] {
 }
 
 @media (max-width: 768px) {
+    .theme-toggle-container {
+        padding: 10px 15px 0 15px;
+    }
+    
+    .header {
+        padding: 20px;
+    }
+    
     .header h1 {
         font-size: 2rem;
     }
@@ -1763,7 +1871,6 @@ a[aria-label] {
 
 /* About Page Styles */
 .about-content {
-    max-width: 800px;
     margin: 0 auto;
     padding: 40px;
     color: var(--text-primary);

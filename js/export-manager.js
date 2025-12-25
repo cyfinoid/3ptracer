@@ -121,6 +121,58 @@ class ExportManager {
             console.log('📊 Converted services:', Object.keys(servicesObj).length, 'services');
         }
         
+        // Convert subdomains Map to Object
+        if (data.subdomains && data.subdomains instanceof Map) {
+            console.log('📊 Converting subdomains Map to Object for serialization');
+            const subdomainsObj = {};
+            for (const [key, value] of data.subdomains) {
+                subdomainsObj[key] = value;
+            }
+            serialized.subdomains = subdomainsObj;
+            console.log('📊 Converted subdomains:', Object.keys(subdomainsObj).length, 'subdomains');
+        }
+        
+        // Convert sovereigntyAnalysis Maps and Sets to Objects
+        if (data.sovereigntyAnalysis) {
+            console.log('📊 Converting sovereigntyAnalysis Maps and Sets for serialization');
+            const sovereignty = { ...data.sovereigntyAnalysis };
+            
+            // Convert countryDistribution Map
+            if (sovereignty.countryDistribution instanceof Map) {
+                const countryDistObj = {};
+                for (const [key, value] of sovereignty.countryDistribution) {
+                    // Convert providers Set to Array
+                    const countryData = { ...value };
+                    if (value.providers instanceof Set) {
+                        countryData.providers = Array.from(value.providers);
+                    }
+                    countryDistObj[key] = countryData;
+                }
+                sovereignty.countryDistribution = countryDistObj;
+            }
+            
+            // Convert services Map in sovereignty
+            if (sovereignty.services instanceof Map) {
+                const servicesObj = {};
+                for (const [key, value] of sovereignty.services) {
+                    servicesObj[key] = value;
+                }
+                sovereignty.services = servicesObj;
+            }
+            
+            // Convert subdomains Map in sovereignty
+            if (sovereignty.subdomains instanceof Map) {
+                const subdomainsObj = {};
+                for (const [key, value] of sovereignty.subdomains) {
+                    subdomainsObj[key] = value;
+                }
+                sovereignty.subdomains = subdomainsObj;
+            }
+            
+            serialized.sovereigntyAnalysis = sovereignty;
+            console.log('📊 Converted sovereigntyAnalysis');
+        }
+        
         return serialized;
     }
 
@@ -322,9 +374,18 @@ class ExportManager {
                 creator: '3rd Party Tracer'
             });
 
-            let currentY = 15;
             const pageHeight = doc.internal.pageSize.height;
+            const pageWidth = doc.internal.pageSize.width;
             const marginBottom = 20;
+
+            // ==========================================
+            // COVER PAGE
+            // ==========================================
+            this.addCoverPage(doc, pageWidth, pageHeight);
+            
+            // Start content page
+            doc.addPage();
+            let currentY = 15;
 
             // Title and header - compact
             doc.setFontSize(16);
@@ -548,14 +609,19 @@ class ExportManager {
                 currentY = doc.lastAutoTable.finalY + 8;
             }
 
-            // Add footer to each page - compact
+            // ==========================================
+            // LAST PAGE - Cyfinoid Research Details
+            // ==========================================
+            doc.addPage();
+            this.addCyfinoidResearchPage(doc, pageWidth, pageHeight);
+
+            // ==========================================
+            // ADD FOOTERS TO ALL PAGES
+            // ==========================================
             const pageCount = doc.internal.getNumberOfPages();
             for (let i = 1; i <= pageCount; i++) {
                 doc.setPage(i);
-                doc.setFontSize(7);
-                doc.setTextColor(150, 150, 150);
-                doc.text(`Page ${i}/${pageCount}`, 15, pageHeight - 10);
-                doc.text('3rd Party Tracer - cyfinoid.github.io/3ptracer', 105, pageHeight - 10, { align: 'center' });
+                this.addPDFFooter(doc, i, pageCount, pageWidth, pageHeight);
             }
 
             // Save the PDF
@@ -568,6 +634,313 @@ class ExportManager {
             console.error('❌ PDF export failed:', error);
             alert('Failed to export PDF. Please try again.');
         }
+    }
+
+    // Add cover page to PDF
+    addCoverPage(doc, pageWidth, pageHeight) {
+        // Center content vertically
+        const centerY = pageHeight / 2;
+        
+        // Main title
+        doc.setFontSize(28);
+        doc.setTextColor(102, 126, 234); // Purple color
+        doc.setFont(undefined, 'bold');
+        const titleText = '3rd Party Tracer';
+        const titleWidth = doc.getTextWidth(titleText);
+        doc.text(titleText, (pageWidth - titleWidth) / 2, centerY - 40);
+        
+        // Subtitle
+        doc.setFontSize(14);
+        doc.setTextColor(100, 100, 100);
+        doc.setFont(undefined, 'normal');
+        const subtitleText = 'Third-Party Service Analysis Report';
+        const subtitleWidth = doc.getTextWidth(subtitleText);
+        doc.text(subtitleText, (pageWidth - subtitleWidth) / 2, centerY - 25);
+        
+        // Domain being tested
+        doc.setFontSize(18);
+        doc.setTextColor(0, 0, 0);
+        doc.setFont(undefined, 'bold');
+        const domainText = `Domain: ${this.exportDomain}`;
+        const domainWidth = doc.getTextWidth(domainText);
+        doc.text(domainText, (pageWidth - domainWidth) / 2, centerY);
+        
+        // Generated date
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.setFont(undefined, 'normal');
+        const dateText = `Generated: ${this.analysisData.formattedTimestamp}`;
+        const dateWidth = doc.getTextWidth(dateText);
+        doc.text(dateText, (pageWidth - dateWidth) / 2, centerY + 15);
+        
+        // Tool URL
+        doc.setFontSize(10);
+        doc.setTextColor(102, 126, 234);
+        const urlText = 'https://cyfinoid.github.io/3ptracer';
+        const urlWidth = doc.getTextWidth(urlText);
+        doc.text(urlText, (pageWidth - urlWidth) / 2, centerY + 30);
+        
+        // Bottom branding
+        doc.setFontSize(9);
+        doc.setTextColor(150, 150, 150);
+        const brandingText = 'Powered by Cyfinoid Research';
+        const brandingWidth = doc.getTextWidth(brandingText);
+        doc.text(brandingText, (pageWidth - brandingWidth) / 2, pageHeight - 30);
+    }
+
+    // Add footer to PDF pages
+    addPDFFooter(doc, pageNum, totalPages, pageWidth, pageHeight) {
+        doc.setFontSize(7);
+        doc.setTextColor(150, 150, 150);
+        doc.setFont(undefined, 'normal');
+        
+        // Left: Tool name
+        doc.text('3rd Party Tracer', 15, pageHeight - 10);
+        
+        // Right: Page number
+        const pageText = `Page ${pageNum} of ${totalPages}`;
+        const pageTextWidth = doc.getTextWidth(pageText);
+        doc.text(pageText, pageWidth - pageTextWidth - 15, pageHeight - 10);
+    }
+
+    // Add Cyfinoid Research information page
+    addCyfinoidResearchPage(doc, pageWidth, pageHeight) {
+        let currentY = 20;
+        const lineHeight = 4.5;
+        const sectionSpacing = 10;
+        const margin = 15;
+        
+        // Helper function to check if we need a new page
+        const checkPageBreak = (requiredSpace) => {
+            if (currentY + requiredSpace > pageHeight - 20) {
+                doc.addPage();
+                currentY = 20;
+            }
+        };
+        
+        // Page title
+        doc.setFontSize(18);
+        doc.setTextColor(102, 126, 234);
+        doc.setFont(undefined, 'bold');
+        doc.text('About Cyfinoid Research', pageWidth / 2, currentY, { align: 'center' });
+        currentY += 10;
+        
+        // Company Overview Section
+        doc.setFontSize(11);
+        doc.setTextColor(0, 0, 0);
+        doc.setFont(undefined, 'bold');
+        doc.text('Company Overview', margin, currentY);
+        currentY += 7;
+        
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        const overviewText = [
+            'Cyfinoid Research is a boutique research and training firm dedicated to pioneering',
+            'advancements in cybersecurity. Our mission is to spark curiosity, share knowledge, and',
+            'empower individuals to make meaningful contributions to the field. We specialize in',
+            'cutting-edge research areas, including Android security, software supply chain',
+            'security, and cloud environments.',
+            '',
+            'Our research findings are transformed into hands-on training programs, ensuring that',
+            'participants receive up-to-date and practical knowledge. Our research has been',
+            'featured at major conferences such as BlackHat, DEFCON, Nullcon, and c0c0n.'
+        ];
+        
+        overviewText.forEach(line => {
+            checkPageBreak(6);
+            if (line.trim()) {
+                doc.text(line, margin, currentY, { maxWidth: pageWidth - (margin * 2) });
+                currentY += lineHeight;
+            } else {
+                currentY += 3;
+            }
+        });
+        
+        currentY += sectionSpacing;
+        
+        // Research Focus Areas Section
+        checkPageBreak(20);
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'bold');
+        doc.text('Research Focus Areas', margin, currentY);
+        currentY += 7;
+        
+        // Research areas as bullet points
+        const researchAreas = [
+            {
+                title: 'Software Supply Chain Security',
+                url: 'https://cyfinoid.com/research/software-supply-chain-security/'
+            },
+            {
+                title: 'Cloud Environments',
+                url: 'https://cyfinoid.com/research/cloud-security/'
+            }
+        ];
+        
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        researchAreas.forEach(area => {
+            checkPageBreak(8);
+            // Bullet point
+            doc.setTextColor(0, 0, 0);
+            doc.text('•', margin, currentY);
+            // Title with link
+            doc.setTextColor(102, 126, 234);
+            const titleWidth = doc.getTextWidth(area.title);
+            doc.text(area.title, margin + 5, currentY);
+            doc.link(margin + 5, currentY - 7, titleWidth, 7, { url: area.url });
+            currentY += 6;
+        });
+        
+        
+        currentY += sectionSpacing;
+        
+        // Training Programs Section
+        checkPageBreak(20);
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(0, 0, 0);
+        doc.text('Training Programs', margin, currentY);
+        currentY += 7;
+        
+        // Training courses as bullet points
+        const courses = [
+            {
+                title: 'Hacking Multi-Cloud Infrastructure',
+                url: 'https://cyfinoid.com/trainings/hacking-multi-cloud-infrastructure/'
+            },
+            {
+                title: 'Attack & Defend Software Supply Chain',
+                url: 'https://cyfinoid.com/trainings/attack-defend-software-supply-chain/'
+            },
+            {
+                title: 'Attacking CI/CD Pipelines',
+                url: 'https://cyfinoid.com/trainings/attacking-ci-cd-environments/'
+            }
+        ];
+        
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        courses.forEach(course => {
+            checkPageBreak(8);
+            // Bullet point
+            doc.setTextColor(0, 0, 0);
+            doc.text('•', margin, currentY);
+            // Title with link
+            doc.setTextColor(102, 126, 234);
+            const titleWidth = doc.getTextWidth(course.title);
+            doc.text(course.title, margin + 5, currentY);
+            doc.link(margin + 5, currentY - 7, titleWidth, 7, { url: course.url });
+            currentY += 6;
+        });
+        
+        currentY += sectionSpacing;
+        
+        // Open Source Contributions Section
+        checkPageBreak(30);
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(0, 0, 0);
+        doc.text('Open Source Contributions', margin, currentY);
+        currentY += 7;
+        
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        const openSourceText = [
+            'Cyfinoid Research is committed to giving back to the security community through',
+            'open source tools and research. Our tools help organizations understand their digital',
+            'footprint, identify security risks, and improve their security posture.',
+            '',
+            '3rd Party Tracer is part of our free research toolkit, designed to help organizations',
+            'discover and analyze their cloud service dependencies. This tool enables security',
+            'professionals to identify third-party services, assess potential risks, and understand',
+            'their organization\'s digital infrastructure.'
+        ];
+        
+        openSourceText.forEach(line => {
+            checkPageBreak(6);
+            if (line.trim()) {
+                doc.text(line, margin, currentY, { maxWidth: pageWidth - (margin * 2) });
+                currentY += lineHeight;
+            } else {
+                currentY += 3;
+            }
+        });
+        
+        // Add links for Open Source section
+        currentY += 3;
+        checkPageBreak(12);
+        doc.setFontSize(9);
+        doc.setTextColor(102, 126, 234);
+        const openSourceLinkText = 'Open Source by Cyfinoid: https://cyfinoid.com/opensource-by-cyfinoid/';
+        const openSourceLinkWidth = doc.getTextWidth(openSourceLinkText);
+        doc.text(openSourceLinkText, margin, currentY);
+        doc.link(margin, currentY - 7, openSourceLinkWidth, 7, { url: 'https://cyfinoid.com/opensource-by-cyfinoid/' });
+        currentY += 6;
+        
+        const githubLinkText = 'GitHub Projects: http://cyfinoid.github.io/';
+        const githubLinkWidth = doc.getTextWidth(githubLinkText);
+        doc.text(githubLinkText, margin, currentY);
+        doc.link(margin, currentY - 7, githubLinkWidth, 7, { url: 'http://cyfinoid.github.io/' });
+        currentY += 6;
+        doc.setTextColor(0, 0, 0);
+        
+        currentY += sectionSpacing;
+        
+        // Conference Presentations Section
+        checkPageBreak(20);
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'bold');
+        doc.text('Conference Presentations', margin, currentY);
+        currentY += 7;
+        
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        const conferenceText = 'Our research has been presented at major security conferences worldwide, including BlackHat, DEFCON, Nullcon, c0c0n, and more.';
+        doc.text(conferenceText, margin, currentY, { maxWidth: pageWidth - (margin * 2) });
+        currentY += sectionSpacing;
+        
+        // Contact Information Section
+        checkPageBreak(20);
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'bold');
+        doc.text('Contact Information', margin, currentY);
+        currentY += 7;
+        
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        const contactInfo = [
+            'For inquiries about our research, training programs, or collaboration opportunities:',
+            ''
+        ];
+        
+        contactInfo.forEach(line => {
+            checkPageBreak(6);
+            if (line.trim()) {
+                doc.text(line, margin, currentY, { maxWidth: pageWidth - (margin * 2) });
+                currentY += lineHeight;
+            } else {
+                currentY += 3;
+            }
+        });
+        
+        // Website link
+        checkPageBreak(6);
+        doc.setTextColor(102, 126, 234);
+        const websiteText = 'Website: https://cyfinoid.com';
+        const websiteWidth = doc.getTextWidth(websiteText);
+        doc.text(websiteText, margin, currentY);
+        doc.link(margin, currentY - 7, websiteWidth, 7, { url: 'https://cyfinoid.com' });
+        currentY += lineHeight;
+        doc.setTextColor(0, 0, 0);
+        
+        // Email
+        checkPageBreak(6);
+        doc.text('Email: info@cyfinoid.com', margin, currentY);
+        currentY += lineHeight;
+        
+        currentY += sectionSpacing;
+        
     }
 
     // Helper method to add section headers in PDF - compact

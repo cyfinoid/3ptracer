@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.6] - 2025-12-24
+
+### Added
+- **JSON Import functionality** - Import previously exported analysis results to view them again without re-running analysis. Supports full data restoration including services, subdomains, security findings, and visualizations
+
+### Changed
+- **PDF export optimization** - Improved space management and layout for better readability and reduced file sizes
+- **UI enhancements** - Improved button styling and sponsor view presentation
+
+### Fixed
+- **HTML escaping** - Fixed HTML escaping issues in exports and display that could cause rendering problems
+- **JSON import/export compatibility** - Fixed data serialization and deserialization to ensure imported results match original analysis
+
 ## [1.0.5] - 2025-12-24
 
 ### Added
