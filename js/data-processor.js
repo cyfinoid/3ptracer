@@ -115,6 +115,8 @@ class DataProcessor {
             takeover: subdomain.takeover || null,
             // FIXED: Keep ASN info for sovereignty analysis
             asnInfo: subdomain.asnInfo || null,
+            // Shodan InternetDB data (ports, vulnerabilities, hostnames, CPEs, tags)
+            shodanInfo: subdomain.shodanInfo || null,
             status: 'analyzed'
         };
 

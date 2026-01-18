@@ -1948,6 +1948,110 @@ class DNSAnalyzer {
         };
     }
 
+    // Get Shodan InternetDB information for IP (ports, vulns, hostnames, CPEs, tags)
+    // This is a FREE API - no authentication required, CORS compliant
+    async getShodanInternetDBInfo(ip) {
+        // Validate IP format (IPv4 only for InternetDB)
+        if (!ip || typeof ip !== 'string') {
+            return null;
+        }
+        
+        // Basic IPv4 validation
+        const ipParts = ip.split('.');
+        if (ipParts.length !== 4 || ipParts.some(p => isNaN(parseInt(p)) || parseInt(p) < 0 || parseInt(p) > 255)) {
+            console.warn(`⚠️ Invalid IP format for Shodan InternetDB: ${ip}`);
+            return null;
+        }
+        
+        // Skip private IPs (InternetDB won't have data for them)
+        if (this.isPrivateIP(ip)) {
+            console.log(`ℹ️ Skipping Shodan InternetDB lookup for private IP: ${ip}`);
+            return null;
+        }
+
+        const url = `https://internetdb.shodan.io/${ip}`;
+        
+        try {
+            console.log(`🔍 Querying Shodan InternetDB for: ${ip}`);
+            this.stats.apiCalls++;
+            
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            
+            // InternetDB returns 404 for IPs with no data - this is normal
+            if (response.status === 404) {
+                console.log(`ℹ️ No Shodan InternetDB data for IP: ${ip}`);
+                return {
+                    ip: ip,
+                    ports: [],
+                    hostnames: [],
+                    cpes: [],
+                    vulns: [],
+                    tags: [],
+                    hasData: false
+                };
+            }
+            
+            if (!response.ok) {
+                console.warn(`⚠️ Shodan InternetDB returned ${response.status} for ${ip}`);
+                return null;
+            }
+            
+            const data = await response.json();
+            
+            // Normalize the response
+            const result = {
+                ip: data.ip || ip,
+                ports: data.ports || [],
+                hostnames: data.hostnames || [],
+                cpes: data.cpes || [],
+                vulns: data.vulns || [],
+                tags: data.tags || [],
+                hasData: true
+            };
+            
+            // Log findings
+            if (result.ports.length > 0) {
+                console.log(`  ✅ Shodan InternetDB: ${ip} has ${result.ports.length} open ports: ${result.ports.slice(0, 5).join(', ')}${result.ports.length > 5 ? '...' : ''}`);
+            }
+            if (result.vulns.length > 0) {
+                console.log(`  ⚠️ Shodan InternetDB: ${ip} has ${result.vulns.length} known vulnerabilities`);
+            }
+            if (result.hostnames.length > 0) {
+                console.log(`  📝 Shodan InternetDB: ${ip} hostnames: ${result.hostnames.slice(0, 3).join(', ')}${result.hostnames.length > 3 ? '...' : ''}`);
+            }
+            
+            return result;
+            
+        } catch (error) {
+            console.warn(`⚠️ Shodan InternetDB lookup failed for ${ip}:`, error.message);
+            return null;
+        }
+    }
+    
+    // Check if IP is private (RFC 1918)
+    isPrivateIP(ip) {
+        const parts = ip.split('.').map(p => parseInt(p));
+        if (parts.length !== 4) return false;
+        
+        // 10.0.0.0/8
+        if (parts[0] === 10) return true;
+        // 172.16.0.0/12
+        if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+        // 192.168.0.0/16
+        if (parts[0] === 192 && parts[1] === 168) return true;
+        // 127.0.0.0/8 (loopback)
+        if (parts[0] === 127) return true;
+        // 169.254.0.0/16 (link-local)
+        if (parts[0] === 169 && parts[1] === 254) return true;
+        
+        return false;
+    }
+
     // Notify about API rate limit
     notifyAPIRateLimit(providerName) {
         for (const callback of this.apiCallbacks) {

@@ -237,6 +237,11 @@ class UIRenderer {
             this.displayInterestingFindings(interestingFindings);
         }, false, interestingFindings?.length || 0);
         
+        // NEW: Display Subdomain Overview with ports and vulnerabilities
+        this.displayCollapsibleSection('Subdomain Overview', () => {
+            this.displaySubdomainOverview(processedData);
+        }, true, processedData.stats.totalSubdomains || 0);
+        
         this.displayCollapsibleSection('Domain Redirects', () => {
             this.displayRedirectsToMain(processedData.redirectsToMain);
         }, false, processedData.redirectsToMain?.length || 0);
@@ -1869,7 +1874,9 @@ class UIRenderer {
                             } else if (sub.ipAddresses[0]) {
                                 info = ` → ${sub.ipAddresses[0]}`;
                             }
-                            return `• ${this.createSubdomainLink(sub.subdomain)}${info}`;
+                            // Add Shodan info (ports, vulnerabilities)
+                            const shodanHtml = this.renderShodanInfo(sub.shodanInfo, true);
+                            return `• ${this.createSubdomainLink(sub.subdomain)}${info}${shodanHtml ? '<br>&nbsp;&nbsp;' + shodanHtml : ''}`;
                         }).join('<br>')}
                     </div>
                 </div>
@@ -1952,12 +1959,23 @@ class UIRenderer {
             [];
         
         let html = '';
+        
+        // Add Shodan summary if available
+        const shodanSummary = this.renderShodanSummary(unclassifiedSubdomains);
+        if (shodanSummary) {
+            html += shodanSummary;
+        }
+        
         providerGroups.forEach(provider => {
+            // Count Shodan findings for this provider
+            const providerVulns = provider.subdomains.filter(s => s.shodanInfo && s.shodanInfo.vulns && s.shodanInfo.vulns.length > 0);
+            const vulnIndicator = providerVulns.length > 0 ? ` • <span class="vuln-count">⚠️ ${providerVulns.length} with vulns</span>` : '';
+            
             html += `
                 <div class="service-item">
-                    <div class="service-name">🏢 ${provider.vendor}</div>
+                    <div class="service-name">🏢 ${window.CommonUtils.escapeHtml(provider.vendor)}</div>
                     <div class="service-description">
-                        ${provider.totalSubdomains} subdomains • ${provider.uniqueIPs} unique IPs
+                        ${provider.totalSubdomains} subdomains • ${provider.uniqueIPs} unique IPs${vulnIndicator}
                     </div>
                     <div class="service-records">
                         <strong>Subdomains:</strong><br>
@@ -1975,7 +1993,11 @@ class UIRenderer {
                                     info = `CNAME → ${sub.cnameTarget}`;
                                 }
                             }
-                            return `• ${this.createSubdomainLink(sub.subdomain)} (${info})`;
+                            
+                            // Add Shodan info (ports, vulnerabilities)
+                            const shodanHtml = this.renderShodanInfo(sub.shodanInfo, true);
+                            
+                            return `• ${this.createSubdomainLink(sub.subdomain)} (${info})${shodanHtml ? '<br>&nbsp;&nbsp;' + shodanHtml : ''}`;
                         }).join('<br>')}
                         ${provider.uniqueIPs > 1 ? `<br><br><strong>IPs:</strong><br>${provider.ips.join(', ')}` : ''}
                     </div>
@@ -1986,7 +2008,120 @@ class UIRenderer {
         container.innerHTML = html;
     }
 
-
+    // NEW: Display subdomain overview table with ports and vulnerabilities
+    // Shows ALL discovered subdomains in a consolidated table view (similar to exports)
+    displaySubdomainOverview(processedData) {
+        const container = document.getElementById('subdomainOverview');
+        const section = container?.closest('.service-category');
+        
+        if (!container) return;
+        
+        // Get ALL subdomains from the data processor
+        const allSubdomains = processedData.dataProcessor ? 
+            Array.from(processedData.dataProcessor.processedData?.subdomains?.values() || []) : [];
+        
+        if (allSubdomains.length === 0) {
+            if (section) section.style.display = 'none';
+            return;
+        }
+        
+        if (section) section.style.display = 'block';
+        
+        // Count subdomains with Shodan data
+        const withShodan = allSubdomains.filter(s => s.shodanInfo && s.shodanInfo.hasData);
+        const withPorts = allSubdomains.filter(s => s.shodanInfo && s.shodanInfo.ports && s.shodanInfo.ports.length > 0);
+        const withVulns = allSubdomains.filter(s => s.shodanInfo && s.shodanInfo.vulns && s.shodanInfo.vulns.length > 0);
+        
+        let html = '';
+        
+        // Summary stats
+        html += `<div class="subdomain-overview-summary" style="margin-bottom: 15px; padding: 10px; background: var(--bg-tertiary); border-radius: 6px;">
+            <strong>📊 Infrastructure Summary:</strong> 
+            ${allSubdomains.length} subdomains discovered`;
+        
+        if (withPorts.length > 0) {
+            html += ` • <span style="color: var(--accent-blue);">${withPorts.length} with open ports</span>`;
+        }
+        if (withVulns.length > 0) {
+            html += ` • <span style="color: #dc3545;">${withVulns.length} with known vulnerabilities</span>`;
+        }
+        html += `</div>`;
+        
+        // Table
+        html += `
+            <div class="subdomain-overview-table-wrapper" style="overflow-x: auto;">
+                <table class="subdomain-overview-table" style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+                    <thead>
+                        <tr style="background: var(--bg-tertiary); text-align: left;">
+                            <th style="padding: 10px; border-bottom: 2px solid var(--border-color);">Subdomain</th>
+                            <th style="padding: 10px; border-bottom: 2px solid var(--border-color);">IP Address</th>
+                            <th style="padding: 10px; border-bottom: 2px solid var(--border-color);">Provider</th>
+                            <th style="padding: 10px; border-bottom: 2px solid var(--border-color);">Open Ports</th>
+                            <th style="padding: 10px; border-bottom: 2px solid var(--border-color);">Vulnerabilities</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+        
+        // Sort subdomains: those with vulnerabilities first, then by subdomain name
+        const sortedSubdomains = [...allSubdomains].sort((a, b) => {
+            const aVulns = (a.shodanInfo?.vulns?.length || 0);
+            const bVulns = (b.shodanInfo?.vulns?.length || 0);
+            if (bVulns !== aVulns) return bVulns - aVulns; // More vulns first
+            return a.subdomain.localeCompare(b.subdomain);
+        });
+        
+        sortedSubdomains.forEach(subdomain => {
+            const ip = subdomain.ipAddresses?.[0] || 'N/A';
+            const provider = subdomain.vendor?.vendor || subdomain.asnInfo?.isp || 'Unknown';
+            const shodanInfo = subdomain.shodanInfo;
+            
+            // Format ports
+            let portsHtml = '<span style="color: var(--text-secondary);">—</span>';
+            if (shodanInfo && shodanInfo.ports && shodanInfo.ports.length > 0) {
+                const portLabels = this.getPortServiceLabels(shodanInfo.ports);
+                portsHtml = `<span class="port-list" title="${portLabels.join(', ')}">${shodanInfo.ports.join(', ')}</span>`;
+            }
+            
+            // Format vulnerabilities
+            let vulnsHtml = '<span style="color: #28a745;">None</span>';
+            if (shodanInfo && shodanInfo.vulns && shodanInfo.vulns.length > 0) {
+                const vulnLinks = shodanInfo.vulns.slice(0, 3).map(cve => 
+                    `<a href="https://nvd.nist.gov/vuln/detail/${encodeURIComponent(cve)}" target="_blank" rel="noopener" class="cve-link" style="color: #dc3545;">${window.CommonUtils.escapeHtml(cve)}</a>`
+                ).join(', ');
+                const hasMore = shodanInfo.vulns.length > 3 ? ` <span style="color: #dc3545;">+${shodanInfo.vulns.length - 3} more</span>` : '';
+                vulnsHtml = vulnLinks + hasMore;
+            }
+            
+            // Row styling for vulnerabilities
+            const rowStyle = (shodanInfo?.vulns?.length > 0) ? 
+                'background: rgba(220, 53, 69, 0.1);' : '';
+            
+            html += `
+                <tr style="${rowStyle}">
+                    <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">
+                        ${this.createSubdomainLink(subdomain.subdomain)}
+                        ${subdomain.primaryService ? `<br><span style="font-size: 0.8em; color: var(--text-secondary);">→ ${window.CommonUtils.escapeHtml(subdomain.primaryService.name)}</span>` : ''}
+                    </td>
+                    <td style="padding: 8px; border-bottom: 1px solid var(--border-color); font-family: monospace;">${window.CommonUtils.escapeHtml(ip)}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${window.CommonUtils.escapeHtml(provider)}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${portsHtml}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${vulnsHtml}</td>
+                </tr>`;
+        });
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>`;
+        
+        // Add note about Shodan data source
+        html += `
+            <div style="margin-top: 10px; font-size: 0.8em; color: var(--text-secondary);">
+                💡 Port and vulnerability data from <a href="https://internetdb.shodan.io/" target="_blank" rel="noopener" style="color: var(--accent-blue);">Shodan InternetDB</a> (free, no API key required)
+            </div>`;
+        
+        container.innerHTML = html;
+    }
 
     // Display DNS records (SPF, DMARC, etc.)
     displayDNSRecords(dnsRecords) {
@@ -2377,6 +2512,133 @@ class UIRenderer {
         // URL encoding for href attribute (handles special characters in domain names)
         const urlEncodedSubdomain = encodeURIComponent(subdomain);
         return `<a href="https://${urlEncodedSubdomain}" target="_blank" rel="noopener" class="subdomain-link">${escapedSubdomain}</a>`;
+    }
+
+    // Render Shodan InternetDB information for a subdomain
+    // Returns HTML string with ports, vulnerabilities, and tags
+    renderShodanInfo(shodanInfo, compact = true) {
+        if (!shodanInfo || !shodanInfo.hasData) {
+            return '';
+        }
+        
+        let html = '';
+        
+        // Ports display
+        if (shodanInfo.ports && shodanInfo.ports.length > 0) {
+            const portLabels = this.getPortServiceLabels(shodanInfo.ports);
+            if (compact) {
+                // Compact mode: just show port numbers with tooltip
+                const portDisplay = shodanInfo.ports.slice(0, 5).join(', ');
+                const hasMore = shodanInfo.ports.length > 5 ? `+${shodanInfo.ports.length - 5} more` : '';
+                html += `<span class="shodan-ports" title="${portLabels.join(', ')}">🔓 ${portDisplay}${hasMore ? ' ' + hasMore : ''}</span>`;
+            } else {
+                // Full mode: show with service labels
+                html += `<div class="shodan-ports-full"><strong>Open Ports:</strong> ${portLabels.join(', ')}</div>`;
+            }
+        }
+        
+        // Vulnerabilities display (always prominent)
+        if (shodanInfo.vulns && shodanInfo.vulns.length > 0) {
+            const vulnLinks = shodanInfo.vulns.slice(0, 3).map(cve => 
+                `<a href="https://nvd.nist.gov/vuln/detail/${encodeURIComponent(cve)}" target="_blank" rel="noopener" class="cve-link">${window.CommonUtils.escapeHtml(cve)}</a>`
+            ).join(', ');
+            const hasMore = shodanInfo.vulns.length > 3 ? ` +${shodanInfo.vulns.length - 3} more` : '';
+            html += `<span class="shodan-vulns">⚠️ ${vulnLinks}${hasMore}</span>`;
+        }
+        
+        // Tags display (compact only shows if there are interesting tags)
+        if (!compact && shodanInfo.tags && shodanInfo.tags.length > 0) {
+            html += `<div class="shodan-tags"><strong>Tags:</strong> ${shodanInfo.tags.map(t => window.CommonUtils.escapeHtml(t)).join(', ')}</div>`;
+        }
+        
+        // Hostnames from Shodan (reverse DNS)
+        if (!compact && shodanInfo.hostnames && shodanInfo.hostnames.length > 0) {
+            html += `<div class="shodan-hostnames"><strong>Hostnames:</strong> ${shodanInfo.hostnames.map(h => window.CommonUtils.escapeHtml(h)).join(', ')}</div>`;
+        }
+        
+        // CPEs (software identification)
+        if (!compact && shodanInfo.cpes && shodanInfo.cpes.length > 0) {
+            const cpeLabels = shodanInfo.cpes.slice(0, 3).map(cpe => this.formatCPE(cpe));
+            const hasMore = shodanInfo.cpes.length > 3 ? ` +${shodanInfo.cpes.length - 3} more` : '';
+            html += `<div class="shodan-cpes"><strong>Software:</strong> ${cpeLabels.join(', ')}${hasMore}</div>`;
+        }
+        
+        return html ? `<div class="shodan-info">${html}</div>` : '';
+    }
+    
+    // Convert port numbers to service labels
+    getPortServiceLabels(ports) {
+        const portServices = {
+            21: 'FTP',
+            22: 'SSH',
+            23: 'Telnet',
+            25: 'SMTP',
+            53: 'DNS',
+            80: 'HTTP',
+            110: 'POP3',
+            143: 'IMAP',
+            443: 'HTTPS',
+            445: 'SMB',
+            465: 'SMTPS',
+            587: 'Submission',
+            993: 'IMAPS',
+            995: 'POP3S',
+            1433: 'MSSQL',
+            1521: 'Oracle',
+            3306: 'MySQL',
+            3389: 'RDP',
+            5432: 'PostgreSQL',
+            5900: 'VNC',
+            6379: 'Redis',
+            8080: 'HTTP-Alt',
+            8443: 'HTTPS-Alt',
+            27017: 'MongoDB'
+        };
+        
+        return ports.map(port => {
+            const service = portServices[port];
+            return service ? `${port}/${service}` : `${port}`;
+        });
+    }
+    
+    // Format CPE string to human-readable
+    formatCPE(cpe) {
+        // CPE format: cpe:/a:vendor:product:version or cpe:2.3:a:vendor:product:version:...
+        try {
+            const parts = cpe.replace(/^cpe:(\/|2\.3:)/, '').split(':');
+            if (parts.length >= 3) {
+                const vendor = parts[1] || '';
+                const product = parts[2] || '';
+                const version = parts[3] || '';
+                return `${vendor}/${product}${version ? ' ' + version : ''}`;
+            }
+        } catch (e) {
+            // Fall back to raw CPE
+        }
+        return window.CommonUtils.escapeHtml(cpe);
+    }
+    
+    // Render Shodan summary for a list of subdomains
+    renderShodanSummary(subdomains) {
+        const withShodan = subdomains.filter(s => s.shodanInfo && s.shodanInfo.hasData);
+        const withVulns = subdomains.filter(s => s.shodanInfo && s.shodanInfo.vulns && s.shodanInfo.vulns.length > 0);
+        const totalPorts = withShodan.reduce((sum, s) => sum + (s.shodanInfo.ports?.length || 0), 0);
+        const totalVulns = withVulns.reduce((sum, s) => sum + (s.shodanInfo.vulns?.length || 0), 0);
+        
+        if (withShodan.length === 0) {
+            return '';
+        }
+        
+        let summaryHtml = `<div class="shodan-summary">`;
+        summaryHtml += `<strong>Shodan Intelligence:</strong> `;
+        summaryHtml += `${withShodan.length} IPs scanned, ${totalPorts} open ports detected`;
+        
+        if (totalVulns > 0) {
+            summaryHtml += `, <span class="vuln-highlight">${totalVulns} known vulnerabilities across ${withVulns.length} IPs</span>`;
+        }
+        
+        summaryHtml += `</div>`;
+        return summaryHtml;
     }
 
     // Truncate text for display

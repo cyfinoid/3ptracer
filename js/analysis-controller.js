@@ -527,9 +527,13 @@ class AnalysisController {
         return subdomains;
     }
 
-    // Enrich subdomain results with ASN information
+    // Enrich subdomain results with ASN and Shodan InternetDB information
     async enrichWithASNInfo(subdomainResults) {
-        console.log(`📡 Getting ASN information for subdomain IPs...`);
+        console.log(`📡 Getting ASN and Shodan InternetDB information for subdomain IPs...`);
+        
+        // Track unique IPs to avoid duplicate Shodan lookups
+        const processedIPs = new Set();
+        const shodanCache = new Map();
         
         for (const subdomain of subdomainResults) {
             // Initialize vendor with safe default
@@ -537,7 +541,11 @@ class AnalysisController {
                 subdomain.vendor = { vendor: 'Unknown', category: 'Unknown' };
             }
             
+            // Initialize shodanInfo with safe default
+            subdomain.shodanInfo = null;
+            
             if (subdomain.ip && !subdomain.isRedirectToMain) {
+                // ASN lookup
                 try {
                     const asnInfo = await this.dnsAnalyzer.getASNInfo(subdomain.ip);
                     if (asnInfo && typeof asnInfo === 'object') {
@@ -557,10 +565,43 @@ class AnalysisController {
                     subdomain.vendor = { vendor: 'Unknown', category: 'Unknown' };
                     subdomain.asnInfo = null;
                 }
+                
+                // Shodan InternetDB lookup (with caching to avoid duplicate API calls)
+                try {
+                    if (shodanCache.has(subdomain.ip)) {
+                        // Use cached result
+                        subdomain.shodanInfo = shodanCache.get(subdomain.ip);
+                    } else if (!processedIPs.has(subdomain.ip)) {
+                        processedIPs.add(subdomain.ip);
+                        const shodanInfo = await this.dnsAnalyzer.getShodanInternetDBInfo(subdomain.ip);
+                        shodanCache.set(subdomain.ip, shodanInfo);
+                        subdomain.shodanInfo = shodanInfo;
+                        
+                        if (shodanInfo && shodanInfo.hasData) {
+                            if (window.logger) {
+                                window.logger.debug(`Shodan info for ${subdomain.ip}: ${shodanInfo.ports.length} ports, ${shodanInfo.vulns.length} vulns`);
+                            }
+                            
+                            // Log security-relevant findings
+                            if (shodanInfo.vulns && shodanInfo.vulns.length > 0) {
+                                console.log(`  🚨 ${subdomain.subdomain} (${subdomain.ip}) has ${shodanInfo.vulns.length} known vulnerabilities`);
+                            }
+                        }
+                    } else {
+                        // IP already processed, get from cache
+                        subdomain.shodanInfo = shodanCache.get(subdomain.ip);
+                    }
+                } catch (error) {
+                    console.warn(`⚠️ Shodan lookup failed for ${subdomain.ip}:`, error.message);
+                    subdomain.shodanInfo = null;
+                }
             }
         }
         
-        console.log(`✅ ASN enrichment complete`);
+        // Log summary
+        const withShodan = subdomainResults.filter(s => s.shodanInfo && s.shodanInfo.hasData).length;
+        const withVulns = subdomainResults.filter(s => s.shodanInfo && s.shodanInfo.vulns && s.shodanInfo.vulns.length > 0).length;
+        console.log(`✅ Enrichment complete: ${withShodan} IPs with Shodan data, ${withVulns} with known vulnerabilities`);
     }
 
     // Perform comprehensive security analysis

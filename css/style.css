@@ -2238,4 +2238,190 @@ a[aria-label] {
 
 .section-content > *:last-child {
     margin-bottom: 0;
+}
+
+/* Shodan InternetDB Styling */
+.shodan-info {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-top: 4px;
+}
+
+.shodan-ports {
+    background: rgba(70, 111, 224, 0.15);
+    color: var(--accent-blue);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-family: monospace;
+    cursor: help;
+}
+
+[data-theme="light"] .shodan-ports {
+    background: rgba(70, 111, 224, 0.1);
+}
+
+.shodan-vulns {
+    background: rgba(214, 60, 83, 0.15);
+    color: var(--accent-red);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: 600;
+}
+
+[data-theme="light"] .shodan-vulns {
+    background: rgba(214, 60, 83, 0.1);
+}
+
+.shodan-vulns .cve-link {
+    color: var(--accent-red);
+    text-decoration: underline;
+}
+
+.shodan-vulns .cve-link:hover {
+    opacity: 0.8;
+}
+
+.shodan-tags {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+}
+
+.shodan-hostnames {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+}
+
+.shodan-cpes {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    font-family: monospace;
+}
+
+.shodan-ports-full {
+    color: var(--text-primary);
+    font-size: 0.9em;
+}
+
+.shodan-summary {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-size: 0.95em;
+}
+
+[data-theme="light"] .shodan-summary {
+    background: var(--bg-tertiary);
+}
+
+.shodan-summary .vuln-highlight {
+    color: var(--accent-red);
+    font-weight: 600;
+}
+
+.vuln-count {
+    color: var(--accent-red);
+    font-weight: 600;
+}
+
+/* Subdomain Overview Table Styling */
+.subdomain-overview-summary {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 12px 15px;
+    margin-bottom: 15px;
+    color: var(--text-primary);
+}
+
+.subdomain-overview-table-wrapper {
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.subdomain-overview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+}
+
+.subdomain-overview-table th {
+    padding: 12px 10px;
+    background: var(--bg-tertiary);
+    border-bottom: 2px solid var(--border-color);
+    text-align: left;
+    color: var(--text-primary);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.subdomain-overview-table td {
+    padding: 10px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+    vertical-align: top;
+}
+
+.subdomain-overview-table tr:last-child td {
+    border-bottom: none;
+}
+
+.subdomain-overview-table tr:hover {
+    background: var(--hover-bg);
+}
+
+/* Highlight rows with vulnerabilities */
+.subdomain-overview-table tr.vuln-row {
+    background: rgba(220, 53, 69, 0.1);
+}
+
+.subdomain-overview-table tr.vuln-row:hover {
+    background: rgba(220, 53, 69, 0.15);
+}
+
+/* Port list styling */
+.subdomain-overview-table .port-list {
+    background: rgba(70, 111, 224, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--accent-blue);
+    cursor: help;
+}
+
+[data-theme="light"] .subdomain-overview-table .port-list {
+    background: rgba(70, 111, 224, 0.08);
+}
+
+/* CVE link styling in table */
+.subdomain-overview-table .cve-link {
+    color: #dc3545;
+    text-decoration: underline;
+}
+
+.subdomain-overview-table .cve-link:hover {
+    opacity: 0.8;
+}
+
+/* Mobile responsiveness for subdomain table */
+@media (max-width: 768px) {
+    .subdomain-overview-table {
+        font-size: 0.8em;
+    }
+    
+    .subdomain-overview-table th,
+    .subdomain-overview-table td {
+        padding: 8px 6px;
+    }
+    
+    /* Hide provider column on mobile */
+    .subdomain-overview-table th:nth-child(3),
+    .subdomain-overview-table td:nth-child(3) {
+        display: none;
+    }
 } 

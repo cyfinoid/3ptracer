@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Subdomain Overview table** - New consolidated view showing all discovered subdomains with IP addresses, providers, open ports, and vulnerabilities in a table format. This matches the export format and provides a clear security overview of discovered infrastructure.
+
+### Fixed
+- **Port information not displayed in UI** - Fixed issue where open port data from Shodan InternetDB was captured during analysis and included in exports, but not visible in the UI. Subdomains were being filtered out of sections that rendered Shodan info due to CNAME classification logic.
+
 ## [1.0.6] - 2025-12-24
 
 ### Added
