@@ -2385,17 +2385,58 @@ a[aria-label] {
     background: rgba(220, 53, 69, 0.15);
 }
 
-/* Port list styling */
-.subdomain-overview-table .port-list {
+/* Port list styling - clickable link to Shodan */
+.subdomain-overview-table .port-list-link {
     background: rgba(70, 111, 224, 0.1);
     padding: 2px 6px;
     border-radius: 4px;
     color: var(--accent-blue);
-    cursor: help;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
 
-[data-theme="light"] .subdomain-overview-table .port-list {
+.subdomain-overview-table .port-list-link:hover {
+    background: rgba(70, 111, 224, 0.2);
+    text-decoration: underline;
+}
+
+.subdomain-overview-table .port-list-link:visited {
+    color: var(--accent-blue);
+}
+
+[data-theme="light"] .subdomain-overview-table .port-list-link {
     background: rgba(70, 111, 224, 0.08);
+}
+
+[data-theme="light"] .subdomain-overview-table .port-list-link:hover {
+    background: rgba(70, 111, 224, 0.15);
+}
+
+/* Shodan loading notice */
+.shodan-loading-notice {
+    animation: fadeIn 0.3s ease;
+}
+
+/* Pulse animation for loading indicator */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.4;
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* CVE link styling in table */

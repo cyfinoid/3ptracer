@@ -9,9 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Subdomain Overview table** - New consolidated view showing all discovered subdomains with IP addresses, providers, open ports, and vulnerabilities in a table format. This matches the export format and provides a clear security overview of discovered infrastructure.
+- **Clickable port numbers linking to Shodan** - Port numbers in the Subdomain Overview table now link directly to the Shodan host page (e.g., `https://www.shodan.io/host/x.x.x.x`) for detailed port and service information.
+- **Loading indicator for Shodan data** - Shows a warning notice while Shodan InternetDB queries are in progress, with a progress counter showing how many IPs have been scanned.
 
 ### Fixed
 - **Port information not displayed in UI** - Fixed issue where open port data from Shodan InternetDB was captured during analysis and included in exports, but not visible in the UI. Subdomains were being filtered out of sections that rendered Shodan info due to CNAME classification logic.
+- **Subdomain Overview not loading on JSON import** - Fixed issue where the new Subdomain Overview table didn't display when importing a previously exported JSON file. The method now correctly handles both live analysis data (via dataProcessor) and imported data (direct on processedData).
 
 ## [1.0.6] - 2025-12-24
 

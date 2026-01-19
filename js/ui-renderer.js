@@ -239,7 +239,7 @@ class UIRenderer {
         
         // NEW: Display Subdomain Overview with ports and vulnerabilities
         this.displayCollapsibleSection('Subdomain Overview', () => {
-            this.displaySubdomainOverview(processedData);
+            this.displaySubdomainOverview(processedData, isProgressive);
         }, true, processedData.stats.totalSubdomains || 0);
         
         this.displayCollapsibleSection('Domain Redirects', () => {
@@ -2010,15 +2010,35 @@ class UIRenderer {
 
     // NEW: Display subdomain overview table with ports and vulnerabilities
     // Shows ALL discovered subdomains in a consolidated table view (similar to exports)
-    displaySubdomainOverview(processedData) {
+    // isProgressive: true when analysis is still in progress (Shodan data may be incomplete)
+    displaySubdomainOverview(processedData, isProgressive = false) {
         const container = document.getElementById('subdomainOverview');
         const section = container?.closest('.service-category');
         
         if (!container) return;
         
-        // Get ALL subdomains from the data processor
-        const allSubdomains = processedData.dataProcessor ? 
-            Array.from(processedData.dataProcessor.processedData?.subdomains?.values() || []) : [];
+        // Get ALL subdomains - support both live analysis and imported data
+        // For live analysis: dataProcessor.processedData.subdomains
+        // For imported data: processedData.subdomains (directly on processedData)
+        let allSubdomains = [];
+        
+        // Try dataProcessor first (live analysis)
+        if (processedData.dataProcessor?.processedData?.subdomains) {
+            const subdomainsMap = processedData.dataProcessor.processedData.subdomains;
+            if (subdomainsMap instanceof Map && subdomainsMap.size > 0) {
+                allSubdomains = Array.from(subdomainsMap.values());
+            }
+        }
+        
+        // Fallback to processedData.subdomains (imported data)
+        if (allSubdomains.length === 0 && processedData.subdomains) {
+            if (processedData.subdomains instanceof Map) {
+                allSubdomains = Array.from(processedData.subdomains.values());
+            } else if (typeof processedData.subdomains === 'object') {
+                // Handle plain object format
+                allSubdomains = Object.values(processedData.subdomains);
+            }
+        }
         
         if (allSubdomains.length === 0) {
             if (section) section.style.display = 'none';
@@ -2028,11 +2048,26 @@ class UIRenderer {
         if (section) section.style.display = 'block';
         
         // Count subdomains with Shodan data
-        const withShodan = allSubdomains.filter(s => s.shodanInfo && s.shodanInfo.hasData);
+        const withShodanQueried = allSubdomains.filter(s => s.shodanInfo !== null && s.shodanInfo !== undefined);
+        const withShodanData = allSubdomains.filter(s => s.shodanInfo && s.shodanInfo.hasData);
         const withPorts = allSubdomains.filter(s => s.shodanInfo && s.shodanInfo.ports && s.shodanInfo.ports.length > 0);
         const withVulns = allSubdomains.filter(s => s.shodanInfo && s.shodanInfo.vulns && s.shodanInfo.vulns.length > 0);
         
+        // Check if Shodan data is still being fetched (not all subdomains have been queried)
+        const shodanPending = withShodanQueried.length < allSubdomains.length;
+        
         let html = '';
+        
+        // Show loading indicator if Shodan data is still being fetched
+        if (isProgressive || shodanPending) {
+            html += `
+                <div class="shodan-loading-notice" style="margin-bottom: 15px; padding: 12px 15px; background: rgba(253, 203, 82, 0.15); border: 1px solid rgba(253, 203, 82, 0.4); border-radius: 6px; color: var(--text-primary);">
+                    <span style="display: inline-block; animation: pulse 1.5s infinite;">⏳</span>
+                    <strong>Loading port scan data...</strong> 
+                    <span style="color: var(--text-secondary);">Querying Shodan InternetDB for open ports and vulnerabilities. This table will update automatically.</span>
+                    <span style="float: right; color: var(--text-secondary);">${withShodanQueried.length}/${allSubdomains.length} IPs scanned</span>
+                </div>`;
+        }
         
         // Summary stats
         html += `<div class="subdomain-overview-summary" style="margin-bottom: 15px; padding: 10px; background: var(--bg-tertiary); border-radius: 6px;">
@@ -2074,12 +2109,21 @@ class UIRenderer {
             const ip = subdomain.ipAddresses?.[0] || 'N/A';
             const provider = subdomain.vendor?.vendor || subdomain.asnInfo?.isp || 'Unknown';
             const shodanInfo = subdomain.shodanInfo;
+            const hasValidIP = ip && ip !== 'N/A';
             
-            // Format ports
-            let portsHtml = '<span style="color: var(--text-secondary);">—</span>';
-            if (shodanInfo && shodanInfo.ports && shodanInfo.ports.length > 0) {
+            // Format ports - link to Shodan host page
+            let portsHtml = '';
+            if (shodanInfo === null || shodanInfo === undefined) {
+                // Shodan query not yet completed for this IP
+                portsHtml = '<span style="color: var(--text-secondary);" title="Scanning...">⏳</span>';
+            } else if (shodanInfo && shodanInfo.ports && shodanInfo.ports.length > 0) {
+                // Has port data - create link to Shodan
                 const portLabels = this.getPortServiceLabels(shodanInfo.ports);
-                portsHtml = `<span class="port-list" title="${portLabels.join(', ')}">${shodanInfo.ports.join(', ')}</span>`;
+                const shodanUrl = hasValidIP ? `https://www.shodan.io/host/${encodeURIComponent(ip)}` : '#';
+                portsHtml = `<a href="${shodanUrl}" target="_blank" rel="noopener" class="port-list-link" title="${portLabels.join(', ')} - Click to view on Shodan">${shodanInfo.ports.join(', ')}</a>`;
+            } else {
+                // Shodan queried but no ports found
+                portsHtml = '<span style="color: var(--text-secondary);">—</span>';
             }
             
             // Format vulnerabilities
@@ -2090,6 +2134,8 @@ class UIRenderer {
                 ).join(', ');
                 const hasMore = shodanInfo.vulns.length > 3 ? ` <span style="color: #dc3545;">+${shodanInfo.vulns.length - 3} more</span>` : '';
                 vulnsHtml = vulnLinks + hasMore;
+            } else if (shodanInfo === null || shodanInfo === undefined) {
+                vulnsHtml = '<span style="color: var(--text-secondary);" title="Scanning...">⏳</span>';
             }
             
             // Row styling for vulnerabilities
@@ -2117,7 +2163,7 @@ class UIRenderer {
         // Add note about Shodan data source
         html += `
             <div style="margin-top: 10px; font-size: 0.8em; color: var(--text-secondary);">
-                💡 Port and vulnerability data from <a href="https://internetdb.shodan.io/" target="_blank" rel="noopener" style="color: var(--accent-blue);">Shodan InternetDB</a> (free, no API key required)
+                💡 Port and vulnerability data from <a href="https://internetdb.shodan.io/" target="_blank" rel="noopener" style="color: var(--accent-blue);">Shodan InternetDB</a> (free, no API key required). Click port numbers to view full details on Shodan.
             </div>`;
         
         container.innerHTML = html;
