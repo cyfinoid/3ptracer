@@ -311,6 +311,14 @@ Every change should be documented in CHANGELOG.md under appropriate category:
 
 Use clear, user-friendly language. Include specifics.
 
+**Important:** Do NOT add changelog entries for:
+- Debug/development issues found and fixed before release (bugs introduced during development)
+- Internal refactoring that doesn't affect users
+- Test iterations or experimental changes that were reverted
+- Issues discovered during pre-release testing that users never experienced
+
+Only document changes that affect the PUBLIC release. If a bug was introduced and fixed during the same development cycle before release, it never existed from the user's perspective.
+
 ## Common Command Patterns
 
 ### Finding Unused Code
