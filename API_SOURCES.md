@@ -142,7 +142,60 @@ curl -L 'https://ip.thc.org/api/v1/lookup' \
   - Response times ~1-2 seconds
   - Free service, community supported
 
-### 2. Wayback Machine CDX API (Historical)
+### 2. Shodan InternetDB (IP Intelligence) ⭐ NEW
+- **Endpoint:** `https://internetdb.shodan.io/{IP}`
+- **Category:** IP Intelligence / Port Scanning / Vulnerability Detection
+- **Method:** GET
+- **Response Format:** JSON
+- **Authentication:** None required
+- **CORS:** ✅ Yes - Full CORS headers (`access-control-allow-origin: *`)
+- **Test Date:** January 9, 2026
+- **Browser Test:** ✅ Confirmed CORS compliant from browser
+- **Test Command:**
+```bash
+curl -s "https://internetdb.shodan.io/8.8.8.8"
+```
+- **Response Example:**
+```json
+{
+  "cpes": [],
+  "hostnames": ["dns.google"],
+  "ip": "8.8.8.8",
+  "ports": [53, 443],
+  "tags": [],
+  "vulns": []
+}
+```
+- **Full Response Example (with vulnerabilities):**
+```json
+{
+  "cpes": ["cpe:/a:apache:http_server:2.4.41"],
+  "hostnames": ["example.com", "www.example.com"],
+  "ip": "93.184.216.34",
+  "ports": [80, 443, 22, 21],
+  "tags": ["cloud", "self-signed"],
+  "vulns": ["CVE-2021-41773", "CVE-2021-42013"]
+}
+```
+- **Integration Potential:** 🟢 **HIGH** - Excellent for enriching resolved IP addresses with port/vulnerability data
+- **Rate Limit:** Generous, no documented limit for reasonable use
+- **Features:**
+  - Open ports detected on the IP
+  - Reverse DNS hostnames
+  - Known vulnerabilities (CVEs) associated with detected services
+  - CPE identifiers (Common Platform Enumeration) for software/hardware
+  - Tags (cloud provider, self-signed certs, etc.)
+- **Documentation:** https://internetdb.shodan.io/
+- **Notes:**
+  - This is different from the main Shodan API which requires authentication
+  - InternetDB is completely free with no API key required
+  - Returns 404 for IPs with no data (handle gracefully)
+  - Data is from Shodan's passive scanning, not real-time
+  - Excellent for security posture assessment
+  - Can identify exposed services and known vulnerabilities
+- **Important:** This is NOT the same as `api.shodan.io` which requires auth. InternetDB is a separate free service.
+
+### 3. Wayback Machine CDX API (Historical)
 - **Endpoint:** `https://web.archive.org/cdx/search/cdx?url=*.{domain}&output=json&fl=original&collapse=urlkey`
 - **Category:** Historical Domain/URL Data
 - **Method:** GET
@@ -165,7 +218,7 @@ curl -s "https://web.archive.org/cdx/search/cdx?url=*.cyfinoid.com&output=json&f
 - **Integration Potential:** 🟡 **MEDIUM** - Historical subdomain discovery, CORS may be an issue
 - **Notes:** Excellent for finding old/defunct subdomains, large datasets available
 
-### 2. CommonCrawl Index API
+### 4. CommonCrawl Index API
 - **Endpoint:** `https://index.commoncrawl.org/CC-MAIN-2024-10-index?url=*.{domain}&output=json`
 - **Category:** Web Crawl Data / Subdomain Discovery
 - **Method:** GET
@@ -218,12 +271,13 @@ curl -s "https://index.commoncrawl.org/CC-MAIN-2024-10-index?url=*.cyfinoid.com&
 - **Test Date:** 2025-10-27
 - **Response:** `{"error": {"code": "AuthenticationRequiredError", "message": "X-Apikey header is missing"}}`
 
-#### 5. Shodan
+#### 5. Shodan Main API (NOT InternetDB)
 - **Endpoint:** `https://api.shodan.io/dns/domain/{domain}`
 - **Category:** Internet-wide Scanning / DNS
 - **Reason for Rejection:** ❌ 401 Unauthorized
 - **Test Date:** 2025-10-27
 - **Response:** HTML 401 error page
+- **Note:** The main Shodan API requires authentication. However, Shodan InternetDB (`https://internetdb.shodan.io/{IP}`) is a separate FREE service that is CORS-compliant and requires no API key. See "Working APIs" section for InternetDB documentation.
 
 #### 6. FullHunt.io
 - **Endpoint:** `https://fullhunt.io/api/v1/domain/{domain}/subdomains`
@@ -491,6 +545,7 @@ curl -s -I "API_ENDPOINT"
 
 ### High Priority 🟢
 1. **THC ip.thc.org API** - CORS compliant, provides reverse DNS subdomain data that complements CT logs. Ready for integration.
+2. **Shodan InternetDB** - CORS compliant, provides port/vulnerability/hostname data for resolved IPs. No API key required. Excellent for security posture assessment.
 
 ### Medium Priority 🟡
 1. **Wayback Machine CDX** - Excellent for historical subdomains, needs CORS proxy or workaround
@@ -541,7 +596,7 @@ This combination provides:
 - APIs without CORS headers may work if the service doesn't explicitly block cross-origin requests
 - Some APIs (like HackerTarget) have rate limits for anonymous users but are generous enough for typical use
 - Historical/archived data sources (Wayback, CommonCrawl) could be valuable but require CORS workarounds
-- Most comprehensive security platforms (Shodan, VirusTotal, SecurityTrails) require paid API access
+- Most comprehensive security platforms (Shodan main API, VirusTotal, SecurityTrails) require paid API access (note: Shodan InternetDB is a free exception - see Working APIs)
 - Certificate Transparency remains the most reliable source for subdomain discovery without authentication
 
 ---

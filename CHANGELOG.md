@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-03-22
+
+### Added
+- **Shodan InternetDB integration** - New integration with Shodan's InternetDB API to enrich subdomain data with open ports, known vulnerabilities (CVEs), and service banners. All queries are made client-side with no API key required.
+- **Subdomain Overview table** - New consolidated view showing all discovered subdomains with IP addresses, providers, open ports, and vulnerabilities in a single table. Provides a clear security overview of discovered infrastructure matching the export format.
+- **Clickable port numbers linking to Shodan** - Port numbers in the Subdomain Overview table link directly to Shodan host pages (e.g., `https://www.shodan.io/host/x.x.x.x`) for detailed service information.
+- **Loading indicator for Shodan data** - Visual progress indicator while Shodan InternetDB queries are in progress, showing how many IPs have been scanned.
+
 ## [1.0.6] - 2025-12-24
 
 ### Added

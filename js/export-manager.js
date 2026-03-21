@@ -298,18 +298,33 @@ class ExportManager {
                 }
             }
             
-            // Subdomains
+            // Subdomains (with Shodan data)
             if (data.subdomains) {
                 const subdomainList = Array.isArray(data.subdomains) ? data.subdomains : Object.values(data.subdomains);
                 if (subdomainList.length > 0) {
                     md += `## Subdomains (${subdomainList.length})\n\n`;
-                    md += `| Subdomain | IP | Provider |\n`;
-                    md += `|-----------|----|---------|\n`;
+                    md += `| Subdomain | IP | Provider | Open Ports | Vulnerabilities |\n`;
+                    md += `|-----------|----|---------|-----------|-----------------|\n`;
                     for (const sub of subdomainList.slice(0, 50)) {
                         const subdomain = sub.subdomain || sub.name || sub;
                         const ip = sub.ip || sub.ipAddresses?.[0] || 'N/A';
                         const provider = sub.asnInfo?.org || sub.provider || 'Unknown';
-                        md += `| ${subdomain} | ${ip} | ${provider} |\n`;
+                        
+                        // Shodan data
+                        let ports = 'N/A';
+                        let vulns = 'None';
+                        if (sub.shodanInfo && sub.shodanInfo.hasData) {
+                            if (sub.shodanInfo.ports && sub.shodanInfo.ports.length > 0) {
+                                ports = sub.shodanInfo.ports.slice(0, 5).join(', ');
+                                if (sub.shodanInfo.ports.length > 5) ports += '...';
+                            }
+                            if (sub.shodanInfo.vulns && sub.shodanInfo.vulns.length > 0) {
+                                vulns = sub.shodanInfo.vulns.slice(0, 3).join(', ');
+                                if (sub.shodanInfo.vulns.length > 3) vulns += '...';
+                            }
+                        }
+                        
+                        md += `| ${subdomain} | ${ip} | ${provider} | ${ports} | ${vulns} |\n`;
                     }
                     if (subdomainList.length > 50) {
                         md += `\n*...and ${subdomainList.length - 50} more subdomains*\n`;
@@ -502,18 +517,20 @@ class ExportManager {
             
             if (subdomainsData.length > 0) {
                 doc.autoTable({
-                    head: [['Subdomain', 'IP Address', 'Provider/Service']],
+                    head: [['Subdomain', 'IP', 'Provider', 'Open Ports', 'Vulnerabilities']],
                     body: subdomainsData,
                     startY: currentY,
                     theme: 'striped',
-                    headStyles: { fillColor: [102, 126, 234], fontSize: 8 },
+                    headStyles: { fillColor: [102, 126, 234], fontSize: 7 },
                     margin: { left: 15, right: 15 },
                     columnStyles: {
-                        0: { cellWidth: 85 },
-                        1: { cellWidth: 40 },
-                        2: { cellWidth: 55 }
+                        0: { cellWidth: 50 },
+                        1: { cellWidth: 28 },
+                        2: { cellWidth: 38 },
+                        3: { cellWidth: 35 },
+                        4: { cellWidth: 29 }
                     },
-                    styles: { fontSize: 7.5, cellPadding: 1.5, overflow: 'linebreak', lineWidth: 0.1 }
+                    styles: { fontSize: 6.5, cellPadding: 1.5, overflow: 'linebreak', lineWidth: 0.1 }
                 });
                 currentY = doc.lastAutoTable.finalY + 8;
             } else {
@@ -1044,7 +1061,7 @@ class ExportManager {
         return geoData;
     }
 
-    // Format subdomains for PDF - optimized
+    // Format subdomains for PDF - optimized with Shodan data
     formatSubdomainsForPDF() {
         const subdomains = [];
         const processedData = this.analysisData.processedData;
@@ -1064,10 +1081,32 @@ class ExportManager {
                 const provider = subdomain.provider || subdomain.service || 
                                (subdomain.asnInfo ? subdomain.asnInfo.org : 'Unknown');
                 
+                // Add Shodan data if available
+                let openPorts = 'N/A';
+                let vulnerabilities = 'None';
+                
+                if (subdomain.shodanInfo && subdomain.shodanInfo.hasData) {
+                    if (subdomain.shodanInfo.ports && subdomain.shodanInfo.ports.length > 0) {
+                        openPorts = subdomain.shodanInfo.ports.slice(0, 10).join(', ');
+                        if (subdomain.shodanInfo.ports.length > 10) {
+                            openPorts += `... (+${subdomain.shodanInfo.ports.length - 10})`;
+                        }
+                    }
+                    
+                    if (subdomain.shodanInfo.vulns && subdomain.shodanInfo.vulns.length > 0) {
+                        vulnerabilities = subdomain.shodanInfo.vulns.slice(0, 5).join(', ');
+                        if (subdomain.shodanInfo.vulns.length > 5) {
+                            vulnerabilities += `... (+${subdomain.shodanInfo.vulns.length - 5})`;
+                        }
+                    }
+                }
+                
                 subdomains.push([
                     subdomain.subdomain || subdomain.name || 'Unknown',
                     ipAddress,
-                    provider
+                    provider,
+                    openPorts,
+                    vulnerabilities
                 ]);
             });
         }
@@ -1212,12 +1251,17 @@ class ExportManager {
             const dnsWS = XLSX.utils.aoa_to_sheet(dnsData);
             XLSX.utils.book_append_sheet(workbook, dnsWS, 'DNS Records');
 
+            // 7. Subdomains Sheet (with Shodan data)
+            const subdomainsData = this.formatSubdomainsForXLSX();
+            const subdomainsWS = XLSX.utils.aoa_to_sheet(subdomainsData);
+            XLSX.utils.book_append_sheet(workbook, subdomainsWS, 'Subdomains');
+
             // Save the file
             const fileName = `3rd-party-analysis-${this.exportDomain}-${this.exportTimestamp}.xlsx`;
             XLSX.writeFile(workbook, fileName);
             
             console.log(`✅ XLSX exported successfully: ${fileName}`);
-            console.log('📊 XLSX sheets created: Summary, Services, Security Findings, Geographic Distribution, Historical Records, DNS Records');
+            console.log('📊 XLSX sheets created: Summary, Services, Security Findings, Geographic Distribution, Historical Records, DNS Records, Subdomains');
             
         } catch (error) {
             console.error('❌ XLSX export failed:', error);
@@ -1406,6 +1450,80 @@ class ExportManager {
         });
         
         console.log('📊 Formatted historical records for XLSX:', data.length - 1, 'records');
+        return data;
+    }
+
+    // Format subdomains for XLSX (with Shodan InternetDB data)
+    formatSubdomainsForXLSX() {
+        const data = [
+            ['Subdomain', 'IP Address', 'Provider', 'Country', 'ASN', 'Open Ports', 'Vulnerabilities (CVEs)', 'Shodan Hostnames', 'Shodan Tags', 'CPEs']
+        ];
+        
+        const processedData = this.analysisData.processedData;
+        
+        if (processedData.subdomains) {
+            // If subdomains is a Map
+            const subdomainList = processedData.subdomains instanceof Map 
+                ? Array.from(processedData.subdomains.values())
+                : Object.values(processedData.subdomains);
+            
+            subdomainList.forEach(subdomain => {
+                const ipAddress = subdomain.ipAddresses && subdomain.ipAddresses.length > 0 
+                    ? subdomain.ipAddresses[0] 
+                    : subdomain.ip || 'N/A';
+                
+                const provider = subdomain.provider || subdomain.service || 
+                               (subdomain.asnInfo ? subdomain.asnInfo.org : 'Unknown');
+                
+                // ASN info
+                const country = subdomain.asnInfo ? subdomain.asnInfo.country || subdomain.asnInfo.location : 'Unknown';
+                const asn = subdomain.asnInfo ? subdomain.asnInfo.asn : 'Unknown';
+                
+                // Shodan InternetDB data
+                let openPorts = 'N/A';
+                let vulnerabilities = 'None';
+                let shodanHostnames = 'N/A';
+                let shodanTags = 'N/A';
+                let cpes = 'N/A';
+                
+                if (subdomain.shodanInfo && subdomain.shodanInfo.hasData) {
+                    if (subdomain.shodanInfo.ports && subdomain.shodanInfo.ports.length > 0) {
+                        openPorts = subdomain.shodanInfo.ports.join(', ');
+                    }
+                    
+                    if (subdomain.shodanInfo.vulns && subdomain.shodanInfo.vulns.length > 0) {
+                        vulnerabilities = subdomain.shodanInfo.vulns.join(', ');
+                    }
+                    
+                    if (subdomain.shodanInfo.hostnames && subdomain.shodanInfo.hostnames.length > 0) {
+                        shodanHostnames = subdomain.shodanInfo.hostnames.join(', ');
+                    }
+                    
+                    if (subdomain.shodanInfo.tags && subdomain.shodanInfo.tags.length > 0) {
+                        shodanTags = subdomain.shodanInfo.tags.join(', ');
+                    }
+                    
+                    if (subdomain.shodanInfo.cpes && subdomain.shodanInfo.cpes.length > 0) {
+                        cpes = subdomain.shodanInfo.cpes.join(', ');
+                    }
+                }
+                
+                data.push([
+                    subdomain.subdomain || subdomain.name || 'Unknown',
+                    ipAddress,
+                    provider,
+                    country,
+                    asn,
+                    openPorts,
+                    vulnerabilities,
+                    shodanHostnames,
+                    shodanTags,
+                    cpes
+                ]);
+            });
+        }
+        
+        console.log('📊 Formatted subdomains for XLSX:', data.length - 1, 'subdomains');
         return data;
     }
 
