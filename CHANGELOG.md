@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-03-31
+
 ### Added
 - **Infrastructure exposure detection via CNAME records** - New finding type that analyzes CNAME target hostnames for leaked infrastructure details (Kubernetes, GitLab, Kong, PostHog, Redis, internal markers, etc.). Detects when DNS records publicly reveal technology stack, service names, or internal architecture. Findings are categorized as Low (technology/architecture exposure) or Informational (sensitive business context) and appear in UI, PDF, Markdown, and JSON exports.
 - **DNS firewall exposure detection** - New security observation that identifies subdomains with directly exposed hosting IPs when >25% of active subdomains are behind DNS firewall/CDN services (Cloudflare, Akamai, Fastly, etc.). Highlights inconsistent protection as a low-severity concern.
