@@ -92,6 +92,74 @@ const CommonUtils = {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    },
+
+    /**
+     * IPv4 dotted-decimal pattern (same as used for ASN / Shodan enrichment).
+     */
+    _ipv4DottedRe() {
+        return /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+    },
+
+    /**
+     * True if the string is an IPv4 address in RFC1918 space, loopback, or IPv4 link-local (APIPA).
+     * Used to skip Shodan InternetDB and unnecessary ASN lookups for non-internet-routable addresses.
+     *
+     * @param {string} ip
+     * @returns {boolean}
+     */
+    isPrivateIPv4(ip) {
+        if (!ip || typeof ip !== 'string') return false;
+        const trimmed = ip.trim();
+        if (!this._ipv4DottedRe().test(trimmed)) return false;
+        const parts = trimmed.split('.').map(p => parseInt(p, 10));
+        if (parts.length !== 4 || parts.some(n => Number.isNaN(n) || n < 0 || n > 255)) return false;
+        const [a, b] = parts;
+        if (a === 10) return true;
+        if (a === 172 && b >= 16 && b <= 31) return true;
+        if (a === 192 && b === 168) return true;
+        if (a === 127) return true;
+        if (a === 169 && b === 254) return true;
+        return false;
+    },
+
+    /**
+     * Collect unique IPv4 addresses from subdomain.ip and A records (order: .ip first, then A records).
+     *
+     * @param {object} subdomain
+     * @returns {string[]}
+     */
+    collectSubdomainIPv4Addresses(subdomain) {
+        const ipv4Re = this._ipv4DottedRe();
+        const out = [];
+        const seen = new Set();
+        const add = (raw) => {
+            if (raw === undefined || raw === null) return;
+            const ip = String(raw).replace(/\.$/, '').trim();
+            if (!ipv4Re.test(ip)) return;
+            if (seen.has(ip)) return;
+            seen.add(ip);
+            out.push(ip);
+        };
+        if (subdomain?.ip) add(subdomain.ip);
+        const aList = subdomain?.records?.A;
+        if (Array.isArray(aList)) {
+            for (const rec of aList) {
+                add(this.getRecordData(rec));
+            }
+        }
+        return out;
+    },
+
+    /**
+     * Primary IPv4 for enrichment (Shodan/ASN): prefers subdomain.ip if it is IPv4, else first A record IPv4.
+     *
+     * @param {object} subdomain
+     * @returns {string|null}
+     */
+    getSubdomainCanonicalIPv4(subdomain) {
+        const list = this.collectSubdomainIPv4Addresses(subdomain);
+        return list.length > 0 ? list[0] : null;
     }
 };
 

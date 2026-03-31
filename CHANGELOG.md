@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Infrastructure exposure detection via CNAME records** - New finding type that analyzes CNAME target hostnames for leaked infrastructure details (Kubernetes, GitLab, Kong, PostHog, Redis, internal markers, etc.). Detects when DNS records publicly reveal technology stack, service names, or internal architecture. Findings are categorized as Low (technology/architecture exposure) or Informational (sensitive business context) and appear in UI, PDF, Markdown, and JSON exports.
+- **DNS firewall exposure detection** - New security observation that identifies subdomains with directly exposed hosting IPs when >25% of active subdomains are behind DNS firewall/CDN services (Cloudflare, Akamai, Fastly, etc.). Highlights inconsistent protection as a low-severity concern.
+
+### Fixed
+- **Private IP subdomain names in security findings** - Security findings for internal IP exposure now include the affected subdomain name in PDF, Markdown, and all export formats (previously only showed the IP address)
+- **Misleading Shodan data for internal IPs** - Private/internal IP subdomains now display "Internal IP" instead of "N/A" for open ports and "N/A" instead of "None" for vulnerabilities across UI, PDF, Markdown, and XLSX exports. Previously indistinguishable from "queried but nothing found"
+- **Unnecessary API calls for private IPs** - ASN and Shodan lookups are now skipped entirely for private/internal IP addresses, avoiding wasted API calls that would always return empty results
+- **Internal IPs on CNAME chains (RFC1918 from A records)** - Canonical IPv4 is taken from `subdomain.ip` or A records when `ip` was missing, so enrichment reliably skips Shodan/ASN, marks `isPrivateIP`, and no longer leaves `shodanInfo: null` on finished scans
+- **JSON export for internal subdomains** - Serialized subdomains now include stable fields: `isPrivateIP`, `resolvedIPv4`, `shodanInfo` with `{ notApplicable: true }` where appropriate, and `asnInfo` cleared for private hosts instead of placeholder "Unknown" objects
+
 ## [1.1.0] - 2026-03-22
 
 ### Added

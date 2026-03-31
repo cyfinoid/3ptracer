@@ -2540,12 +2540,123 @@ class ServiceDetectionEngine {
                     }
                 }
             }
+
+            // Infrastructure exposure detection via CNAME targets
+            const cnameTarget = subdomain.cnameTarget;
+            if (cnameTarget && subdomainName) {
+                const exposedDetails = this._detectInfrastructureExposure(cnameTarget);
+                if (exposedDetails.length > 0) {
+                    const hasLowRisk = exposedDetails.some(d => d.risk === 'low');
+                    findings.push({
+                        type: 'infrastructure_exposure',
+                        risk: hasLowRisk ? 'low' : 'info',
+                        description: `Infrastructure exposed: ${exposedDetails.map(d => d.label).join(', ')}`,
+                        recommendation: 'CNAME records reveal internal infrastructure naming. Consider using generic hostnames to reduce information leakage.',
+                        subdomain: subdomainName,
+                        cnameTarget: cnameTarget,
+                        exposedDetails: exposedDetails.map(d => d.label),
+                        category: 'infrastructure_exposure',
+                        ip: subdomainIP || 'Active subdomain'
+                    });
+                }
+            }
             
         }
         
         console.log(`🔍 Interesting findings analysis: ${activeSubdomains.length} active subdomains analyzed, ${findings.length} findings discovered`);
         
         return findings;
+    }
+
+    /**
+     * Tokenizes a CNAME target hostname and matches against known infrastructure keywords.
+     * Returns an array of { keyword, label, risk } objects for each match found.
+     */
+    _detectInfrastructureExposure(cnameTarget) {
+        const infraKeywords = {
+            // Container / Orchestration — risk: low
+            'k8s':        { label: 'k8s (Kubernetes)',       risk: 'low' },
+            'kubernetes': { label: 'Kubernetes',             risk: 'low' },
+            'eks':        { label: 'EKS (AWS Kubernetes)',   risk: 'low' },
+            'gke':        { label: 'GKE (Google Kubernetes)',risk: 'low' },
+            'aks':        { label: 'AKS (Azure Kubernetes)', risk: 'low' },
+            'docker':     { label: 'Docker',                 risk: 'low' },
+            'container':  { label: 'Container',              risk: 'low' },
+            'ecs':        { label: 'ECS (AWS Containers)',   risk: 'low' },
+            'fargate':    { label: 'Fargate (AWS)',          risk: 'low' },
+
+            // CI/CD and DevTools — risk: low
+            'gitlab':     { label: 'GitLab',                 risk: 'low' },
+            'jenkins':    { label: 'Jenkins',                risk: 'low' },
+            'argocd':     { label: 'Argo CD',                risk: 'low' },
+            'argo':       { label: 'Argo',                   risk: 'low' },
+            'drone':      { label: 'Drone CI',               risk: 'low' },
+            'concourse':  { label: 'Concourse CI',           risk: 'low' },
+            'circleci':   { label: 'CircleCI',               risk: 'low' },
+            'teamcity':   { label: 'TeamCity',               risk: 'low' },
+
+            // Databases — risk: low
+            'redis':         { label: 'Redis',               risk: 'low' },
+            'postgres':      { label: 'PostgreSQL',          risk: 'low' },
+            'mysql':         { label: 'MySQL',               risk: 'low' },
+            'mongo':         { label: 'MongoDB',             risk: 'low' },
+            'elasticsearch': { label: 'Elasticsearch',       risk: 'low' },
+            'cassandra':     { label: 'Cassandra',           risk: 'low' },
+            'memcached':     { label: 'Memcached',           risk: 'low' },
+
+            // Messaging / Queue — risk: low
+            'kafka':      { label: 'Kafka',                  risk: 'low' },
+            'rabbitmq':   { label: 'RabbitMQ',               risk: 'low' },
+            'sqs':        { label: 'SQS (AWS Queue)',        risk: 'low' },
+            'nats':       { label: 'NATS',                   risk: 'low' },
+            'pulsar':     { label: 'Pulsar',                 risk: 'low' },
+
+            // Monitoring / Observability — risk: low
+            'grafana':    { label: 'Grafana',                risk: 'low' },
+            'prometheus': { label: 'Prometheus',             risk: 'low' },
+            'posthog':    { label: 'PostHog',                risk: 'low' },
+            'datadog':    { label: 'Datadog',                risk: 'low' },
+            'kibana':     { label: 'Kibana',                 risk: 'low' },
+            'loki':       { label: 'Loki',                   risk: 'low' },
+            'jaeger':     { label: 'Jaeger',                 risk: 'low' },
+            'sentry':     { label: 'Sentry',                 risk: 'low' },
+
+            // API Gateways — risk: low
+            'kong':       { label: 'Kong Gateway',           risk: 'low' },
+            'istio':      { label: 'Istio',                  risk: 'low' },
+            'envoy':      { label: 'Envoy Proxy',            risk: 'low' },
+            'traefik':    { label: 'Traefik',                risk: 'low' },
+
+            // Storage — risk: low
+            'minio':      { label: 'MinIO',                  risk: 'low' },
+            'ceph':       { label: 'Ceph',                   risk: 'low' },
+            'gluster':    { label: 'GlusterFS',              risk: 'low' },
+
+            // Internal markers — risk: low
+            'internal':   { label: 'Internal resource',      risk: 'low' },
+            'private':    { label: 'Private resource',       risk: 'low' },
+            'corp':       { label: 'Corporate resource',     risk: 'low' },
+            'intranet':   { label: 'Intranet resource',      risk: 'low' },
+            'mgmt':       { label: 'Management interface',   risk: 'low' },
+
+            // Sensitive context — risk: info
+            'payment':      { label: 'Payment context',      risk: 'info' },
+            'vault':        { label: 'Vault (secrets)',      risk: 'info' },
+            'secret':       { label: 'Secrets context',      risk: 'info' },
+        };
+
+        const tokens = cnameTarget.toLowerCase().split(/[-.]/).filter(t => t.length > 0);
+        const matched = [];
+        const seen = new Set();
+
+        for (const token of tokens) {
+            if (infraKeywords[token] && !seen.has(token)) {
+                seen.add(token);
+                matched.push({ keyword: token, ...infraKeywords[token] });
+            }
+        }
+
+        return matched;
     }
 
     // Helper function to check if an IP address is private/internal
@@ -2701,6 +2812,71 @@ class ServiceDetectionEngine {
                         description: 'S3 bucket detected - verify access controls',
                         recommendation: 'Check S3 bucket permissions and public access',
                         cname: cnameData
+                    });
+                }
+            }
+        }
+        
+        // Check for direct IP exposure when majority of subdomains use DNS firewalls
+        const dnsFirewallPatterns = [
+            'cloudflare', 'akamai', 'fastly', 'imperva', 'incapsula',
+            'sucuri', 'cloudfront', 'azure front door', 'stackpath',
+            'f5 networks', 'barracuda', 'google shield'
+        ];
+        const dnsFirewallASNs = new Set([
+            13335, 209242, 395747, 132892,  // Cloudflare
+            16625, 20940, 21357, 21399, 22207,  // Akamai
+            54113, 394192,  // Fastly
+        ]);
+        
+        const activeSubdomains = subdomains.filter(s => {
+            const ip = s.ip || (s.ipAddresses && s.ipAddresses.length > 0 ? s.ipAddresses[0] : null);
+            if (!ip) return false;
+            const privateInfo = this.isPrivateIP(ip);
+            return !(privateInfo && privateInfo.isPrivate);
+        });
+        
+        if (activeSubdomains.length >= 4) {
+            const behindFirewall = [];
+            const directExposed = [];
+            
+            for (const subdomain of activeSubdomains) {
+                const vendorName = (subdomain.vendor?.vendor || '').toLowerCase();
+                const asnStr = subdomain.asnInfo?.asn || subdomain.vendor?.asn || '';
+                const asnMatch = String(asnStr).match(/(\d+)/);
+                const asnNum = asnMatch ? parseInt(asnMatch[1]) : 0;
+                const category = (subdomain.vendor?.category || '').toLowerCase();
+                
+                const isFirewalled = category === 'cdn' ||
+                    dnsFirewallASNs.has(asnNum) ||
+                    dnsFirewallPatterns.some(p => vendorName.includes(p));
+                
+                if (isFirewalled) {
+                    behindFirewall.push(subdomain);
+                } else {
+                    directExposed.push(subdomain);
+                }
+            }
+            
+            const firewallRatio = behindFirewall.length / activeSubdomains.length;
+            
+            if (firewallRatio >= 0.25 && directExposed.length > 0) {
+                const firewallVendors = [...new Set(behindFirewall.map(s => s.vendor?.vendor || 'Unknown'))].join(', ');
+                const pct = Math.round(firewallRatio * 100);
+                
+                for (const subdomain of directExposed) {
+                    const subName = subdomain?.subdomain || subdomain?.name || 'unknown';
+                    const ip = subdomain.ip || (subdomain.ipAddresses && subdomain.ipAddresses.length > 0 ? subdomain.ipAddresses[0] : 'N/A');
+                    const vendor = subdomain.vendor?.vendor || 'Unknown';
+                    
+                    issues.push({
+                        type: 'origin_ip_exposed',
+                        risk: 'low',
+                        description: `Hosting IP directly exposed (${vendor}) while ${pct}% of subdomains use DNS firewall protection`,
+                        recommendation: `Consider routing this subdomain through the same DNS firewall/CDN (${firewallVendors}) used by other subdomains for consistent protection.`,
+                        subdomain: subName,
+                        ip: ip,
+                        details: `${pct}% of active subdomains are behind DNS firewall services (${firewallVendors}), but this subdomain resolves directly to ${vendor} infrastructure at ${ip}, bypassing that protection layer.`
                     });
                 }
             }

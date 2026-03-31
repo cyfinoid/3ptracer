@@ -121,12 +121,33 @@ class ExportManager {
             console.log('📊 Converted services:', Object.keys(servicesObj).length, 'services');
         }
         
-        // Convert subdomains Map to Object
+        // Convert subdomains Map to Object (ensure export-stable fields for internal IPs / Shodan)
         if (data.subdomains && data.subdomains instanceof Map) {
             console.log('📊 Converting subdomains Map to Object for serialization');
             const subdomainsObj = {};
             for (const [key, value] of data.subdomains) {
-                subdomainsObj[key] = value;
+                const primaryV4 = value.ipAddresses && value.ipAddresses.length > 0
+                    ? value.ipAddresses[0]
+                    : null;
+                const isPrivate = !!value.isPrivateIP
+                    || !!(value.shodanInfo && value.shodanInfo.notApplicable)
+                    || (typeof CommonUtils !== 'undefined' && CommonUtils.isPrivateIPv4 && primaryV4
+                        && CommonUtils.isPrivateIPv4(primaryV4));
+                let shodanOut = value.shodanInfo != null ? value.shodanInfo : null;
+                if (isPrivate && (!shodanOut || !shodanOut.notApplicable)) {
+                    shodanOut = { notApplicable: true, reason: 'Internal IP' };
+                }
+                subdomainsObj[key] = {
+                    ...value,
+                    ipAddresses: Array.isArray(value.ipAddresses) ? [...value.ipAddresses] : [],
+                    resolvedIPv4: primaryV4,
+                    isPrivateIP: isPrivate,
+                    shodanInfo: shodanOut,
+                    asnInfo: isPrivate ? null : (value.asnInfo || null)
+                };
+                if (isPrivate && (!value.vendor || value.vendor.vendor === 'Unknown')) {
+                    subdomainsObj[key].vendor = { vendor: 'Internal Network', category: 'internal' };
+                }
             }
             serialized.subdomains = subdomainsObj;
             console.log('📊 Converted subdomains:', Object.keys(subdomainsObj).length, 'subdomains');
@@ -289,6 +310,9 @@ class ExportManager {
                 md += `## Security Issues\n\n`;
                 for (const issue of allIssues) {
                     md += `### ⚠️ ${issue.type || issue.description}\n`;
+                    if (issue.subdomain) {
+                        md += `- **Subdomain:** ${issue.subdomain}\n`;
+                    }
                     md += `- **Risk:** ${issue.risk?.toUpperCase() || 'Unknown'}\n`;
                     md += `- **Description:** ${issue.description}\n`;
                     if (issue.recommendation) {
@@ -309,11 +333,14 @@ class ExportManager {
                         const subdomain = sub.subdomain || sub.name || sub;
                         const ip = sub.ip || sub.ipAddresses?.[0] || 'N/A';
                         const provider = sub.asnInfo?.org || sub.provider || 'Unknown';
+                        const isPrivate = sub.isPrivateIP || (sub.shodanInfo && sub.shodanInfo.notApplicable);
                         
-                        // Shodan data
                         let ports = 'N/A';
                         let vulns = 'None';
-                        if (sub.shodanInfo && sub.shodanInfo.hasData) {
+                        if (isPrivate) {
+                            ports = 'Internal IP';
+                            vulns = 'N/A';
+                        } else if (sub.shodanInfo && sub.shodanInfo.hasData) {
                             if (sub.shodanInfo.ports && sub.shodanInfo.ports.length > 0) {
                                 ports = sub.shodanInfo.ports.slice(0, 5).join(', ');
                                 if (sub.shodanInfo.ports.length > 5) ports += '...';
@@ -337,7 +364,11 @@ class ExportManager {
             if (findings.length > 0) {
                 md += `## Interesting Findings\n\n`;
                 for (const finding of findings) {
-                    md += `- **${finding.subdomain}**: ${finding.description}\n`;
+                    let line = `- **${finding.subdomain}**: ${finding.description}`;
+                    if (finding.type === 'infrastructure_exposure' && finding.cnameTarget) {
+                        line += ` (CNAME: \`${finding.cnameTarget}\`)`;
+                    }
+                    md += line + `\n`;
                 }
                 md += `\n`;
             }
@@ -1020,10 +1051,14 @@ class ExportManager {
         ['takeovers', 'dnsIssues', 'cloudIssues'].forEach(issueType => {
             if (securityResults[issueType] && securityResults[issueType].length > 0) {
                 securityResults[issueType].forEach(issue => {
+                    let description = issue.description || 'No description';
+                    if (issue.subdomain) {
+                        description = `${issue.subdomain} - ${description}`;
+                    }
                     findings.push([
                         this.capitalizeFirst(issue.risk || issue.severity || 'medium'),
                         this.formatIssueType(issueType),
-                        issue.description || 'No description',
+                        description,
                         issue.recommendation || 'Review configuration'
                     ]);
                 });
@@ -1081,11 +1116,15 @@ class ExportManager {
                 const provider = subdomain.provider || subdomain.service || 
                                (subdomain.asnInfo ? subdomain.asnInfo.org : 'Unknown');
                 
-                // Add Shodan data if available
+                const isPrivate = subdomain.isPrivateIP || (subdomain.shodanInfo && subdomain.shodanInfo.notApplicable);
+                
                 let openPorts = 'N/A';
                 let vulnerabilities = 'None';
                 
-                if (subdomain.shodanInfo && subdomain.shodanInfo.hasData) {
+                if (isPrivate) {
+                    openPorts = 'Internal IP';
+                    vulnerabilities = 'N/A';
+                } else if (subdomain.shodanInfo && subdomain.shodanInfo.hasData) {
                     if (subdomain.shodanInfo.ports && subdomain.shodanInfo.ports.length > 0) {
                         openPorts = subdomain.shodanInfo.ports.slice(0, 10).join(', ');
                         if (subdomain.shodanInfo.ports.length > 10) {
@@ -1124,9 +1163,19 @@ class ExportManager {
         
         // Use the same interesting findings displayed in the UI
         interestingFindings.forEach(finding => {
-            const findingType = finding.type === 'interesting_subdomain' ? 'Pattern' : 'Service';
-            const details = finding.subdomain || 'N/A';
-            const significance = finding.description || finding.reason || 'Infrastructure finding';
+            let findingType;
+            let details = finding.subdomain || 'N/A';
+            let significance = finding.description || finding.reason || 'Infrastructure finding';
+
+            if (finding.type === 'infrastructure_exposure') {
+                findingType = `Exposure (${finding.risk === 'low' ? 'Low' : 'Info'})`;
+                details += finding.cnameTarget ? `\n→ ${finding.cnameTarget}` : '';
+                if (finding.exposedDetails && finding.exposedDetails.length > 0) {
+                    significance += `\nExposed: ${finding.exposedDetails.join(', ')}`;
+                }
+            } else {
+                findingType = finding.type === 'interesting_subdomain' ? 'Pattern' : 'Service';
+            }
             
             findings.push([
                 findingType,
@@ -1475,6 +1524,8 @@ class ExportManager {
                 const provider = subdomain.provider || subdomain.service || 
                                (subdomain.asnInfo ? subdomain.asnInfo.org : 'Unknown');
                 
+                const isPrivate = subdomain.isPrivateIP || (subdomain.shodanInfo && subdomain.shodanInfo.notApplicable);
+                
                 // ASN info
                 const country = subdomain.asnInfo ? subdomain.asnInfo.country || subdomain.asnInfo.location : 'Unknown';
                 const asn = subdomain.asnInfo ? subdomain.asnInfo.asn : 'Unknown';
@@ -1486,7 +1537,13 @@ class ExportManager {
                 let shodanTags = 'N/A';
                 let cpes = 'N/A';
                 
-                if (subdomain.shodanInfo && subdomain.shodanInfo.hasData) {
+                if (isPrivate) {
+                    openPorts = 'Internal IP';
+                    vulnerabilities = 'N/A';
+                    shodanHostnames = 'N/A';
+                    shodanTags = 'N/A';
+                    cpes = 'N/A';
+                } else if (subdomain.shodanInfo && subdomain.shodanInfo.hasData) {
                     if (subdomain.shodanInfo.ports && subdomain.shodanInfo.ports.length > 0) {
                         openPorts = subdomain.shodanInfo.ports.join(', ');
                     }
