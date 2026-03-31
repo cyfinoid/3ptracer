@@ -342,7 +342,7 @@ class Visualizer {
                 <div class="timeline-item" style="display: flex; margin-bottom: 15px; padding-left: 20px; border-left: 3px solid var(--accent-blue); position: relative;">
                     <div class="timeline-dot" style="position: absolute; left: -8px; top: 0; width: 12px; height: 12px; background: var(--accent-blue); border-radius: 50%;"></div>
                     <div style="flex: 1;">
-                        <div style="font-weight: bold; color: var(--text-color); margin-bottom: 5px;">${formattedDate}</div>
+                        <div style="font-weight: bold; color: var(--text-primary); margin-bottom: 5px;">${formattedDate}</div>
                         <div style="font-size: 0.85em; color: var(--text-secondary);">
                             ${records.length} certificate${records.length !== 1 ? 's' : ''} observed
                         </div>

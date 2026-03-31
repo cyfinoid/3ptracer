@@ -48,7 +48,7 @@ class DataProcessor {
         // Store DNS records separately from services
         this.processedData.dnsRecords = dnsRecords || [];
 
-        console.log(`📊 Data processing complete: ${regularSubdomains.length} active subdomains, ${allHistoricalRecords.length} historical records`);
+        if (window.logger) window.logger.debug(`Data processing complete: ${regularSubdomains.length} active subdomains, ${allHistoricalRecords.length} historical records`);
 
         return this.getProcessedData();
     }
@@ -150,7 +150,7 @@ class DataProcessor {
 
         // Process CNAME-detected service if available
         if (subdomain.detectedService) {
-            console.log(`🔧 Processing CNAME-detected service: ${subdomain.detectedService.name} for ${subdomain.subdomain}`);
+            if (window.logger) window.logger.debug(`Processing CNAME-detected service: ${subdomain.detectedService.name} for ${subdomain.subdomain}`);
             
             // Convert detected service to service entry format
             const serviceEntry = {
@@ -234,44 +234,6 @@ class DataProcessor {
         }
     }
 
-    // Merge data with existing subdomain
-    mergeSubdomainData(existing, newData) {
-        // Merge IP addresses
-        if (newData.ip && !existing.ipAddresses.includes(newData.ip)) {
-            existing.ipAddresses.push(newData.ip);
-        }
-        
-        // Update CNAME info if available
-        if (newData.cnameTarget) {
-            existing.cnameTarget = newData.cnameTarget;
-        }
-        
-        if (newData.cnameChain) {
-            existing.cnameChain = newData.cnameChain;
-        }
-        
-        // Update vendor info if more specific
-        if (newData.vendor && newData.vendor.vendor !== 'Unknown') {
-            existing.vendor = newData.vendor;
-        }
-        
-        // Update ASN info
-        if (newData.asnInfo) {
-            existing.asnInfo = newData.asnInfo;
-        }
-        
-        // Update takeover info
-        if (newData.takeover) {
-            existing.takeover = newData.takeover;
-        }
-        
-        // Merge records
-        if (newData.records) {
-            existing.records = { ...existing.records, ...newData.records };
-        }
-    }
-
-    // Process services from various sources
     // Build CNAME records from subdomain chain data
     buildCNAMERecords(subdomain) {
         const cnameRecords = [];
@@ -412,29 +374,6 @@ class DataProcessor {
         return score;
     }
 
-    // Get services by category
-    getServicesByCategory(category) {
-        return Array.from(this.processedData.services.values())
-            .filter(service => service.category === category);
-    }
-
-    // Get services by vendor
-    getServicesByVendor(vendor) {
-        return Array.from(this.processedData.services.values())
-            .filter(service => this.getVendorFromService(service) === vendor);
-    }
-
-    // Get vendor from service
-    getVendorFromService(service) {
-        if (service.name.includes('Microsoft')) return 'Microsoft';
-        if (service.name.includes('Amazon') || service.name.includes('AWS')) return 'Amazon AWS';
-        if (service.name.includes('ProofPoint')) return 'ProofPoint';
-        if (service.name.includes('Google')) return 'Google';
-        if (service.name.includes('Cloudflare')) return 'Cloudflare';
-        if (service.name.includes('DigitalOcean')) return 'DigitalOcean';
-        return 'Other';
-    }
-
     // Get all services
     getAllServices() {
         return Array.from(this.processedData.services.values());
@@ -468,7 +407,7 @@ class DataProcessor {
             !this.hasSignificantCNAME(subdomain)
         );
 
-        console.log(`🔍 Subdomain classification: ${categorizedSubdomains.size} in services, ${cnameSubdomainNames.size} in CNAME mappings, ${unclassified.length} unclassified`);
+        if (window.logger) window.logger.debug(`Subdomain classification: ${categorizedSubdomains.size} in services, ${cnameSubdomainNames.size} in CNAME mappings, ${unclassified.length} unclassified`);
         
         return unclassified;
     }
@@ -545,45 +484,28 @@ class DataProcessor {
             }
         };
 
-        console.log('🌍 Starting data sovereignty analysis...');
-
-        // DEBUG: Log the data structures we're working with
         const services = Array.from(this.processedData.services.values());
         const subdomains = Array.from(this.processedData.subdomains.values());
-        
-        console.log(`🔍 DEBUG: Found ${services.length} services and ${subdomains.length} subdomains to analyze`);
-        
-        // DEBUG: Sample a few entries to see the structure
-        if (services.length > 0) {
-            console.log('🔍 DEBUG: Sample service structure:', JSON.stringify(services[0], null, 2));
-        }
-        if (subdomains.length > 0) {
-            console.log('🔍 DEBUG: Sample subdomain structure:', JSON.stringify(subdomains[0], null, 2));
-        }
 
-        // Analyze services by geographic location
         let servicesWithASN = 0;
-        services.forEach(service => {
+        for (const service of services) {
             if (service.metadata?.asnInfo) {
                 servicesWithASN++;
-                console.log(`🔍 DEBUG: Processing service ${service.name} with ASN info:`, service.metadata.asnInfo);
                 this.processSovereigntyLocation(service.metadata.asnInfo, service.name, 'service', sovereigntyData);
-            } else {
-                console.log(`🔍 DEBUG: Service ${service.name} has no ASN info. Metadata:`, service.metadata);
             }
-        });
+        }
 
-        // Analyze subdomains by geographic location  
         let subdomainsWithASN = 0;
-        subdomains.forEach(subdomain => {
+        for (const subdomain of subdomains) {
             if (subdomain.asnInfo) {
                 subdomainsWithASN++;
                 this.processSovereigntyLocation(subdomain.asnInfo, subdomain.subdomain, 'subdomain', sovereigntyData);
             }
-            // Skip subdomains without ASN info (no IP addresses) - this is normal
-        });
+        }
 
-        console.log(`🌍 Sovereignty: ${servicesWithASN} services and ${subdomainsWithASN} subdomains with ASN data`);
+        if (window.logger) {
+            window.logger.debug(`Sovereignty: ${servicesWithASN} services and ${subdomainsWithASN} subdomains with ASN data`);
+        }
 
         // Calculate statistics
         sovereigntyData.statistics.totalIPs = [...services, ...subdomains].reduce((count, item) => {
@@ -609,7 +531,7 @@ class DataProcessor {
         // Identify potential sovereignty issues
         this.identifySovereigntyIssues(sovereigntyData);
 
-        console.log(`🌍 Sovereignty analysis complete: ${sovereigntyData.statistics.uniqueCountries} countries, ${sovereigntyData.statistics.totalIPs} IP addresses`);
+        if (window.logger) window.logger.debug(`Sovereignty analysis complete: ${sovereigntyData.statistics.uniqueCountries} countries, ${sovereigntyData.statistics.totalIPs} IP addresses`);
 
         return sovereigntyData;
     }
@@ -1046,7 +968,7 @@ class DataProcessor {
             return a.type.localeCompare(b.type);
         });
         
-        console.log(`📋 Collected ${rawRecords.length} raw DNS records from main domain and subdomains (CNAME chains consolidated)`);
+        if (window.logger) window.logger.debug(`Collected ${rawRecords.length} raw DNS records (CNAME chains consolidated)`);
         return rawRecords;
     }
 

@@ -749,7 +749,7 @@ input[type="checkbox"] {
     padding: 8px 16px;
     border: 1px solid var(--border-color);
     background: var(--bg-tertiary);
-    color: var(--text-color);
+    color: var(--text-primary);
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -1008,7 +1008,7 @@ small,
 [data-theme="light"] .text-muted,
 [data-theme="light"] small,
 [data-theme="light"] .form-group small {
-    color: #495057;
+    color: var(--text-secondary);
 }
 
 /* ARIA live region for screen readers */
@@ -1062,7 +1062,7 @@ a[aria-label] {
     transform: translateX(-50%);
     padding: 4px 8px;
     background: var(--bg-tertiary);
-    color: var(--text-color);
+    color: var(--text-primary);
     border-radius: 4px;
     font-size: 0.8em;
     white-space: nowrap;
@@ -1488,7 +1488,7 @@ a[aria-label] {
 .sovereignty-section-title {
     font-size: 1.1rem;
     font-weight: 600;
-    color: var(--text-color);
+    color: var(--text-primary);
     margin-bottom: 15px;
     padding-bottom: 8px;
     border-bottom: 2px solid var(--border-color);
@@ -1620,7 +1620,7 @@ a[aria-label] {
 .location-details {
     margin-bottom: 12px;
     padding-top: 10px;
-    border-top: 1px solid #e9ecef;
+    border-top: 1px solid var(--border-color);
 }
 
 .location-details:first-of-type {
@@ -1629,7 +1629,7 @@ a[aria-label] {
 }
 
 .location-details strong {
-    color: #2c3e50;
+    color: var(--text-primary);
     font-size: 0.9rem;
     display: block;
     margin-bottom: 6px;
@@ -1645,7 +1645,7 @@ a[aria-label] {
     padding: 4px 0;
     font-size: 0.85rem;
     line-height: 1.4;
-    border-bottom: 1px solid #f8f9fa;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .location-list li:last-child {
@@ -1653,7 +1653,7 @@ a[aria-label] {
 }
 
 .service-name, .subdomain-name {
-    color: var(--text-color);
+    color: var(--text-primary);
     font-weight: 500;
 }
 
@@ -1785,7 +1785,7 @@ a[aria-label] {
 
 .risk-issues li {
     font-size: 0.85rem;
-    color: var(--text-color);
+    color: var(--text-primary);
     margin-bottom: 4px;
     line-height: 1.4;
 }
@@ -1798,7 +1798,7 @@ a[aria-label] {
 }
 
 .risk-providers strong {
-    color: #2c3e50;
+    color: var(--text-primary);
 }
 
 /* Distribution Table */
@@ -1829,7 +1829,7 @@ a[aria-label] {
     padding: 12px 15px;
     border-bottom: 1px solid var(--border-color);
     font-size: 0.85rem;
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .distribution-table tr:hover {
@@ -1947,12 +1947,12 @@ a[aria-label] {
 
 .feature-list li {
     padding: 8px 0;
-    border-bottom: 1px solid #e9ecef;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .feature-list li:before {
     content: "✓";
-    color: #28a745;
+    color: var(--accent-green);
     font-weight: bold;
     margin-right: 10px;
 }
@@ -2200,7 +2200,7 @@ a[aria-label] {
     border-radius: 4px;
     cursor: pointer;
     font-size: 0.85em;
-    color: var(--text-color);
+    color: var(--text-primary);
     transition: background 0.2s ease;
 }
 
