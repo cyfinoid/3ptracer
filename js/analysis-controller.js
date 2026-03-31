@@ -544,55 +544,66 @@ class AnalysisController {
             // Initialize shodanInfo with safe default
             subdomain.shodanInfo = null;
             
-            if (subdomain.ip && !subdomain.isRedirectToMain) {
+            const resolvedIPv4 = CommonUtils.getSubdomainCanonicalIPv4(subdomain);
+            if (resolvedIPv4 && (!subdomain.ip || subdomain.ip !== resolvedIPv4)) {
+                subdomain.ip = resolvedIPv4;
+            }
+            
+            if (resolvedIPv4 && !subdomain.isRedirectToMain) {
+                // Skip ASN and Shodan for private/internal IPs
+                if (CommonUtils.isPrivateIPv4(resolvedIPv4)) {
+                    subdomain.isPrivateIP = true;
+                    subdomain.vendor = { vendor: 'Internal Network', category: 'internal' };
+                    subdomain.asnInfo = null;
+                    subdomain.shodanInfo = { notApplicable: true, reason: 'Internal IP' };
+                    console.log(`  ℹ️ Skipping ASN/Shodan for private IP: ${subdomain.subdomain} (${resolvedIPv4})`);
+                    continue;
+                }
+
                 // ASN lookup
                 try {
-                    const asnInfo = await this.dnsAnalyzer.getASNInfo(subdomain.ip);
+                    const asnInfo = await this.dnsAnalyzer.getASNInfo(resolvedIPv4);
                     if (asnInfo && typeof asnInfo === 'object') {
                         subdomain.vendor = this.serviceDetector.classifyVendor(asnInfo);
-                        // FIXED: Store the raw ASN info for sovereignty analysis
                         subdomain.asnInfo = asnInfo;
                         if (window.logger) {
-                            window.logger.debug(`ASN info for ${subdomain.ip}: ${asnInfo.asn || 'Unknown'}`);
+                            window.logger.debug(`ASN info for ${resolvedIPv4}: ${asnInfo.asn || 'Unknown'}`);
                         }
                     } else {
-                        console.warn(`⚠️ Invalid ASN response for ${subdomain.ip}`);
+                        console.warn(`⚠️ Invalid ASN response for ${resolvedIPv4}`);
                         subdomain.vendor = { vendor: 'Unknown', category: 'Unknown' };
                         subdomain.asnInfo = null;
                     }
                 } catch (error) {
-                    console.warn(`⚠️ ASN lookup failed for ${subdomain.ip}:`, error.message);
+                    console.warn(`⚠️ ASN lookup failed for ${resolvedIPv4}:`, error.message);
                     subdomain.vendor = { vendor: 'Unknown', category: 'Unknown' };
                     subdomain.asnInfo = null;
                 }
                 
                 // Shodan InternetDB lookup (with caching to avoid duplicate API calls)
                 try {
-                    if (shodanCache.has(subdomain.ip)) {
-                        // Use cached result
-                        subdomain.shodanInfo = shodanCache.get(subdomain.ip);
-                    } else if (!processedIPs.has(subdomain.ip)) {
-                        processedIPs.add(subdomain.ip);
-                        const shodanInfo = await this.dnsAnalyzer.getShodanInternetDBInfo(subdomain.ip);
-                        shodanCache.set(subdomain.ip, shodanInfo);
+                    if (shodanCache.has(resolvedIPv4)) {
+                        subdomain.shodanInfo = shodanCache.get(resolvedIPv4);
+                    } else if (!processedIPs.has(resolvedIPv4)) {
+                        processedIPs.add(resolvedIPv4);
+                        const shodanInfo = await this.dnsAnalyzer.getShodanInternetDBInfo(resolvedIPv4);
+                        shodanCache.set(resolvedIPv4, shodanInfo);
                         subdomain.shodanInfo = shodanInfo;
                         
                         if (shodanInfo && shodanInfo.hasData) {
                             if (window.logger) {
-                                window.logger.debug(`Shodan info for ${subdomain.ip}: ${shodanInfo.ports.length} ports, ${shodanInfo.vulns.length} vulns`);
+                                window.logger.debug(`Shodan info for ${resolvedIPv4}: ${shodanInfo.ports.length} ports, ${shodanInfo.vulns.length} vulns`);
                             }
                             
-                            // Log security-relevant findings
                             if (shodanInfo.vulns && shodanInfo.vulns.length > 0) {
-                                console.log(`  🚨 ${subdomain.subdomain} (${subdomain.ip}) has ${shodanInfo.vulns.length} known vulnerabilities`);
+                                console.log(`  🚨 ${subdomain.subdomain} (${resolvedIPv4}) has ${shodanInfo.vulns.length} known vulnerabilities`);
                             }
                         }
                     } else {
-                        // IP already processed, get from cache
-                        subdomain.shodanInfo = shodanCache.get(subdomain.ip);
+                        subdomain.shodanInfo = shodanCache.get(resolvedIPv4);
                     }
                 } catch (error) {
-                    console.warn(`⚠️ Shodan lookup failed for ${subdomain.ip}:`, error.message);
+                    console.warn(`⚠️ Shodan lookup failed for ${resolvedIPv4}:`, error.message);
                     subdomain.shodanInfo = null;
                 }
             }

@@ -438,8 +438,15 @@ class DNSAnalyzer {
                 
                 console.log(`  ✅ Subdomain ${subdomain} analysis complete - A/AAAA/CNAME records processed`);
                 
-                // Get ASN info if we have an IP
-                if (analysis.ip && /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(analysis.ip)) {
+                // Ensure IPv4 is set when A records exist but ip was never set (record ordering edge cases)
+                if (!analysis.ip && analysis.records.A && analysis.records.A.length > 0) {
+                    const v4 = CommonUtils.getSubdomainCanonicalIPv4({ ip: null, records: { A: analysis.records.A } });
+                    if (v4) analysis.ip = v4;
+                }
+                
+                // Get ASN info only for public IPv4 (skip private/link-local — wastes API calls)
+                const ipv4Re = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+                if (analysis.ip && ipv4Re.test(analysis.ip) && !CommonUtils.isPrivateIPv4(analysis.ip)) {
                     try {
                         const asnInfo = await this.getASNInfo(analysis.ip);
                         analysis.vendor = this.classifyVendor(asnInfo);
@@ -448,6 +455,10 @@ class DNSAnalyzer {
                     } catch (error) {
                         console.warn(`  ⚠️  ASN lookup failed for ${analysis.ip}:`, error.message);
                     }
+                } else if (analysis.ip && ipv4Re.test(analysis.ip) && CommonUtils.isPrivateIPv4(analysis.ip)) {
+                    analysis.isPrivateIP = true;
+                    analysis.vendor = { vendor: 'Internal Network', category: 'internal' };
+                    analysis.asnInfo = null;
                 }
                 
                 // Check for takeover from CNAME records (service detection already handled above)
@@ -2033,22 +2044,18 @@ class DNSAnalyzer {
         }
     }
     
-    // Check if IP is private (RFC 1918)
+    // Check if IP is private (RFC 1918); delegates to CommonUtils when available
     isPrivateIP(ip) {
-        const parts = ip.split('.').map(p => parseInt(p));
-        if (parts.length !== 4) return false;
-        
-        // 10.0.0.0/8
+        if (typeof CommonUtils !== 'undefined' && CommonUtils.isPrivateIPv4) {
+            return CommonUtils.isPrivateIPv4(ip);
+        }
+        const parts = String(ip).split('.').map(p => parseInt(p, 10));
+        if (parts.length !== 4 || parts.some(p => Number.isNaN(p) || p < 0 || p > 255)) return false;
         if (parts[0] === 10) return true;
-        // 172.16.0.0/12
         if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
-        // 192.168.0.0/16
         if (parts[0] === 192 && parts[1] === 168) return true;
-        // 127.0.0.0/8 (loopback)
         if (parts[0] === 127) return true;
-        // 169.254.0.0/16 (link-local)
         if (parts[0] === 169 && parts[1] === 254) return true;
-        
         return false;
     }
 

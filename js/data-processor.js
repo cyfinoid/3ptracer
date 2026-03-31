@@ -101,22 +101,50 @@ class DataProcessor {
     processSubdomain(subdomain) {
         const subdomainKey = subdomain.subdomain;
         
+        let ipAddresses = typeof CommonUtils !== 'undefined' && CommonUtils.collectSubdomainIPv4Addresses
+            ? CommonUtils.collectSubdomainIPv4Addresses(subdomain)
+            : subdomain.ip ? [subdomain.ip] : [];
+        if (ipAddresses.length === 0 && subdomain.ip) {
+            ipAddresses = [subdomain.ip];
+        }
+        
+        const primaryV4 = ipAddresses.length > 0 ? ipAddresses[0] : null;
+        let isPrivateIP = !!subdomain.isPrivateIP;
+        if (!isPrivateIP && primaryV4 && CommonUtils.isPrivateIPv4) {
+            isPrivateIP = CommonUtils.isPrivateIPv4(primaryV4);
+        }
+        
+        let shodanInfo = subdomain.shodanInfo != null ? subdomain.shodanInfo : null;
+        if (isPrivateIP && (!shodanInfo || !shodanInfo.notApplicable)) {
+            shodanInfo = { notApplicable: true, reason: 'Internal IP' };
+        }
+        
+        let vendor = (subdomain.vendor && typeof subdomain.vendor === 'object')
+            ? subdomain.vendor
+            : { vendor: 'Unknown', category: 'Unknown' };
+        if (isPrivateIP && (!vendor.vendor || vendor.vendor === 'Unknown')) {
+            vendor = { vendor: 'Internal Network', category: 'internal' };
+        }
+        
+        let asnInfo = subdomain.asnInfo;
+        if (isPrivateIP) {
+            asnInfo = null;
+        }
+        
         // Create standardized subdomain data with safe defaults
         const subdomainData = {
             subdomain: subdomain.subdomain,
             records: subdomain.records || {},
-            ipAddresses: subdomain.ip ? [subdomain.ip] : [],
+            ipAddresses,
             cnameChain: subdomain.cnameChain || [],
             cnameTarget: subdomain.cnameTarget || null,
             primaryService: subdomain.primaryService || null,
             infrastructure: subdomain.infrastructure || null,
-            vendor: (subdomain.vendor && typeof subdomain.vendor === 'object') ? 
-                subdomain.vendor : { vendor: 'Unknown', category: 'Unknown' },
+            vendor,
             takeover: subdomain.takeover || null,
-            // FIXED: Keep ASN info for sovereignty analysis
-            asnInfo: subdomain.asnInfo || null,
-            // Shodan InternetDB data (ports, vulnerabilities, hostnames, CPEs, tags)
-            shodanInfo: subdomain.shodanInfo || null,
+            asnInfo,
+            shodanInfo,
+            isPrivateIP,
             status: 'analyzed'
         };
 
@@ -179,8 +207,9 @@ class DataProcessor {
             this.processServices([primaryServiceData], subdomain.subdomain);
         }
 
-        // Process vendor-based service if no primary service
+        // Process vendor-based service if no primary service (skip synthetic "Internal Network" rows)
         if (!subdomain.primaryService && 
+            !subdomainData.isPrivateIP &&
             subdomainData.vendor && 
             subdomainData.vendor.vendor && 
             subdomainData.vendor.vendor !== 'Unknown' &&

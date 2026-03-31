@@ -1697,10 +1697,20 @@ class UIRenderer {
         
         const patternFindings = interestingFindings.filter(f => f.type === 'interesting_subdomain');
         const serviceFindings = interestingFindings.filter(f => f.type === 'service_subdomain');
+        const exposureFindings = interestingFindings.filter(f => f.type === 'infrastructure_exposure');
         
         let html = `<div class="risk-section"><h4>🔍 Interesting Infrastructure Findings (${interestingFindings.length})</h4>`;
         html += '<p style="color: #666; font-size: 0.9rem; margin-bottom: 15px;"><em>⚠️ Note: These findings are based on pattern matching of active subdomains only. Historical/obsolete subdomains are excluded. No actual content verification is performed.</em></p>';
         
+        if (exposureFindings.length > 0) {
+            html += `<div style="margin-bottom: 20px;"><h5 style="color: #ffc107; margin-bottom: 10px;">⚠️ Infrastructure Exposure (${exposureFindings.length})</h5>`;
+            html += '<p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 10px;"><em>CNAME records reveal internal infrastructure details such as technology stack, service names, or architecture. Attackers can use this for targeted reconnaissance.</em></p>';
+            exposureFindings.forEach(finding => {
+                html += this.formatInterestingFinding(finding);
+            });
+            html += '</div>';
+        }
+
         if (serviceFindings.length > 0) {
             html += `<div style="margin-bottom: 20px;"><h5 style="color: #17a2b8; margin-bottom: 10px;">🔧 Service-Related Subdomains (${serviceFindings.length})</h5>`;
             serviceFindings.forEach(finding => {
@@ -1732,9 +1742,16 @@ class UIRenderer {
 
     // Format interesting finding
     formatInterestingFinding(finding) {
+        const isExposure = finding.type === 'infrastructure_exposure';
+        const borderColor = isExposure ? '#ffc107' : '#17a2b8';
+        const icon = isExposure ? '⚠️' : '🔍';
+        const riskBadge = isExposure
+            ? `<span style="display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.75rem; font-weight: 600; background: ${finding.risk === 'low' ? 'rgba(255, 193, 7, 0.15); color: #ffc107;' : 'rgba(23, 162, 184, 0.15); color: #17a2b8;'}">${finding.risk === 'low' ? 'LOW' : 'INFO'}</span> `
+            : '';
+
         let html = `
-            <div class="service-item" style="border-left: 4px solid #17a2b8;">
-                <div class="service-name">🔍 ${window.CommonUtils.escapeHtml(finding.description)}</div>
+            <div class="service-item" style="border-left: 4px solid ${borderColor};">
+                <div class="service-name">${icon} ${riskBadge}${window.CommonUtils.escapeHtml(finding.description)}</div>
                 <div class="service-description">
         `;
         
@@ -1748,6 +1765,12 @@ class UIRenderer {
                     <strong>Service:</strong> ${window.CommonUtils.escapeHtml(finding.service.toUpperCase())}<br>
                     <strong>Subdomain:</strong> ${this.createSubdomainLink(finding.subdomain)}<br>
                     <strong>IP:</strong> ${window.CommonUtils.escapeHtml(finding.ip)}<br>
+            `;
+        } else if (finding.type === 'infrastructure_exposure') {
+            html += `
+                    <strong>Subdomain:</strong> ${this.createSubdomainLink(finding.subdomain)}<br>
+                    <strong>CNAME Target:</strong> <code style="font-size: 0.85em; padding: 1px 4px; background: var(--bg-tertiary); border-radius: 3px;">${window.CommonUtils.escapeHtml(finding.cnameTarget)}</code><br>
+                    <strong>Exposed Details:</strong> ${finding.exposedDetails.map(d => window.CommonUtils.escapeHtml(d)).join(', ')}<br>
             `;
         }
         
@@ -2047,14 +2070,16 @@ class UIRenderer {
         
         if (section) section.style.display = 'block';
         
-        // Count subdomains with Shodan data
-        const withShodanQueried = allSubdomains.filter(s => s.shodanInfo !== null && s.shodanInfo !== undefined);
-        const withShodanData = allSubdomains.filter(s => s.shodanInfo && s.shodanInfo.hasData);
-        const withPorts = allSubdomains.filter(s => s.shodanInfo && s.shodanInfo.ports && s.shodanInfo.ports.length > 0);
-        const withVulns = allSubdomains.filter(s => s.shodanInfo && s.shodanInfo.vulns && s.shodanInfo.vulns.length > 0);
+        // Count subdomains with Shodan data (exclude private IPs from scan counts)
+        const scannableSubdomains = allSubdomains.filter(s => !s.isPrivateIP && !(s.shodanInfo && s.shodanInfo.notApplicable));
+        const privateIPCount = allSubdomains.length - scannableSubdomains.length;
+        const withShodanQueried = scannableSubdomains.filter(s => s.shodanInfo !== null && s.shodanInfo !== undefined);
+        const withShodanData = scannableSubdomains.filter(s => s.shodanInfo && s.shodanInfo.hasData);
+        const withPorts = scannableSubdomains.filter(s => s.shodanInfo && s.shodanInfo.ports && s.shodanInfo.ports.length > 0);
+        const withVulns = scannableSubdomains.filter(s => s.shodanInfo && s.shodanInfo.vulns && s.shodanInfo.vulns.length > 0);
         
-        // Check if Shodan data is still being fetched (not all subdomains have been queried)
-        const shodanPending = withShodanQueried.length < allSubdomains.length;
+        // Check if Shodan data is still being fetched (not all scannable subdomains have been queried)
+        const shodanPending = withShodanQueried.length < scannableSubdomains.length;
         
         let html = '';
         
@@ -2065,7 +2090,7 @@ class UIRenderer {
                     <span style="display: inline-block; animation: pulse 1.5s infinite;">⏳</span>
                     <strong>Loading port scan data...</strong> 
                     <span style="color: var(--text-secondary);">Querying Shodan InternetDB for open ports and vulnerabilities. This table will update automatically.</span>
-                    <span style="float: right; color: var(--text-secondary);">${withShodanQueried.length}/${allSubdomains.length} IPs scanned</span>
+                    <span style="float: right; color: var(--text-secondary);">${withShodanQueried.length}/${scannableSubdomains.length} IPs scanned${privateIPCount > 0 ? ` (${privateIPCount} internal)` : ''}</span>
                 </div>`;
         }
         
@@ -2110,25 +2135,27 @@ class UIRenderer {
             const provider = subdomain.vendor?.vendor || subdomain.asnInfo?.isp || 'Unknown';
             const shodanInfo = subdomain.shodanInfo;
             const hasValidIP = ip && ip !== 'N/A';
+            const isPrivate = subdomain.isPrivateIP || (shodanInfo && shodanInfo.notApplicable);
             
             // Format ports - link to Shodan host page
             let portsHtml = '';
-            if (shodanInfo === null || shodanInfo === undefined) {
-                // Shodan query not yet completed for this IP
+            if (isPrivate) {
+                portsHtml = '<span style="color: var(--text-secondary); font-style: italic;" title="Internal/private IP - not scannable from the internet">Internal IP</span>';
+            } else if (shodanInfo === null || shodanInfo === undefined) {
                 portsHtml = '<span style="color: var(--text-secondary);" title="Scanning...">⏳</span>';
             } else if (shodanInfo && shodanInfo.ports && shodanInfo.ports.length > 0) {
-                // Has port data - create link to Shodan
                 const portLabels = this.getPortServiceLabels(shodanInfo.ports);
                 const shodanUrl = hasValidIP ? `https://www.shodan.io/host/${encodeURIComponent(ip)}` : '#';
                 portsHtml = `<a href="${shodanUrl}" target="_blank" rel="noopener" class="port-list-link" title="${portLabels.join(', ')} - Click to view on Shodan">${shodanInfo.ports.join(', ')}</a>`;
             } else {
-                // Shodan queried but no ports found
                 portsHtml = '<span style="color: var(--text-secondary);">—</span>';
             }
             
             // Format vulnerabilities
             let vulnsHtml = '<span style="color: #28a745;">None</span>';
-            if (shodanInfo && shodanInfo.vulns && shodanInfo.vulns.length > 0) {
+            if (isPrivate) {
+                vulnsHtml = '<span style="color: var(--text-secondary); font-style: italic;" title="Internal/private IP - not scannable from the internet">N/A</span>';
+            } else if (shodanInfo && shodanInfo.vulns && shodanInfo.vulns.length > 0) {
                 const vulnLinks = shodanInfo.vulns.slice(0, 3).map(cve => 
                     `<a href="https://nvd.nist.gov/vuln/detail/${encodeURIComponent(cve)}" target="_blank" rel="noopener" class="cve-link" style="color: #dc3545;">${window.CommonUtils.escapeHtml(cve)}</a>`
                 ).join(', ');
