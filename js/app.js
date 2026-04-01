@@ -23,106 +23,78 @@ class App {
 const app = new App();
 window.app = app; // Expose globally for import functionality
 
-// Standard analysis function - Full analysis with subdomain discovery (called from HTML)
-async function analyzeStandard() {
+// Parse and validate domain input; returns a single domain string or null.
+// If the input contains multiple comma-separated domains, triggers batch mode and returns null.
+function parseDomainInput() {
     const domainInput = document.getElementById('domain');
-    const standardBtn = document.getElementById('analyzeStandardBtn');
-    const quickEmailBtn = document.getElementById('analyzeQuickEmailBtn');
     const inputValue = domainInput.value.trim();
-    
+
     if (!inputValue) {
         alert('Please enter a domain name');
-        return;
+        return null;
     }
-    
-    // L4: Auto-detect batch mode from comma-separated input
+
     const domains = inputValue.split(/[,\s]+/)
         .map(d => d.trim())
         .filter(d => d && d.includes('.'));
-    
+
     if (domains.length > 1) {
-        await analyzeBatchDomains(domains);
-        return;
+        analyzeBatchDomains(domains);
+        return null;
     }
-    
-    const domain = domains[0] || inputValue;
-    
-    // Disable buttons and show progress
-    if (standardBtn) {
-        standardBtn.disabled = true;
-        standardBtn.querySelector('.btn-text').textContent = 'Analyzing...';
+
+    return domains[0] || inputValue;
+}
+
+// Shared wrapper for both analysis modes.
+// activeId/inactiveId are the button IDs; busyLabel/idleLabel control the active button text.
+async function runAnalysis(activeId, inactiveId, busyLabel, idleLabel, analysisFn) {
+    const domain = parseDomainInput();
+    if (!domain) return;
+
+    const activeBtn = document.getElementById(activeId);
+    const inactiveBtn = document.getElementById(inactiveId);
+
+    if (activeBtn) {
+        activeBtn.disabled = true;
+        activeBtn.querySelector('.btn-text').textContent = busyLabel;
     }
-    if (quickEmailBtn) quickEmailBtn.disabled = true;
+    if (inactiveBtn) inactiveBtn.disabled = true;
     analysisInProgress = true;
-    
-    // Hide previous results
+
     document.getElementById('results').style.display = 'none';
-    
+
     try {
-        await app.analyzeDomain(domain);
+        await analysisFn(domain);
         app.saveResults();
     } catch (error) {
-        console.error('Analysis failed:', error);
+        if (window.logger) window.logger.debug(`Analysis failed: ${error.message}`);
     } finally {
-        // Re-enable buttons
-        if (standardBtn) {
-            standardBtn.disabled = false;
-            standardBtn.querySelector('.btn-text').textContent = 'Analyze Domain';
+        if (activeBtn) {
+            activeBtn.disabled = false;
+            activeBtn.querySelector('.btn-text').textContent = idleLabel;
         }
-        if (quickEmailBtn) quickEmailBtn.disabled = false;
+        if (inactiveBtn) inactiveBtn.disabled = false;
         analysisInProgress = false;
     }
 }
 
+// Standard analysis function - Full analysis with subdomain discovery (called from HTML)
+async function analyzeStandard() {
+    await runAnalysis(
+        'analyzeStandardBtn', 'analyzeQuickEmailBtn',
+        'Analyzing...', 'Analyze Domain',
+        (domain) => app.analyzeDomain(domain)
+    );
+}
+
 // Quick + Email Checks - Fast analysis without subdomain discovery (called from HTML)
 async function analyzeQuickEmail() {
-    const domainInput = document.getElementById('domain');
-    const standardBtn = document.getElementById('analyzeStandardBtn');
-    const quickEmailBtn = document.getElementById('analyzeQuickEmailBtn');
-    const inputValue = domainInput.value.trim();
-    
-    if (!inputValue) {
-        alert('Please enter a domain name');
-        return;
-    }
-    
-    // L4: Auto-detect batch mode from comma-separated input
-    const domains = inputValue.split(/[,\s]+/)
-        .map(d => d.trim())
-        .filter(d => d && d.includes('.'));
-    
-    if (domains.length > 1) {
-        await analyzeBatchDomains(domains);
-        return;
-    }
-    
-    const domain = domains[0] || inputValue;
-    
-    // Disable buttons and show progress
-    if (quickEmailBtn) {
-        quickEmailBtn.disabled = true;
-        quickEmailBtn.querySelector('.btn-text').textContent = 'Scanning...';
-    }
-    if (standardBtn) standardBtn.disabled = true;
-    analysisInProgress = true;
-    
-    // Hide previous results
-    document.getElementById('results').style.display = 'none';
-    
-    try {
-        await app.analysisController.analyzeQuickEmail(domain);
-        app.saveResults();
-    } catch (error) {
-        console.error('Quick + Email checks failed:', error);
-    } finally {
-        // Re-enable buttons
-        if (quickEmailBtn) {
-            quickEmailBtn.disabled = false;
-            quickEmailBtn.querySelector('.btn-text').textContent = 'Quick + Email Checks';
-        }
-        if (standardBtn) standardBtn.disabled = false;
-        analysisInProgress = false;
-    }
+    await runAnalysis(
+        'analyzeQuickEmailBtn', 'analyzeStandardBtn',
+        'Scanning...', 'Quick + Email Checks',
+        (domain) => app.analysisController.analyzeQuickEmail(domain)
+    );
 }
 
 // ==========================================
@@ -131,7 +103,6 @@ async function analyzeQuickEmail() {
 
 // Global flag to track if analysis is in progress
 let analysisInProgress = false;
-let analysisAbortController = null;
 
 // Setup keyboard shortcuts
 function setupKeyboardShortcuts() {
@@ -260,7 +231,7 @@ function showKeyboardShortcutsHelp() {
     let html = `
         <div style="background: var(--card-bg); padding: 20px; border-radius: 12px; max-width: 400px; width: 90%; position: relative;">
             <button onclick="document.getElementById('shortcutsModal').style.display='none'" style="position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--text-secondary);">×</button>
-            <h3 style="margin-top: 0; color: var(--text-color);">⌨️ Keyboard Shortcuts</h3>
+            <h3 style="margin-top: 0; color: var(--text-primary);">⌨️ Keyboard Shortcuts</h3>
             <table style="width: 100%; border-collapse: collapse;">
     `;
     
@@ -268,7 +239,7 @@ function showKeyboardShortcutsHelp() {
         html += `
             <tr style="border-bottom: 1px solid var(--border-color);">
                 <td style="padding: 8px 0;"><kbd style="background: var(--bg-tertiary); padding: 3px 8px; border-radius: 4px; font-family: monospace; border: 1px solid var(--border-color);">${shortcut.key}</kbd></td>
-                <td style="padding: 8px 0; color: var(--text-color);">${shortcut.action}</td>
+                <td style="padding: 8px 0; color: var(--text-primary);">${shortcut.action}</td>
             </tr>
         `;
     }
@@ -338,9 +309,9 @@ function copyShareableLink() {
             }, 2000);
         }
         
-        console.log('📋 Shareable link copied:', link);
+        if (window.logger) window.logger.debug(`Shareable link copied: ${link}`);
     }).catch(err => {
-        console.error('Failed to copy link:', err);
+        if (window.logger) window.logger.debug(`Failed to copy link: ${err.message}`);
         // Fallback: show link in prompt
         prompt('Copy this shareable link:', link);
     });
@@ -433,7 +404,7 @@ async function analyzeBatchDomains(domains) {
                 });
             }
         } catch (error) {
-            console.error(`Batch analysis failed for ${domain}:`, error);
+            if (window.logger) window.logger.debug(`Batch analysis failed for ${domain}: ${error.message}`);
             results.push({
                 domain: domain,
                 status: 'error',
@@ -552,14 +523,14 @@ function exportBatchResults() {
 function registerServiceWorker() {
     // Skip registration for file:// protocol
     if (window.location.protocol === 'file:') {
-        console.log('ℹ️ PWA features disabled (file:// protocol). Serve over HTTPS for full PWA support.');
+        if (window.logger) window.logger.debug('PWA features disabled (file:// protocol)');
         return;
     }
     
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js')
             .then(registration => {
-                console.log('✅ Service Worker registered:', registration.scope);
+                if (window.logger) window.logger.debug(`Service Worker registered: ${registration.scope}`);
                 
                 // Check for updates
                 registration.addEventListener('updatefound', () => {
@@ -577,7 +548,7 @@ function registerServiceWorker() {
             })
             .catch(error => {
                 // Common reasons: localhost without HTTPS, insecure context
-                console.log('ℹ️ Service Worker not registered:', error.message);
+                if (window.logger) window.logger.debug(`Service Worker not registered: ${error.message}`);
             });
     }
 }
@@ -606,11 +577,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (urlParams.domain) {
             // URL parameter takes priority
             domainInput.value = urlParams.domain;
-            console.log(`📋 Domain from URL: ${urlParams.domain}`);
+            if (window.logger) window.logger.debug(`Domain from URL: ${urlParams.domain}`);
             
             // Auto-start analysis if requested
             if (urlParams.autoStart) {
-                console.log('🚀 Auto-starting analysis...');
+                if (window.logger) window.logger.debug('Auto-starting analysis...');
                 // Small delay to ensure DOM is fully ready
                 setTimeout(() => {
                     analyzeStandard();
@@ -672,14 +643,14 @@ async function handleFileImport(event) {
         event.target.value = '';
         
     } catch (error) {
-        console.error('❌ Import failed:', error);
+        if (window.logger) window.logger.debug(`Import failed: ${error.message}`);
         alert('Failed to import JSON file. Please check the file format and try again.');
     }
 }
 
 // Import and display analysis data
 async function importAnalysisData(importData) {
-    console.log('📥 Importing analysis data...');
+    if (window.logger) window.logger.debug('Importing analysis data...');
     
     try {
         // Convert serialized data back to Maps
@@ -707,12 +678,7 @@ async function importAnalysisData(importData) {
         const analysisController = appInstance?.analysisController;
         
         if (!analysisController || !analysisController.uiRenderer) {
-            console.error('❌ AnalysisController or UIRenderer not available', {
-                hasWindowApp: !!window.app,
-                hasApp: typeof app !== 'undefined',
-                hasAnalysisController: !!analysisController,
-                hasUIRenderer: !!analysisController?.uiRenderer
-            });
+            if (window.logger) window.logger.debug('AnalysisController or UIRenderer not available');
             alert('Error: Unable to display imported data. Please refresh the page and try again.');
             return;
         }
@@ -747,7 +713,7 @@ async function importAnalysisData(importData) {
                 interestingFindings
             );
         } else {
-            console.warn('⚠️ Export manager not available. Export options may not be shown.');
+            if (window.logger) window.logger.debug('Export manager not available');
         }
         
         // Set domain input to imported domain
@@ -756,16 +722,10 @@ async function importAnalysisData(importData) {
             domainInput.value = importData.meta.domain;
         }
         
-        console.log('✅ Import completed successfully');
-        console.log('📊 Imported data summary:', {
-            domain: importData.meta.domain,
-            servicesCount: processedData.services instanceof Map ? processedData.services.size : Object.keys(processedData.services || {}).length,
-            subdomainsCount: processedData.subdomains instanceof Map ? processedData.subdomains.size : Object.keys(processedData.subdomains || {}).length,
-            hasSecurityResults: !!securityResults
-        });
+        if (window.logger) window.logger.debug(`Import completed: ${importData.meta.domain}`);
         
     } catch (error) {
-        console.error('❌ Failed to import analysis data:', error);
+        if (window.logger) window.logger.debug(`Failed to import analysis data: ${error.message}`);
         alert('Failed to process imported data. Please check the file format.');
     }
 }
@@ -798,7 +758,7 @@ function deserializeImportedData(processedData) {
         }
         
         deserialized.services = servicesMap;
-        console.log('📊 Converted services object to Map:', servicesMap.size, 'services');
+        if (window.logger) window.logger.debug(`Converted services object to Map: ${servicesMap.size} services`);
     }
     
     // Convert subdomains object back to Map (if it exists and is an object)
@@ -816,7 +776,7 @@ function deserializeImportedData(processedData) {
         }
         
         deserialized.subdomains = subdomainsMap;
-        console.log('📊 Converted subdomains object to Map:', subdomainsMap.size, 'subdomains');
+        if (window.logger) window.logger.debug(`Converted subdomains object to Map: ${subdomainsMap.size} subdomains`);
     } else if (!processedData.subdomains) {
         // Initialize empty Map if subdomains don't exist
         deserialized.subdomains = new Map();
@@ -824,7 +784,7 @@ function deserializeImportedData(processedData) {
     
     // Convert sovereigntyAnalysis objects back to Maps and Sets
     if (processedData.sovereigntyAnalysis && typeof processedData.sovereigntyAnalysis === 'object') {
-        console.log('📊 Converting sovereigntyAnalysis objects back to Maps and Sets');
+        if (window.logger) window.logger.debug('Converting sovereigntyAnalysis objects back to Maps and Sets');
         const sovereignty = { ...processedData.sovereigntyAnalysis };
         
         // Convert countryDistribution object back to Map
@@ -843,7 +803,7 @@ function deserializeImportedData(processedData) {
                 }
             }
             sovereignty.countryDistribution = countryDistMap;
-            console.log('📊 Converted countryDistribution to Map:', countryDistMap.size, 'countries');
+            if (window.logger) window.logger.debug(`Converted countryDistribution to Map: ${countryDistMap.size} countries`);
         }
         
         // Convert services Map in sovereignty
@@ -869,7 +829,7 @@ function deserializeImportedData(processedData) {
         }
         
         deserialized.sovereigntyAnalysis = sovereignty;
-        console.log('📊 Converted sovereigntyAnalysis');
+        if (window.logger) window.logger.debug('Converted sovereigntyAnalysis');
     }
     
     return deserialized;
@@ -878,7 +838,6 @@ function deserializeImportedData(processedData) {
 
 // Initialize collapsible functionality for service categories
 function initializeCollapsibleCategories() {
-    // Use event delegation to handle clicks on category headers
     document.addEventListener('click', function(e) {
         const categoryHeader = e.target.closest('.category-header, .service-category > h2');
         if (categoryHeader) {
@@ -888,14 +847,4 @@ function initializeCollapsibleCategories() {
             }
         }
     });
-    
-    // Initialize existing categories (set all to expanded by default)
-    const categories = document.querySelectorAll('.service-category');
-    categories.forEach(category => {
-        // Only collapse if it's empty or has display:none
-        const serviceList = category.querySelector('.service-list');
-        if (!serviceList || serviceList.children.length === 0) {
-            // Don't auto-collapse, let user control it
-        }
-    });
-} 
+}

@@ -64,10 +64,10 @@ class UIRenderer {
     addCollapseControls() {
         const controlsHTML = `
             <div class="collapse-controls" style="display: flex; gap: 10px; margin-bottom: 15px; justify-content: flex-end;">
-                <button onclick="window.uiRenderer.collapseAll()" class="collapse-control-btn" style="padding: 6px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; font-size: 0.85em; color: var(--text-color);">
+                <button onclick="window.uiRenderer.collapseAll()" class="collapse-control-btn" style="padding: 6px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; font-size: 0.85em; color: var(--text-primary);">
                     Collapse All
                 </button>
-                <button onclick="window.uiRenderer.expandAll()" class="collapse-control-btn" style="padding: 6px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; font-size: 0.85em; color: var(--text-color);">
+                <button onclick="window.uiRenderer.expandAll()" class="collapse-control-btn" style="padding: 6px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; font-size: 0.85em; color: var(--text-primary);">
                     Expand All
                 </button>
             </div>
@@ -415,23 +415,6 @@ class UIRenderer {
         });
     }
 
-    // Hide all vendor sections
-    hideAllVendorSections() {
-        const vendorSections = [
-            'microsoftServices', 'awsServices', 'proofpointServices',
-            'googleServices', 'cloudflareServices', 'digitaloceanServices',
-            'linodeServices', 'hetznerServices', 'otherServices'
-        ];
-        
-        vendorSections.forEach(containerId => {
-            const container = document.getElementById(containerId);
-            const section = container?.closest('.service-category');
-            if (section) {
-                section.style.display = 'none';
-            }
-        });
-    }
-
     // Get vendor from service
     getVendorFromService(service) {
         if (service.name.includes('Microsoft')) return 'Microsoft';
@@ -518,9 +501,9 @@ class UIRenderer {
             'service-card';
             
         const alertStyle = isHighRiskThirdParty ? 
-            'background: #fff3cd; border-left: 4px solid #ff6b35; padding: 8px; margin: 8px 0; border-radius: 4px;' :
+            'background: rgba(253, 203, 82, 0.15); border-left: 4px solid var(--accent-yellow); padding: 8px; margin: 8px 0; border-radius: 4px;' :
             isAnyThirdParty ? 
-            'background: #e8f4f8; border-left: 4px solid #17a2b8; padding: 8px; margin: 8px 0; border-radius: 4px;' :
+            'background: rgba(70, 111, 224, 0.1); border-left: 4px solid var(--accent-blue); padding: 8px; margin: 8px 0; border-radius: 4px;' :
             '';
         
         let html = `
@@ -621,9 +604,9 @@ class UIRenderer {
         // Show infrastructure information
         if (service.infrastructure) {
             html += `
-                <div class="service-infrastructure" style="background: #f8f9fa; padding: 8px; margin: 8px 0; border-radius: 4px; border-left: 3px solid #007bff;">
+                <div class="service-infrastructure" style="background: var(--bg-tertiary); padding: 8px; margin: 8px 0; border-radius: 4px; border-left: 3px solid var(--accent-blue);">
                     <strong>🏗️ Infrastructure:</strong> ${window.CommonUtils.escapeHtml(service.infrastructure.name)}<br>
-                    <span style="color: #666; font-size: 0.9em;">${window.CommonUtils.escapeHtml(service.infrastructure.description)}</span>
+                    <span style="color: var(--text-secondary); font-size: 0.9em;">${window.CommonUtils.escapeHtml(service.infrastructure.description)}</span>
                 </div>
             `;
         }
@@ -839,7 +822,7 @@ class UIRenderer {
         
         let html = `
             <div class="extracted-emails-section" style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
-                <h4 style="margin-top: 0; color: var(--text-color);">📧 Email Addresses Found (${totalEmails})</h4>
+                <h4 style="margin-top: 0; color: var(--text-primary);">📧 Email Addresses Found (${totalEmails})</h4>
                 <p style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 15px;">
                     Email addresses discovered in DMARC, TLS-RPT, and TXT records:
                 </p>`;
@@ -855,9 +838,9 @@ class UIRenderer {
             
             for (const emailInfo of internal) {
                 html += `
-                    <div style="padding: 8px 12px; background: var(--card-bg); border-radius: 4px; border-left: 3px solid #28a745; display: flex; justify-content: space-between; align-items: center;">
-                        <code style="font-size: 0.9em; color: var(--text-color);">${window.CommonUtils.escapeHtml(emailInfo.email)}</code>
-                        <span style="font-size: 0.75em; color: var(--text-secondary);">${window.CommonUtils.escapeHtml(emailInfo.source)}</span>
+                    <div class="email-card" style="padding: 8px 12px; background: var(--card-bg); border-radius: 4px; border-left: 3px solid #28a745; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;">
+                        <code style="font-size: 0.9em; color: var(--text-primary); word-break: break-all;">${window.CommonUtils.escapeHtml(emailInfo.email)}</code>
+                        <span style="font-size: 0.75em; color: var(--text-secondary); white-space: nowrap;">${window.CommonUtils.escapeHtml(emailInfo.source)}</span>
                     </div>`;
             }
             
@@ -889,9 +872,9 @@ class UIRenderer {
                 else if (domain.includes('emailauth') || domain.includes('easydmarc')) serviceTag = 'DMARC Service';
                 
                 html += `
-                    <div style="padding: 8px 12px; background: var(--card-bg); border-radius: 4px; border-left: 3px solid #17a2b8; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 5px;">
-                        <code style="font-size: 0.9em; color: var(--text-color);">${window.CommonUtils.escapeHtml(emailInfo.email)}</code>
-                        <div style="display: flex; gap: 8px; align-items: center;">
+                    <div class="email-card" style="padding: 8px 12px; background: var(--card-bg); border-radius: 4px; border-left: 3px solid #17a2b8; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 5px;">
+                        <code style="font-size: 0.9em; color: var(--text-primary); word-break: break-all;">${window.CommonUtils.escapeHtml(emailInfo.email)}</code>
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                             ${serviceTag ? `<span style="font-size: 0.75em; padding: 2px 6px; background: var(--accent-blue); color: white; border-radius: 3px;">${window.CommonUtils.escapeHtml(serviceTag)}</span>` : ''}
                             <span style="font-size: 0.75em; color: var(--text-secondary);">${window.CommonUtils.escapeHtml(emailInfo.source)}</span>
                         </div>
@@ -911,7 +894,7 @@ class UIRenderer {
         
         let html = `
             <div class="mx-records-section" style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
-                <h4 style="margin-top: 0; color: var(--text-color);">📬 MX Records (${mxRecords.length})</h4>
+                <h4 style="margin-top: 0; color: var(--text-primary);">📬 MX Records (${mxRecords.length})</h4>
                 <p style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 15px;">
                     Mail exchangers that handle email for this domain:
                 </p>
@@ -965,12 +948,12 @@ class UIRenderer {
             else if (serverLower.includes('sendgrid')) provider = 'SendGrid';
             
             html += `
-                <div style="padding: 10px 12px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid #17a2b8; display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <code style="font-size: 0.9em; color: var(--text-color);">${server}</code>
+                <div class="mx-card" style="padding: 10px 12px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid #17a2b8; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;">
+                    <div style="min-width: 0;">
+                        <code style="font-size: 0.9em; color: var(--text-primary); word-break: break-all;">${server}</code>
                         <span style="font-size: 0.8em; color: var(--text-secondary); margin-left: 10px;">Priority: ${priority}</span>
                     </div>
-                    <span style="font-size: 0.85em; color: var(--accent-blue);">${provider}</span>
+                    <span style="font-size: 0.85em; color: var(--accent-blue); white-space: nowrap;">${provider}</span>
                 </div>`;
         }
         
@@ -998,18 +981,18 @@ class UIRenderer {
         
         let html = `
             <div class="dmarc-record-section" style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
-                <h4 style="margin-top: 0; color: var(--text-color);">🛡️ DMARC Policy</h4>
+                <h4 style="margin-top: 0; color: var(--text-primary);">🛡️ DMARC Policy</h4>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 15px 0;">
                     <div style="padding: 12px; background: var(--card-bg); border-radius: 6px; text-align: center; border-left: 4px solid ${policyColor};">
                         <div style="font-size: 1.2em; font-weight: bold; color: ${policyColor};">${policyIcon} ${policy.toUpperCase()}</div>
                         <div style="font-size: 0.8em; color: var(--text-secondary);">Policy</div>
                     </div>
                     <div style="padding: 12px; background: var(--card-bg); border-radius: 6px; text-align: center;">
-                        <div style="font-size: 1.2em; font-weight: bold; color: var(--text-color);">${pct}%</div>
+                        <div style="font-size: 1.2em; font-weight: bold; color: var(--text-primary);">${pct}%</div>
                         <div style="font-size: 0.8em; color: var(--text-secondary);">Percentage</div>
                     </div>
                     <div style="padding: 12px; background: var(--card-bg); border-radius: 6px; text-align: center;">
-                        <div style="font-size: 1.2em; font-weight: bold; color: var(--text-color);">${subPolicy.toUpperCase()}</div>
+                        <div style="font-size: 1.2em; font-weight: bold; color: var(--text-primary);">${subPolicy.toUpperCase()}</div>
                         <div style="font-size: 0.8em; color: var(--text-secondary);">Subdomain Policy</div>
                     </div>
                 </div>`;
@@ -1021,8 +1004,8 @@ class UIRenderer {
             
             html += `<div style="margin-top: 10px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
                 <div style="font-size: 0.85em; color: var(--text-secondary);">Reporting:</div>`;
-            if (cleanRua) html += `<div style="font-size: 0.85em; color: var(--text-color);">Aggregate (rua): <code>${cleanRua}</code></div>`;
-            if (cleanRuf) html += `<div style="font-size: 0.85em; color: var(--text-color);">Forensic (ruf): <code>${cleanRuf}</code></div>`;
+            if (cleanRua) html += `<div style="font-size: 0.85em; color: var(--text-primary);">Aggregate (rua): <code>${cleanRua}</code></div>`;
+            if (cleanRuf) html += `<div style="font-size: 0.85em; color: var(--text-primary);">Forensic (ruf): <code>${cleanRuf}</code></div>`;
             html += `</div>`;
         }
         
@@ -1046,7 +1029,7 @@ class UIRenderer {
         
         let html = `
             <div class="dkim-selectors-section" style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
-                <h4 style="margin-top: 0; color: var(--text-color);">🔑 DKIM Selectors Found (${dkimSelectors.length})</h4>
+                <h4 style="margin-top: 0; color: var(--text-primary);">🔑 DKIM Selectors Found (${dkimSelectors.length})</h4>
                 <p style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 15px;">
                     Email mode probed 12 common DKIM selectors and found the following active ones:
                 </p>
@@ -1073,7 +1056,7 @@ class UIRenderer {
             html += `
                 <div style="padding: 12px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid #28a745;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <strong style="color: var(--text-color);">${dkim.selector}._domainkey</strong>
+                        <strong style="color: var(--text-primary);">${dkim.selector}._domainkey</strong>
                         <span style="font-size: 0.85em; color: var(--text-secondary);">${provider}</span>
                     </div>
                     <code style="font-size: 0.75em; word-break: break-all; color: var(--text-secondary); display: block; max-height: 60px; overflow: hidden;">
@@ -1101,26 +1084,26 @@ class UIRenderer {
         
         let html = `
             <div class="spf-chain-analysis" style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
-                <h4 style="margin-top: 0; color: var(--text-color);">📧 SPF Include Chain Analysis</h4>
+                <h4 style="margin-top: 0; color: var(--text-primary);">📧 SPF Include Chain Analysis</h4>
                 
-                <div style="display: flex; gap: 20px; margin-bottom: 15px; flex-wrap: wrap;">
-                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                <div class="security-info-grid" style="display: flex; gap: 20px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: min(200px, 100%); padding: 10px; background: var(--card-bg); border-radius: 6px;">
                         <div style="font-size: 0.9em; color: var(--text-secondary);">DNS Lookups</div>
                         <div style="font-size: 1.5em; font-weight: bold; color: ${statusColor};">
                             ${spfAnalysis.lookupCount} / ${spfAnalysis.maxLookups}
                         </div>
                         <div style="font-size: 0.8em; color: ${statusColor};">${statusIcon} ${statusText}</div>
                     </div>
-                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                    <div style="flex: 1; min-width: min(200px, 100%); padding: 10px; background: var(--card-bg); border-radius: 6px;">
                         <div style="font-size: 0.9em; color: var(--text-secondary);">Include Depth</div>
-                        <div style="font-size: 1.5em; font-weight: bold; color: var(--text-color);">
+                        <div style="font-size: 1.5em; font-weight: bold; color: var(--text-primary);">
                             ${spfAnalysis.includeChain.length}
                         </div>
                         <div style="font-size: 0.8em; color: var(--text-secondary);">include/redirect mechanisms</div>
                     </div>
-                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                    <div style="flex: 1; min-width: min(200px, 100%); padding: 10px; background: var(--card-bg); border-radius: 6px;">
                         <div style="font-size: 0.9em; color: var(--text-secondary);">Void Lookups</div>
-                        <div style="font-size: 1.5em; font-weight: bold; color: ${spfAnalysis.voidLookups > 2 ? '#ffc107' : 'var(--text-color)'};">
+                        <div style="font-size: 1.5em; font-weight: bold; color: ${spfAnalysis.voidLookups > 2 ? 'var(--accent-yellow)' : 'var(--text-primary)'};">
                             ${spfAnalysis.voidLookups}
                         </div>
                         <div style="font-size: 0.8em; color: var(--text-secondary);">RFC 7208 recommends max 2</div>
@@ -1128,8 +1111,8 @@ class UIRenderer {
                 </div>
                 
                 <div style="margin-bottom: 15px;">
-                    <strong style="color: var(--text-color);">SPF Record:</strong>
-                    <div style="font-family: monospace; font-size: 0.85em; padding: 10px; background: var(--card-bg); border-radius: 4px; word-break: break-all; color: var(--text-color); margin-top: 5px;">
+                    <strong style="color: var(--text-primary);">SPF Record:</strong>
+                    <div style="font-family: monospace; font-size: 0.85em; padding: 10px; background: var(--card-bg); border-radius: 4px; word-break: break-all; color: var(--text-primary); margin-top: 5px;">
                         ${window.CommonUtils.escapeHtml(spfAnalysis.spfRecord)}
                     </div>
                 </div>`;
@@ -1138,7 +1121,7 @@ class UIRenderer {
         if (spfAnalysis.includeChain.length > 0) {
             html += `
                 <div style="margin-bottom: 15px;">
-                    <strong style="color: var(--text-color);">Include Chain:</strong>
+                    <strong style="color: var(--text-primary);">Include Chain:</strong>
                     <div style="margin-top: 10px; padding: 10px; background: var(--card-bg); border-radius: 4px;">
                         ${this.renderSPFIncludeTree(spfAnalysis.includeChain, spfAnalysis.domain)}
                     </div>
@@ -1150,7 +1133,7 @@ class UIRenderer {
             html += `
                 <div style="margin-bottom: 15px;">
                     <strong style="color: #ffc107;">⚠️ Warnings:</strong>
-                    <ul style="margin: 5px 0; padding-left: 20px; color: var(--text-color);">
+                    <ul style="margin: 5px 0; padding-left: 20px; color: var(--text-primary);">
                         ${spfAnalysis.warnings.map(w => `<li>${window.CommonUtils.escapeHtml(w)}</li>`).join('')}
                     </ul>
                 </div>`;
@@ -1161,7 +1144,7 @@ class UIRenderer {
             html += `
                 <div style="margin-bottom: 15px;">
                     <strong style="color: #dc3545;">❌ Errors:</strong>
-                    <ul style="margin: 5px 0; padding-left: 20px; color: var(--text-color);">
+                    <ul style="margin: 5px 0; padding-left: 20px; color: var(--text-primary);">
                         ${spfAnalysis.errors.map(e => `<li>${window.CommonUtils.escapeHtml(e)}</li>`).join('')}
                     </ul>
                 </div>`;
@@ -1172,7 +1155,7 @@ class UIRenderer {
             html += `
                 <div style="padding: 10px; background: rgba(40, 167, 69, 0.1); border-radius: 4px; border: 1px solid #28a745;">
                     <strong style="color: #28a745;">💡 Suggestion: Flattened SPF Record</strong>
-                    <div style="font-family: monospace; font-size: 0.85em; padding: 10px; background: var(--card-bg); border-radius: 4px; word-break: break-all; color: var(--text-color); margin-top: 5px;">
+                    <div style="font-family: monospace; font-size: 0.85em; padding: 10px; background: var(--card-bg); border-radius: 4px; word-break: break-all; color: var(--text-primary); margin-top: 5px;">
                         ${window.CommonUtils.escapeHtml(spfAnalysis.flattenedRecord)}
                     </div>
                     <div style="font-size: 0.8em; color: var(--text-secondary); margin-top: 5px;">
@@ -1205,13 +1188,13 @@ class UIRenderer {
             const indent = '&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(entry.depth + 1);
             const icon = entry.type === 'redirect' ? '➡️' : '📦';
             const statusIcon = entry.resolved ? '✅' : '❌';
-            const statusColor = entry.resolved ? 'var(--text-color)' : '#dc3545';
+            const statusColor = entry.resolved ? 'var(--text-primary)' : 'var(--accent-red)';
             
             html += `<div style="color: ${statusColor};">`;
             html += `${indent}├─ ${icon} ${window.CommonUtils.escapeHtml(entry.type)}: <strong>${window.CommonUtils.escapeHtml(entry.domain)}</strong> ${statusIcon}`;
             
             if (entry.error) {
-                html += ` <span style="color: #dc3545; font-size: 0.9em;">(${window.CommonUtils.escapeHtml(entry.error)})</span>`;
+                html += ` <span style="color: var(--accent-red); font-size: 0.9em;">(${window.CommonUtils.escapeHtml(entry.error)})</span>`;
             }
             
             html += '</div>';
@@ -1225,21 +1208,21 @@ class UIRenderer {
     renderEmailSecurityStandards(mtaSts, bimi, smtpTlsReporting) {
         let html = `
             <div class="email-security-standards" style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
-                <h4 style="margin-top: 0; color: var(--text-color);">📧 Email Security Standards</h4>
+                <h4 style="margin-top: 0; color: var(--text-primary);">📧 Email Security Standards</h4>
                 
-                <div style="display: flex; gap: 15px; flex-wrap: wrap;">`;
+                <div class="email-standards-grid" style="display: flex; gap: 15px; flex-wrap: wrap;">`;
         
         // MTA-STS Card (H2)
         if (mtaSts) {
-            const statusColor = mtaSts.enabled ? '#28a745' : '#6c757d';
+            const statusColor = mtaSts.enabled ? 'var(--accent-green)' : 'var(--text-secondary)';
             const statusIcon = mtaSts.enabled ? '✅' : '❌';
             const statusText = mtaSts.enabled ? 'Enabled' : 'Not Configured';
             
             html += `
-                <div style="flex: 1; min-width: 250px; padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <strong style="color: var(--text-color);">MTA-STS</strong>
-                        <span style="color: ${statusColor}; font-size: 0.9em;">${statusIcon} ${statusText}</span>
+                <div class="email-standard-card" style="flex: 1; min-width: min(250px, 100%); padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 4px;">
+                        <strong style="color: var(--text-primary);">MTA-STS</strong>
+                        <span style="color: ${statusColor}; font-size: 0.9em; white-space: nowrap;">${statusIcon} ${statusText}</span>
                     </div>
                     <div style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 8px;">
                         Mail Transfer Agent Strict Transport Security (RFC 8461)
@@ -1247,7 +1230,7 @@ class UIRenderer {
             
             if (mtaSts.enabled) {
                 html += `
-                    <div style="font-size: 0.85em; color: var(--text-color);">
+                    <div style="font-size: 0.85em; color: var(--text-primary);">
                         <strong>Version:</strong> ${mtaSts.version || 'Unknown'}<br>
                         ${mtaSts.id ? `<strong>Policy ID:</strong> ${mtaSts.id}<br>` : ''}
                     </div>`;
@@ -1263,15 +1246,15 @@ class UIRenderer {
         
         // BIMI Card (H3)
         if (bimi) {
-            const statusColor = bimi.enabled ? '#28a745' : '#6c757d';
+            const statusColor = bimi.enabled ? 'var(--accent-green)' : 'var(--text-secondary)';
             const statusIcon = bimi.enabled ? '✅' : '❌';
             const statusText = bimi.enabled ? 'Enabled' : 'Not Configured';
             
             html += `
-                <div style="flex: 1; min-width: 250px; padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <strong style="color: var(--text-color);">BIMI</strong>
-                        <span style="color: ${statusColor}; font-size: 0.9em;">${statusIcon} ${statusText}</span>
+                <div class="email-standard-card" style="flex: 1; min-width: min(250px, 100%); padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 4px;">
+                        <strong style="color: var(--text-primary);">BIMI</strong>
+                        <span style="color: ${statusColor}; font-size: 0.9em; white-space: nowrap;">${statusIcon} ${statusText}</span>
                     </div>
                     <div style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 8px;">
                         Brand Indicators for Message Identification
@@ -1279,7 +1262,7 @@ class UIRenderer {
             
             if (bimi.enabled) {
                 html += `
-                    <div style="font-size: 0.85em; color: var(--text-color);">
+                    <div style="font-size: 0.85em; color: var(--text-primary);">
                         <strong>Version:</strong> ${bimi.version || 'Unknown'}<br>
                         ${bimi.logoUrl ? `<strong>Logo:</strong> <a href="${window.CommonUtils.escapeHtml(bimi.logoUrl)}" target="_blank" rel="noopener" style="color: var(--accent-blue);">${window.CommonUtils.escapeHtml(bimi.logoUrl.substring(0, 40))}...</a><br>` : '<strong>Logo:</strong> Not set<br>'}
                         ${bimi.certificateUrl ? `<strong>VMC:</strong> Configured<br>` : ''}
@@ -1296,15 +1279,15 @@ class UIRenderer {
         
         // SMTP TLS Reporting Card (H7)
         if (smtpTlsReporting) {
-            const statusColor = smtpTlsReporting.enabled ? '#28a745' : '#6c757d';
+            const statusColor = smtpTlsReporting.enabled ? 'var(--accent-green)' : 'var(--text-secondary)';
             const statusIcon = smtpTlsReporting.enabled ? '✅' : '❌';
             const statusText = smtpTlsReporting.enabled ? 'Enabled' : 'Not Configured';
             
             html += `
-                <div style="flex: 1; min-width: 250px; padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <strong style="color: var(--text-color);">TLS-RPT</strong>
-                        <span style="color: ${statusColor}; font-size: 0.9em;">${statusIcon} ${statusText}</span>
+                <div class="email-standard-card" style="flex: 1; min-width: min(250px, 100%); padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 4px;">
+                        <strong style="color: var(--text-primary);">TLS-RPT</strong>
+                        <span style="color: ${statusColor}; font-size: 0.9em; white-space: nowrap;">${statusIcon} ${statusText}</span>
                     </div>
                     <div style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 8px;">
                         SMTP TLS Reporting (RFC 8460)
@@ -1312,7 +1295,7 @@ class UIRenderer {
             
             if (smtpTlsReporting.enabled) {
                 html += `
-                    <div style="font-size: 0.85em; color: var(--text-color);">
+                    <div style="font-size: 0.85em; color: var(--text-primary);">
                         <strong>Version:</strong> ${smtpTlsReporting.version || 'Unknown'}<br>
                         <strong>Reports sent to:</strong> ${smtpTlsReporting.reportingAddresses?.length || 0} address(es)
                     </div>`;
@@ -1337,21 +1320,21 @@ class UIRenderer {
     renderDANETLSAStatus(dane, inline = false) {
         if (!dane) return '';
         
-        const statusColor = dane.enabled ? '#28a745' : '#6c757d';
+        const statusColor = dane.enabled ? 'var(--accent-green)' : 'var(--text-secondary)';
         const statusIcon = dane.enabled ? '✅' : '❌';
         const statusText = dane.enabled ? 'Enabled' : 'Not Configured';
         
         const marginTop = inline ? '0' : '20px';
         const flexBasis = inline ? '1' : 'auto';
-        const minWidth = inline ? '300px' : 'auto';
+        const minWidth = inline ? 'min(300px, 100%)' : 'auto';
         
         let html = `
             <div class="dane-status" style="margin-top: ${marginTop}; flex: ${flexBasis}; min-width: ${minWidth}; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
-                <h4 style="margin-top: 0; color: var(--text-color);">🔐 DANE/TLSA Status</h4>
+                <h4 style="margin-top: 0; color: var(--text-primary);">🔐 DANE/TLSA Status</h4>
                 
-                <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
-                    <div style="flex: 1; min-width: 250px; padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div class="security-info-grid" style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: min(250px, 100%); padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;">
                             <div>
                                 <div style="font-size: 1.2em; font-weight: bold; color: ${statusColor};">${statusIcon} ${statusText}</div>
                                 <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 5px;">
@@ -1364,16 +1347,16 @@ class UIRenderer {
         if (dane.enabled) {
             // Show which services have DANE
             html += `
-                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                    <div style="flex: 1; min-width: min(200px, 100%); padding: 10px; background: var(--card-bg); border-radius: 6px;">
                         <div style="font-size: 0.9em; color: var(--text-secondary);">Protected Services</div>
                         <div style="margin-top: 5px;">
                             ${dane.smtpDANE ? '<span style="display: inline-block; padding: 2px 8px; margin: 2px; background: rgba(40, 167, 69, 0.1); border-radius: 3px; color: #28a745;">📧 SMTP</span>' : ''}
                             ${dane.httpsDANE ? '<span style="display: inline-block; padding: 2px 8px; margin: 2px; background: rgba(40, 167, 69, 0.1); border-radius: 3px; color: #28a745;">🌐 HTTPS</span>' : ''}
                         </div>
                     </div>
-                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                    <div style="flex: 1; min-width: min(200px, 100%); padding: 10px; background: var(--card-bg); border-radius: 6px;">
                         <div style="font-size: 0.9em; color: var(--text-secondary);">TLSA Records</div>
-                        <div style="font-size: 1.2em; font-weight: bold; color: var(--text-color);">${dane.records?.length || 0}</div>
+                        <div style="font-size: 1.2em; font-weight: bold; color: var(--text-primary);">${dane.records?.length || 0}</div>
                     </div>`;
         }
         
@@ -1396,11 +1379,11 @@ class UIRenderer {
         if (!dnssec) return '';
         
         const statusColors = {
-            'secure': '#28a745',
-            'insecure': '#ffc107',
-            'unsigned': '#6c757d',
-            'error': '#dc3545',
-            'unknown': '#6c757d'
+            'secure': 'var(--accent-green)',
+            'insecure': 'var(--accent-yellow)',
+            'unsigned': 'var(--text-secondary)',
+            'error': 'var(--accent-red)',
+            'unknown': 'var(--text-secondary)'
         };
         
         const statusIcons = {
@@ -1425,15 +1408,15 @@ class UIRenderer {
         
         const marginTop = inline ? '0' : '20px';
         const flexBasis = inline ? '1' : 'auto';
-        const minWidth = inline ? '300px' : 'auto';
+        const minWidth = inline ? 'min(300px, 100%)' : 'auto';
         
         let html = `
             <div class="dnssec-status" style="margin-top: ${marginTop}; flex: ${flexBasis}; min-width: ${minWidth}; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
-                <h4 style="margin-top: 0; color: var(--text-color);">🔐 DNSSEC Status</h4>
+                <h4 style="margin-top: 0; color: var(--text-primary);">🔐 DNSSEC Status</h4>
                 
-                <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
-                    <div style="flex: 1; min-width: 250px; padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${color};">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div class="security-info-grid" style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: min(250px, 100%); padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${color};">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;">
                             <div>
                                 <div style="font-size: 1.2em; font-weight: bold; color: ${color};">${icon} ${label}</div>
                                 <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 5px;">
@@ -1446,9 +1429,9 @@ class UIRenderer {
         // Show DNSKEY info if present
         if (dnssec.dnskeyPresent && dnssec.records.dnskey.length > 0) {
             html += `
-                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                    <div style="flex: 1; min-width: min(200px, 100%); padding: 10px; background: var(--card-bg); border-radius: 6px;">
                         <div style="font-size: 0.9em; color: var(--text-secondary);">DNSKEY Records</div>
-                        <div style="font-size: 1.2em; font-weight: bold; color: var(--text-color);">${dnssec.records.dnskey.length}</div>
+                        <div style="font-size: 1.2em; font-weight: bold; color: var(--text-primary);">${dnssec.records.dnskey.length}</div>
                         <div style="font-size: 0.8em; color: var(--text-secondary);">`;
             
             for (const key of dnssec.records.dnskey) {
@@ -1460,9 +1443,9 @@ class UIRenderer {
         // Show DS info if present
         if (dnssec.dsPresent && dnssec.records.ds.length > 0) {
             html += `
-                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                    <div style="flex: 1; min-width: min(200px, 100%); padding: 10px; background: var(--card-bg); border-radius: 6px;">
                         <div style="font-size: 0.9em; color: var(--text-secondary);">DS Records</div>
-                        <div style="font-size: 1.2em; font-weight: bold; color: var(--text-color);">${dnssec.records.ds.length}</div>
+                        <div style="font-size: 1.2em; font-weight: bold; color: var(--text-primary);">${dnssec.records.ds.length}</div>
                         <div style="font-size: 0.8em; color: var(--text-secondary);">`;
             
             for (const ds of dnssec.records.ds) {
@@ -1508,10 +1491,10 @@ class UIRenderer {
     // Format grouped security issues with expandable sections
     formatGroupedSecurityIssues(groupedIssues, riskLevel) {
         const riskColors = {
-            critical: '#8B0000', high: '#FF8C00', medium: '#FFD700',
-            low: '#0066CC', info: '#FFFFFF'
+            critical: 'var(--accent-red)', high: '#FF8C00', medium: 'var(--accent-yellow)',
+            low: 'var(--accent-blue)', info: 'var(--text-primary)'
         };
-        const color = riskColors[riskLevel] || '#6c757d';
+        const color = riskColors[riskLevel] || 'var(--text-secondary)';
         
         let html = '';
         for (const [groupKey, issues] of Object.entries(groupedIssues)) {
@@ -1643,8 +1626,8 @@ class UIRenderer {
     // Format security issue
     formatSecurityIssue(issue) {
         const riskColors = {
-            critical: '#8B0000', high: '#FF8C00', medium: '#FFD700',
-            low: '#0066CC', info: '#FFFFFF'
+            critical: 'var(--accent-red)', high: '#FF8C00', medium: 'var(--accent-yellow)',
+            low: 'var(--accent-blue)', info: 'var(--text-primary)'
         };
         
         const categoryIcons = {
@@ -1653,7 +1636,7 @@ class UIRenderer {
         };
         
         const icon = categoryIcons[issue.category] || '🔍';
-        const color = riskColors[issue.risk] || '#6c757d';
+        const color = riskColors[issue.risk] || 'var(--text-secondary)';
         
         let html = `
             <div class="service-item security-issues" style="border-left: 4px solid ${color};">
@@ -2248,9 +2231,9 @@ class UIRenderer {
                 // Show parsed DKIM info if available
                 if (record.parsed && record.type === 'DKIM') {
                     const confidence = record.parsed.confidence;
-                    const confidenceColor = confidence === 'high' ? '#28a745' : 
-                                           confidence === 'medium' ? '#ffc107' : 
-                                           confidence === 'low' ? '#fd7e14' : '#6c757d';
+                    const confidenceColor = confidence === 'high' ? 'var(--accent-green)' : 
+                                           confidence === 'medium' ? 'var(--accent-yellow)' : 
+                                           confidence === 'low' ? '#fd7e14' : 'var(--text-secondary)';
                     
                     html += `<div class="dkim-parsed">
                         <strong>Selector:</strong> ${window.CommonUtils.escapeHtml(record.parsed.selector)} | 
@@ -2354,11 +2337,11 @@ class UIRenderer {
                 <table style="width: 100%; border-collapse: collapse; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; background: var(--card-bg); border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <thead>
                         <tr style="background: var(--table-header-bg); border-bottom: 2px solid var(--border-color);">
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 200px;">📜 Subdomain</th>
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 100px;">Source</th>
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 100px;">Discovered</th>
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 120px;">Issuer</th>
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 100px;">Expiry</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">📜 Subdomain</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Source</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Discovered</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Issuer</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Expiry</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -2398,7 +2381,7 @@ class UIRenderer {
             
             html += `
                 <tr style="border-bottom: 1px solid var(--border-color);">
-                    <td style="padding: 12px 8px; color: var(--text-color); word-break: break-all;">
+                    <td style="padding: 12px 8px; color: var(--text-primary); word-break: break-all;">
                         ${this.createSubdomainLink(record.subdomain)}
                     </td>
                     <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.8rem;">${window.CommonUtils.escapeHtml(source)}</td>
@@ -2427,10 +2410,10 @@ class UIRenderer {
                 <table style="width: 100%; border-collapse: collapse; background: var(--card-bg); border-radius: 8px; overflow: hidden;">
                     <thead>
                         <tr style="background: var(--bg-secondary);">
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 200px;">Host Label</th>
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 80px;">TTL</th>
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 80px;">Record Type</th>
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 300px;">Record Data</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Host Label</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">TTL</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Record Type</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Record Data</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -2439,9 +2422,9 @@ class UIRenderer {
         rawRecords.forEach(record => {
             html += `
                 <tr style="border-bottom: 1px solid var(--border-color);">
-                    <td style="padding: 12px 8px; color: var(--text-color); word-break: break-all; font-family: monospace;">${record.host}</td>
+                    <td style="padding: 12px 8px; color: var(--text-primary); word-break: break-all; font-family: monospace;">${record.host}</td>
                     <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.9rem; font-family: monospace;">${record.ttl}</td>
-                    <td style="padding: 12px 8px; color: var(--text-color); font-weight: 600; font-family: monospace;">${record.type}</td>
+                    <td style="padding: 12px 8px; color: var(--text-primary); font-weight: 600; font-family: monospace;">${record.type}</td>
                     <td style="padding: 12px 8px; color: var(--text-secondary); word-break: break-word; font-family: monospace; font-size: 0.9rem;">${record.data}</td>
                 </tr>
             `;
@@ -2475,9 +2458,9 @@ class UIRenderer {
         rawRecords.forEach(record => {
             tableRows += `
                 <tr style="border-bottom: 1px solid var(--border-color);">
-                    <td style="padding: 12px 8px; color: var(--text-color); word-break: break-all; font-family: monospace;">${window.CommonUtils.escapeHtml(record.host)}</td>
+                    <td style="padding: 12px 8px; color: var(--text-primary); word-break: break-all; font-family: monospace;">${window.CommonUtils.escapeHtml(record.host)}</td>
                     <td style="padding: 12px 8px; color: var(--text-secondary); font-size: 0.9rem; font-family: monospace;">${window.CommonUtils.escapeHtml(record.ttl)}</td>
-                    <td style="padding: 12px 8px; color: var(--text-color); font-weight: 600; font-family: monospace;">${window.CommonUtils.escapeHtml(record.type)}</td>
+                    <td style="padding: 12px 8px; color: var(--text-primary); font-weight: 600; font-family: monospace;">${window.CommonUtils.escapeHtml(record.type)}</td>
                     <td style="padding: 12px 8px; color: var(--text-secondary); word-break: break-word; font-family: monospace; font-size: 0.9rem;">${window.CommonUtils.escapeHtml(record.data)}</td>
                 </tr>
             `;
@@ -2497,10 +2480,10 @@ class UIRenderer {
                         <table style="width: 100%; border-collapse: collapse; background: var(--card-bg); border-radius: 8px; overflow: hidden;">
                             <thead>
                                 <tr style="background: var(--bg-secondary);">
-                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 200px;">Host Label</th>
-                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 80px;">TTL</th>
-                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 80px;">Record Type</th>
-                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-color); border-bottom: 2px solid var(--border-color); min-width: 300px;">Record Data</th>
+                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Host Label</th>
+                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">TTL</th>
+                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Record Type</th>
+                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Record Data</th>
                                 </tr>
                             </thead>
                             <tbody>

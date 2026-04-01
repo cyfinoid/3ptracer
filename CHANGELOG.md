@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-04-01
+
+### Changed
+- **Complete mobile responsive overhaul** - Rewrote CSS breakpoints at 768px and 480px for proper full-width mobile layouts, stacked export buttons, responsive email/MX/service cards, and eliminated horizontal scrolling with `overflow-x: hidden`
+
+### Fixed
+- **Dark mode inline style colors** - Replaced hardcoded colors in inline styles with CSS variables (`var(--text-primary)`, `var(--text-secondary)`, `var(--bg-tertiary)`, `var(--accent-blue)`, `var(--accent-yellow)`) across `ui-renderer.js`, `visualizer.js`, `app.js`, and `index.html` for proper dark mode support
+- **API provider resilience** - Providers that fail 3 consecutive fetches are now marked unavailable for the session instead of retrying indefinitely; blocklists that return "query blocked" are skipped for the remainder of the session
+- **Consolidated API notification methods** - Deduplicated four separate notification helpers into a single `notifyAPIStatus()` method in `dns-analyzer.js`
+
+### Optimizations
+- **Code deduplication in `app.js`** - Extracted shared `runAnalysis()` wrapper and `parseDomainInput()` helper, eliminating ~60 lines of duplicated logic between `analyzeStandard()` and `analyzeQuickEmail()`
+- **Removed ~85 lines of unused code** - Removed `mergeSubdomainData()`, `getServicesByCategory()`, `getServicesByVendor()`, `getVendorFromService()` from `data-processor.js`; `hideAllVendorSections()` from `ui-renderer.js`; unused `analysisAbortController` variable from `app.js`
+- **Logging cleanup** - Replaced raw `console.log`/`console.error` calls with conditional `window.logger.debug()` across `app.js` and `data-processor.js`; removed verbose debug logging from data sovereignty analysis
+
 ## [1.1.2] - 2026-03-31
 
 ### Added
