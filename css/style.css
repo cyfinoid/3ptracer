@@ -826,61 +826,111 @@ input[type="checkbox"] {
 
 /* Mobile-specific layout */
 @media (max-width: 768px) {
+    body {
+        padding: 0;
+    }
+
+    .container {
+        border-radius: 0;
+        box-shadow: none;
+    }
+
     .content {
         padding: 10px;
     }
-    
+
+    .header {
+        padding-bottom: 20px;
+    }
+
+    .header h1 {
+        font-size: 1.8em;
+    }
+
+    .header p {
+        font-size: 0.95em;
+    }
+
+    .theme-toggle-container {
+        padding: 10px 10px 0 10px;
+    }
+
     .input-section {
         padding: 15px;
+        margin-bottom: 15px;
     }
-    
+
+    input[type="text"] {
+        max-width: 100%;
+    }
+
     /* Stack options vertically on mobile */
     .form-group[style*="flex"] {
         flex-direction: column !important;
         gap: 15px !important;
     }
-    
+
     /* Full-width buttons on mobile */
     .analyze-btn,
     .export-btn {
         width: 100%;
         justify-content: center;
     }
-    
+
     /* Service category adjustments on mobile */
     .service-category {
-        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 12px;
     }
-    
+
     .service-category h2,
     .category-header {
         font-size: 1.1em;
-        padding: 15px;
+        padding: 12px;
     }
-    
+
     .service-category h2::after,
     .category-header::after {
-        right: 15px;
+        right: 12px;
     }
-    
+
+    .service-list {
+        padding: 12px;
+    }
+
+    .service-item,
+    .service-card {
+        padding: 12px;
+        margin-bottom: 8px;
+    }
+
+    .service-card h3 {
+        font-size: 16px;
+    }
+
+    .service-records {
+        padding: 10px;
+        font-size: 13px;
+    }
+
     /* Responsive tables */
     table {
         display: block;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
     }
-    
+
     /* Better visualization on mobile */
     .viz-tabs {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         padding-bottom: 5px;
     }
-    
+
     .viz-content {
         min-height: 300px !important;
     }
-    
+
     /* Export buttons: single column stacked on mobile */
     .export-buttons {
         display: flex !important;
@@ -889,7 +939,7 @@ input[type="checkbox"] {
         align-items: stretch !important;
         gap: 10px;
     }
-    
+
     .export-btn {
         width: 100% !important;
         min-width: 0;
@@ -900,12 +950,28 @@ input[type="checkbox"] {
         border: 2px solid rgba(255, 255, 255, 0.6);
         font-size: 0.95rem;
     }
-    
+
     .export-section {
-        margin: 15px 0;
-        padding: 20px 12px;
+        margin: 10px 0;
+        padding: 15px 10px;
+        border-radius: 8px;
     }
-    
+
+    .export-header h3 {
+        font-size: 1.2em;
+    }
+
+    .export-header p {
+        font-size: 0.85em;
+        margin-bottom: 12px;
+    }
+
+    /* Stats cards */
+    .stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+
     /* Modal improvements */
     .modal-content,
     #shortcutsModal > div {
@@ -913,26 +979,114 @@ input[type="checkbox"] {
         max-width: none !important;
         margin: 10px;
     }
-    
+
     /* Batch mode textarea */
     #batchDomains {
         min-height: 120px;
+    }
+
+    /* Footer */
+    .footer {
+        padding: 25px 0;
+        margin-top: 20px;
+    }
+
+    .footer-content {
+        grid-template-columns: 1fr;
+        gap: 20px;
+        padding: 0 15px;
     }
 }
 
 /* Small phone adjustments */
 @media (max-width: 480px) {
-    h1 {
+    .content {
+        padding: 6px;
+    }
+
+    .header {
+        padding-bottom: 15px;
+    }
+
+    .header h1 {
         font-size: 1.5em;
     }
-    
+
+    .header p {
+        font-size: 0.85em;
+    }
+
+    .theme-toggle-container {
+        padding: 8px 6px 0 6px;
+    }
+
+    .theme-toggle {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+
+    .input-section {
+        padding: 10px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+    }
+
     .tagline {
         font-size: 0.9em;
     }
-    
+
     /* Stack analysis options */
     .form-group > div {
         width: 100%;
+    }
+
+    .form-group {
+        margin-bottom: 12px;
+    }
+
+    .analyze-btn {
+        padding: 12px 16px;
+        font-size: 15px;
+    }
+
+    .service-category {
+        border-radius: 6px;
+        margin-bottom: 8px;
+    }
+
+    .service-category h2,
+    .category-header {
+        padding: 10px;
+        font-size: 1em;
+    }
+
+    .service-category h2::after,
+    .category-header::after {
+        right: 10px;
+        font-size: 0.7em;
+    }
+
+    .service-list {
+        padding: 8px;
+    }
+
+    .service-item,
+    .service-card {
+        padding: 10px;
+        margin-bottom: 6px;
+    }
+
+    .service-card h3 {
+        font-size: 15px;
+    }
+
+    .service-records {
+        font-size: 12px;
+        padding: 8px;
+    }
+
+    .stats {
+        gap: 6px;
     }
 }
 
@@ -1258,28 +1412,6 @@ a[aria-label] {
 
 .stat-card-time .stat-label::before {
     content: '⏱ ';
-}
-
-@media (max-width: 768px) {
-    .theme-toggle-container {
-        padding: 10px 15px 0 15px;
-    }
-    
-    .header {
-        padding: 20px;
-    }
-    
-    .header h1 {
-        font-size: 2rem;
-    }
-    
-    .content {
-        padding: 20px;
-    }
-    
-    .stats {
-        grid-template-columns: 1fr;
-    }
 }
 
 /* Footer styling */
@@ -2470,26 +2602,6 @@ a[aria-label] {
    Mobile: Dynamically generated elements
    ========================================== */
 @media (max-width: 480px) {
-    body {
-        padding: 8px;
-    }
-
-    .content {
-        padding: 8px;
-    }
-
-    .input-section {
-        padding: 12px;
-    }
-
-    .header h1 {
-        font-size: 1.4em;
-    }
-
-    .header p {
-        font-size: 0.9em;
-    }
-
     /* MX record cards: stack server + provider */
     .mx-card {
         flex-direction: column !important;
@@ -2505,7 +2617,7 @@ a[aria-label] {
     /* Security info grids (SPF stats, DNSSEC, DANE) */
     .security-info-grid {
         flex-direction: column !important;
-        gap: 10px !important;
+        gap: 8px !important;
     }
 
     .security-info-grid > div {
@@ -2516,7 +2628,7 @@ a[aria-label] {
     /* Email security standard cards (MTA-STS, BIMI, TLS-RPT) */
     .email-standards-grid {
         flex-direction: column !important;
-        gap: 10px !important;
+        gap: 8px !important;
     }
 
     .email-standard-card {
@@ -2526,9 +2638,9 @@ a[aria-label] {
 
     /* DNS records tables: enable horizontal scroll */
     .dns-records-table {
-        margin-left: -8px;
-        margin-right: -8px;
-        padding: 0 8px;
+        margin-left: -6px;
+        margin-right: -6px;
+        padding: 0 6px;
     }
 
     .dns-records-table table {
@@ -2537,60 +2649,59 @@ a[aria-label] {
 
     .dns-records-table th,
     .dns-records-table td {
-        padding: 8px 4px;
-    }
-
-    /* Service category sections */
-    .service-category {
-        border-radius: 8px;
-    }
-
-    .service-list {
-        padding: 10px;
-    }
-
-    .service-item,
-    .service-card {
-        padding: 12px;
+        padding: 6px 3px;
     }
 
     .service-records {
-        font-size: 0.8em;
-        padding: 8px;
         word-break: break-all;
     }
 
     /* Export section */
     .export-section {
-        padding: 15px 10px;
-        border-radius: 8px;
+        padding: 12px 8px;
+        border-radius: 6px;
     }
 
     .export-header h3 {
-        font-size: 1.1em;
+        font-size: 1.05em;
     }
 
     .export-header p {
-        font-size: 0.85em;
+        font-size: 0.8em;
+    }
+
+    .export-btn {
+        padding: 10px 12px;
+        font-size: 0.9rem;
     }
 
     /* Collapse controls */
     .collapse-controls {
         justify-content: center !important;
+        gap: 8px;
+    }
+
+    .collapse-controls button {
+        padding: 6px 12px;
+        font-size: 0.85em;
     }
 
     /* Collapsible section content */
     .section-content {
-        padding: 10px;
+        padding: 8px;
     }
 
     /* Stat cards */
     .stat-card {
-        padding: 12px;
+        padding: 10px;
     }
 
     .stat-number {
-        font-size: 1.5em;
+        font-size: 1.3em;
+    }
+
+    .stat-label {
+        font-size: 0.75em;
     }
 
     /* Footer */
@@ -2600,6 +2711,15 @@ a[aria-label] {
     }
 
     .footer {
-        padding: 20px 0;
+        padding: 15px 0;
+    }
+
+    .footer-section h3 {
+        font-size: 16px;
+    }
+
+    .footer-section p,
+    .footer-section a {
+        font-size: 13px;
     }
 }
