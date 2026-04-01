@@ -838,9 +838,9 @@ class UIRenderer {
             
             for (const emailInfo of internal) {
                 html += `
-                    <div style="padding: 8px 12px; background: var(--card-bg); border-radius: 4px; border-left: 3px solid #28a745; display: flex; justify-content: space-between; align-items: center;">
-                        <code style="font-size: 0.9em; color: var(--text-primary);">${window.CommonUtils.escapeHtml(emailInfo.email)}</code>
-                        <span style="font-size: 0.75em; color: var(--text-secondary);">${window.CommonUtils.escapeHtml(emailInfo.source)}</span>
+                    <div class="email-card" style="padding: 8px 12px; background: var(--card-bg); border-radius: 4px; border-left: 3px solid #28a745; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;">
+                        <code style="font-size: 0.9em; color: var(--text-primary); word-break: break-all;">${window.CommonUtils.escapeHtml(emailInfo.email)}</code>
+                        <span style="font-size: 0.75em; color: var(--text-secondary); white-space: nowrap;">${window.CommonUtils.escapeHtml(emailInfo.source)}</span>
                     </div>`;
             }
             
@@ -872,9 +872,9 @@ class UIRenderer {
                 else if (domain.includes('emailauth') || domain.includes('easydmarc')) serviceTag = 'DMARC Service';
                 
                 html += `
-                    <div style="padding: 8px 12px; background: var(--card-bg); border-radius: 4px; border-left: 3px solid #17a2b8; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 5px;">
-                        <code style="font-size: 0.9em; color: var(--text-primary);">${window.CommonUtils.escapeHtml(emailInfo.email)}</code>
-                        <div style="display: flex; gap: 8px; align-items: center;">
+                    <div class="email-card" style="padding: 8px 12px; background: var(--card-bg); border-radius: 4px; border-left: 3px solid #17a2b8; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 5px;">
+                        <code style="font-size: 0.9em; color: var(--text-primary); word-break: break-all;">${window.CommonUtils.escapeHtml(emailInfo.email)}</code>
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                             ${serviceTag ? `<span style="font-size: 0.75em; padding: 2px 6px; background: var(--accent-blue); color: white; border-radius: 3px;">${window.CommonUtils.escapeHtml(serviceTag)}</span>` : ''}
                             <span style="font-size: 0.75em; color: var(--text-secondary);">${window.CommonUtils.escapeHtml(emailInfo.source)}</span>
                         </div>
@@ -948,12 +948,12 @@ class UIRenderer {
             else if (serverLower.includes('sendgrid')) provider = 'SendGrid';
             
             html += `
-                <div style="padding: 10px 12px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid #17a2b8; display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <code style="font-size: 0.9em; color: var(--text-primary);">${server}</code>
+                <div class="mx-card" style="padding: 10px 12px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid #17a2b8; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;">
+                    <div style="min-width: 0;">
+                        <code style="font-size: 0.9em; color: var(--text-primary); word-break: break-all;">${server}</code>
                         <span style="font-size: 0.8em; color: var(--text-secondary); margin-left: 10px;">Priority: ${priority}</span>
                     </div>
-                    <span style="font-size: 0.85em; color: var(--accent-blue);">${provider}</span>
+                    <span style="font-size: 0.85em; color: var(--accent-blue); white-space: nowrap;">${provider}</span>
                 </div>`;
         }
         
@@ -1086,22 +1086,22 @@ class UIRenderer {
             <div class="spf-chain-analysis" style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
                 <h4 style="margin-top: 0; color: var(--text-primary);">📧 SPF Include Chain Analysis</h4>
                 
-                <div style="display: flex; gap: 20px; margin-bottom: 15px; flex-wrap: wrap;">
-                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                <div class="security-info-grid" style="display: flex; gap: 20px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: min(200px, 100%); padding: 10px; background: var(--card-bg); border-radius: 6px;">
                         <div style="font-size: 0.9em; color: var(--text-secondary);">DNS Lookups</div>
                         <div style="font-size: 1.5em; font-weight: bold; color: ${statusColor};">
                             ${spfAnalysis.lookupCount} / ${spfAnalysis.maxLookups}
                         </div>
                         <div style="font-size: 0.8em; color: ${statusColor};">${statusIcon} ${statusText}</div>
                     </div>
-                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                    <div style="flex: 1; min-width: min(200px, 100%); padding: 10px; background: var(--card-bg); border-radius: 6px;">
                         <div style="font-size: 0.9em; color: var(--text-secondary);">Include Depth</div>
                         <div style="font-size: 1.5em; font-weight: bold; color: var(--text-primary);">
                             ${spfAnalysis.includeChain.length}
                         </div>
                         <div style="font-size: 0.8em; color: var(--text-secondary);">include/redirect mechanisms</div>
                     </div>
-                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                    <div style="flex: 1; min-width: min(200px, 100%); padding: 10px; background: var(--card-bg); border-radius: 6px;">
                         <div style="font-size: 0.9em; color: var(--text-secondary);">Void Lookups</div>
                         <div style="font-size: 1.5em; font-weight: bold; color: ${spfAnalysis.voidLookups > 2 ? 'var(--accent-yellow)' : 'var(--text-primary)'};">
                             ${spfAnalysis.voidLookups}
@@ -1210,7 +1210,7 @@ class UIRenderer {
             <div class="email-security-standards" style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
                 <h4 style="margin-top: 0; color: var(--text-primary);">📧 Email Security Standards</h4>
                 
-                <div style="display: flex; gap: 15px; flex-wrap: wrap;">`;
+                <div class="email-standards-grid" style="display: flex; gap: 15px; flex-wrap: wrap;">`;
         
         // MTA-STS Card (H2)
         if (mtaSts) {
@@ -1219,10 +1219,10 @@ class UIRenderer {
             const statusText = mtaSts.enabled ? 'Enabled' : 'Not Configured';
             
             html += `
-                <div style="flex: 1; min-width: 250px; padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div class="email-standard-card" style="flex: 1; min-width: min(250px, 100%); padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 4px;">
                         <strong style="color: var(--text-primary);">MTA-STS</strong>
-                        <span style="color: ${statusColor}; font-size: 0.9em;">${statusIcon} ${statusText}</span>
+                        <span style="color: ${statusColor}; font-size: 0.9em; white-space: nowrap;">${statusIcon} ${statusText}</span>
                     </div>
                     <div style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 8px;">
                         Mail Transfer Agent Strict Transport Security (RFC 8461)
@@ -1251,10 +1251,10 @@ class UIRenderer {
             const statusText = bimi.enabled ? 'Enabled' : 'Not Configured';
             
             html += `
-                <div style="flex: 1; min-width: 250px; padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div class="email-standard-card" style="flex: 1; min-width: min(250px, 100%); padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 4px;">
                         <strong style="color: var(--text-primary);">BIMI</strong>
-                        <span style="color: ${statusColor}; font-size: 0.9em;">${statusIcon} ${statusText}</span>
+                        <span style="color: ${statusColor}; font-size: 0.9em; white-space: nowrap;">${statusIcon} ${statusText}</span>
                     </div>
                     <div style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 8px;">
                         Brand Indicators for Message Identification
@@ -1284,10 +1284,10 @@ class UIRenderer {
             const statusText = smtpTlsReporting.enabled ? 'Enabled' : 'Not Configured';
             
             html += `
-                <div style="flex: 1; min-width: 250px; padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div class="email-standard-card" style="flex: 1; min-width: min(250px, 100%); padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 4px;">
                         <strong style="color: var(--text-primary);">TLS-RPT</strong>
-                        <span style="color: ${statusColor}; font-size: 0.9em;">${statusIcon} ${statusText}</span>
+                        <span style="color: ${statusColor}; font-size: 0.9em; white-space: nowrap;">${statusIcon} ${statusText}</span>
                     </div>
                     <div style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 8px;">
                         SMTP TLS Reporting (RFC 8460)
@@ -1326,15 +1326,15 @@ class UIRenderer {
         
         const marginTop = inline ? '0' : '20px';
         const flexBasis = inline ? '1' : 'auto';
-        const minWidth = inline ? '300px' : 'auto';
+        const minWidth = inline ? 'min(300px, 100%)' : 'auto';
         
         let html = `
             <div class="dane-status" style="margin-top: ${marginTop}; flex: ${flexBasis}; min-width: ${minWidth}; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
                 <h4 style="margin-top: 0; color: var(--text-primary);">🔐 DANE/TLSA Status</h4>
                 
-                <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
-                    <div style="flex: 1; min-width: 250px; padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div class="security-info-grid" style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: min(250px, 100%); padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${statusColor};">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;">
                             <div>
                                 <div style="font-size: 1.2em; font-weight: bold; color: ${statusColor};">${statusIcon} ${statusText}</div>
                                 <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 5px;">
@@ -1347,14 +1347,14 @@ class UIRenderer {
         if (dane.enabled) {
             // Show which services have DANE
             html += `
-                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                    <div style="flex: 1; min-width: min(200px, 100%); padding: 10px; background: var(--card-bg); border-radius: 6px;">
                         <div style="font-size: 0.9em; color: var(--text-secondary);">Protected Services</div>
                         <div style="margin-top: 5px;">
                             ${dane.smtpDANE ? '<span style="display: inline-block; padding: 2px 8px; margin: 2px; background: rgba(40, 167, 69, 0.1); border-radius: 3px; color: #28a745;">📧 SMTP</span>' : ''}
                             ${dane.httpsDANE ? '<span style="display: inline-block; padding: 2px 8px; margin: 2px; background: rgba(40, 167, 69, 0.1); border-radius: 3px; color: #28a745;">🌐 HTTPS</span>' : ''}
                         </div>
                     </div>
-                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                    <div style="flex: 1; min-width: min(200px, 100%); padding: 10px; background: var(--card-bg); border-radius: 6px;">
                         <div style="font-size: 0.9em; color: var(--text-secondary);">TLSA Records</div>
                         <div style="font-size: 1.2em; font-weight: bold; color: var(--text-primary);">${dane.records?.length || 0}</div>
                     </div>`;
@@ -1408,15 +1408,15 @@ class UIRenderer {
         
         const marginTop = inline ? '0' : '20px';
         const flexBasis = inline ? '1' : 'auto';
-        const minWidth = inline ? '300px' : 'auto';
+        const minWidth = inline ? 'min(300px, 100%)' : 'auto';
         
         let html = `
             <div class="dnssec-status" style="margin-top: ${marginTop}; flex: ${flexBasis}; min-width: ${minWidth}; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
                 <h4 style="margin-top: 0; color: var(--text-primary);">🔐 DNSSEC Status</h4>
                 
-                <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
-                    <div style="flex: 1; min-width: 250px; padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${color};">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div class="security-info-grid" style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: min(250px, 100%); padding: 15px; background: var(--card-bg); border-radius: 6px; border-left: 4px solid ${color};">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;">
                             <div>
                                 <div style="font-size: 1.2em; font-weight: bold; color: ${color};">${icon} ${label}</div>
                                 <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 5px;">
@@ -1429,7 +1429,7 @@ class UIRenderer {
         // Show DNSKEY info if present
         if (dnssec.dnskeyPresent && dnssec.records.dnskey.length > 0) {
             html += `
-                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                    <div style="flex: 1; min-width: min(200px, 100%); padding: 10px; background: var(--card-bg); border-radius: 6px;">
                         <div style="font-size: 0.9em; color: var(--text-secondary);">DNSKEY Records</div>
                         <div style="font-size: 1.2em; font-weight: bold; color: var(--text-primary);">${dnssec.records.dnskey.length}</div>
                         <div style="font-size: 0.8em; color: var(--text-secondary);">`;
@@ -1443,7 +1443,7 @@ class UIRenderer {
         // Show DS info if present
         if (dnssec.dsPresent && dnssec.records.ds.length > 0) {
             html += `
-                    <div style="flex: 1; min-width: 200px; padding: 10px; background: var(--card-bg); border-radius: 6px;">
+                    <div style="flex: 1; min-width: min(200px, 100%); padding: 10px; background: var(--card-bg); border-radius: 6px;">
                         <div style="font-size: 0.9em; color: var(--text-secondary);">DS Records</div>
                         <div style="font-size: 1.2em; font-weight: bold; color: var(--text-primary);">${dnssec.records.ds.length}</div>
                         <div style="font-size: 0.8em; color: var(--text-secondary);">`;
@@ -2337,11 +2337,11 @@ class UIRenderer {
                 <table style="width: 100%; border-collapse: collapse; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.85rem; background: var(--card-bg); border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <thead>
                         <tr style="background: var(--table-header-bg); border-bottom: 2px solid var(--border-color);">
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color); min-width: 200px;">📜 Subdomain</th>
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color); min-width: 100px;">Source</th>
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color); min-width: 100px;">Discovered</th>
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color); min-width: 120px;">Issuer</th>
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color); min-width: 100px;">Expiry</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">📜 Subdomain</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Source</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Discovered</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Issuer</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Expiry</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -2410,10 +2410,10 @@ class UIRenderer {
                 <table style="width: 100%; border-collapse: collapse; background: var(--card-bg); border-radius: 8px; overflow: hidden;">
                     <thead>
                         <tr style="background: var(--bg-secondary);">
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color); min-width: 200px;">Host Label</th>
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color); min-width: 80px;">TTL</th>
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color); min-width: 80px;">Record Type</th>
-                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color); min-width: 300px;">Record Data</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Host Label</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">TTL</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Record Type</th>
+                            <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Record Data</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -2480,10 +2480,10 @@ class UIRenderer {
                         <table style="width: 100%; border-collapse: collapse; background: var(--card-bg); border-radius: 8px; overflow: hidden;">
                             <thead>
                                 <tr style="background: var(--bg-secondary);">
-                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color); min-width: 200px;">Host Label</th>
-                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color); min-width: 80px;">TTL</th>
-                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color); min-width: 80px;">Record Type</th>
-                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color); min-width: 300px;">Record Data</th>
+                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Host Label</th>
+                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">TTL</th>
+                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Record Type</th>
+                                    <th style="padding: 12px 8px; text-align: left; font-weight: 600; color: var(--text-primary); border-bottom: 2px solid var(--border-color);">Record Data</th>
                                 </tr>
                             </thead>
                             <tbody>

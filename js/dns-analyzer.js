@@ -135,6 +135,12 @@ class DNSAnalyzer {
         // Track rate-limited providers to avoid notification spam
         this.rateLimitedProviders = new Set();
         
+        // Track consecutive fetch failure counts per provider (for retry threshold)
+        this.providerFailCounts = new Map();
+        
+        // Track blocklists that returned "query blocked" so we stop hitting them
+        this.blockedBlocklists = new Set();
+        
         // Rate limiting
         this.rateLimiter = new RateLimiter(10, 1000); // 10 requests per second
         
@@ -167,6 +173,8 @@ class DNSAnalyzer {
         this.discoveryQueue.clear(); // Clear discovery queue
         this.apiCallbacks = [];
         this.rateLimitedProviders.clear(); // Clear rate limit tracking
+        this.providerFailCounts.clear(); // Clear provider failure counts
+        this.blockedBlocklists.clear(); // Clear blocklist blocked tracking
         this.currentDomain = null;
         
         console.log('🧹 DNS Analyzer internal state cleared for new analysis');
@@ -1897,6 +1905,12 @@ class DNSAnalyzer {
         let lastError = null;
 
         for (const provider of providers) {
+            // Skip providers already known to be rate-limited this session
+            if (this.rateLimitedProviders.has(provider.name)) {
+                rateLimitedProviders.push(provider.name);
+                continue;
+            }
+
             try {
                 const response = await fetch(provider.url, {
                     method: 'GET',
@@ -1909,18 +1923,14 @@ class DNSAnalyzer {
                 // Check for rate limit (429 Too Many Requests)
                 if (response.status === 429) {
                     rateLimitedProviders.push(provider.name);
-                    // Notify about rate limit via callback (only once per provider per session)
-                    if (!this.rateLimitedProviders.has(provider.name)) {
-                        this.rateLimitedProviders.add(provider.name);
-                        this.notifyAPIRateLimit(provider.name);
-                    }
-                    // Continue to next provider, but track that we hit rate limits
+                    this.rateLimitedProviders.add(provider.name);
+                    this.notifyAPIRateLimit(provider.name);
                     continue;
                 }
                 
                 if (response.ok) {
                     const data = await response.json();
-                    // If we had rate limits on other providers, notify about successful fallback
+                    this.providerFailCounts.delete(provider.name);
                     if (rateLimitedProviders.length > 0) {
                         this.notifyAPIFallback(rateLimitedProviders, provider.name);
                     }
@@ -1933,6 +1943,16 @@ class DNSAnalyzer {
             } catch (error) {
                 lastError = error.message;
                 console.warn(`Failed to get ASN from ${provider.name}:`, error.message);
+                // Track consecutive failures per provider. After 3 failures, mark unavailable.
+                // "Failed to fetch" can be CORS-blocked 429 or transient network issue.
+                const failCount = (this.providerFailCounts.get(provider.name) || 0) + 1;
+                this.providerFailCounts.set(provider.name, failCount);
+                if (failCount >= 3) {
+                    this.rateLimitedProviders.add(provider.name);
+                    rateLimitedProviders.push(provider.name);
+                    console.warn(`⛔ ${provider.name} marked as unavailable after ${failCount} consecutive failures — skipping for remainder of session`);
+                    this.notifyAPIStatus(provider.name, 'error', `Unavailable after ${failCount} consecutive failures. Skipping for this session.`);
+                }
                 continue;
             }
         }
@@ -2061,46 +2081,22 @@ class DNSAnalyzer {
 
     // Notify about API rate limit
     notifyAPIRateLimit(providerName) {
-        for (const callback of this.apiCallbacks) {
-            try {
-                callback('IP Geolocation', 'error', `${providerName} rate limit exceeded (429). Too many requests. Stopping requests to this provider.`);
-            } catch (error) {
-                console.warn('Error in API notification callback:', error);
-            }
-        }
+        this.notifyAPIStatus(providerName, 'error', 'Rate limit exceeded (429). Skipping for this session.');
     }
 
     // Notify about successful fallback after rate limits
     notifyAPIFallback(rateLimitedProviders, successfulProvider) {
-        for (const callback of this.apiCallbacks) {
-            try {
-                callback('IP Geolocation', 'warning', `${rateLimitedProviders.join(', ')} rate-limited, using ${successfulProvider} as fallback.`);
-            } catch (error) {
-                console.warn('Error in API notification callback:', error);
-            }
-        }
+        this.notifyAPIStatus(successfulProvider, 'warning', `Using as fallback (${rateLimitedProviders.join(', ')} unavailable).`);
     }
 
     // Notify when all providers are rate-limited
     notifyAPIAllRateLimited(rateLimitedProviders) {
-        for (const callback of this.apiCallbacks) {
-            try {
-                callback('IP Geolocation', 'error', `All IP geolocation APIs rate-limited (${rateLimitedProviders.join(', ')}). Location data unavailable. Please wait before analyzing another domain.`);
-            } catch (error) {
-                console.warn('Error in API notification callback:', error);
-            }
-        }
+        this.notifyAPIStatus('IP Geolocation', 'error', `All providers unavailable (${rateLimitedProviders.join(', ')}). Location data unavailable.`);
     }
 
     // Notify when all providers fail (non-rate-limit errors)
     notifyAPIAllFailed() {
-        for (const callback of this.apiCallbacks) {
-            try {
-                callback('IP Geolocation', 'warning', 'All IP geolocation APIs failed. Location data unavailable for some IPs.');
-            } catch (error) {
-                console.warn('Error in API notification callback:', error);
-            }
-        }
+        this.notifyAPIStatus('IP Geolocation', 'warning', 'All providers failed. Location data unavailable for some IPs.');
     }
 
     // Check IP against Spamhaus ZEN blocklist
@@ -2166,6 +2162,10 @@ class DNSAnalyzer {
             return null;
         }
 
+        if (this.blockedBlocklists.has('Spamhaus DBL')) {
+            return { listed: false, blocklist: 'Spamhaus DBL', error: 'Query blocked' };
+        }
+
         // Query format: domain.dbl.spamhaus.org
         const queryDomain = `${domain}.dbl.spamhaus.org`;
 
@@ -2189,7 +2189,9 @@ class DNSAnalyzer {
             // 127.255.255.254 = Anonymous query through public resolver
             // 127.255.255.255 = Excessive number of queries
             if (ip.startsWith('127.255.255.')) {
-                console.warn(`Spamhaus DBL returned error code ${ip} for ${domain}`);
+                this.blockedBlocklists.add('Spamhaus DBL');
+                console.warn(`Spamhaus DBL returned error code ${ip} for ${domain} — skipping for remainder of session`);
+                this.notifyAPIStatus('Spamhaus DBL', 'error', `Queries blocked (${ip}). Skipping for this session.`);
                 return { listed: false, blocklist: 'Spamhaus DBL', error: ip };
             }
 
@@ -2214,7 +2216,9 @@ class DNSAnalyzer {
 
             // 127.0.1.255 means IP queries are prohibited (error, not a listing)
             if (ip === '127.0.1.255') {
-                console.warn(`Spamhaus DBL: IP queries prohibited for ${domain}`);
+                this.blockedBlocklists.add('Spamhaus DBL');
+                console.warn(`Spamhaus DBL: IP queries prohibited for ${domain} — skipping for remainder of session`);
+                this.notifyAPIStatus('Spamhaus DBL', 'error', 'IP queries prohibited. Skipping for this session.');
                 return { listed: false, blocklist: 'Spamhaus DBL', error: ip };
             }
 
@@ -2246,6 +2250,10 @@ class DNSAnalyzer {
     async checkDomainAgainstSURBL(domain) {
         if (!domain || typeof domain !== 'string') {
             return null;
+        }
+
+        if (this.blockedBlocklists.has('SURBL')) {
+            return { listed: false, blocklist: 'SURBL', error: 'Query blocked' };
         }
 
         // Query format: domain.multi.surbl.org
@@ -2299,6 +2307,10 @@ class DNSAnalyzer {
             return null;
         }
 
+        if (this.blockedBlocklists.has('URIBL')) {
+            return { listed: false, blocklist: 'URIBL', error: 'Query blocked' };
+        }
+
         // Use multi.uribl.com for proper bitmask checking (per URIBL documentation)
         const queryDomain = `${domain}.multi.uribl.com`;
 
@@ -2326,7 +2338,9 @@ class DNSAnalyzer {
             
             // Check if query was blocked (bit 1) - this is NOT a positive listing
             if (lastOctet === 1) {
-                console.warn(`URIBL query blocked for ${domain} (high volume)`);
+                this.blockedBlocklists.add('URIBL');
+                console.warn(`URIBL query blocked for ${domain} (high volume) — skipping for remainder of session`);
+                this.notifyAPIStatus('URIBL', 'error', 'Queries blocked (high volume). Skipping for this session.');
                 return { listed: false, blocklist: 'URIBL', error: 'Query blocked' };
             }
             
