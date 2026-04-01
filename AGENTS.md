@@ -461,17 +461,19 @@ If you modify the file structure, update:
 - Removed duplicate `createSubdomainLink()` method in ui-renderer.js
 - Removed ~300 lines of dead code
 
-### Files Currently in Use (as of v1.0.2)
-**JavaScript (8 files):**
-1. logger.js (NEW in v1.0.2)
-2. app.js
-3. dns-analyzer.js
-4. service-detection-engine.js
-5. data-processor.js
-6. ui-renderer.js
-7. analysis-controller.js
-8. export-manager.js
-9. theme-toggle.js
+### Files Currently in Use (as of v1.1.3)
+**JavaScript (11 files):**
+1. common.js
+2. logger.js
+3. app.js
+4. dns-analyzer.js
+5. service-detection-engine.js
+6. data-processor.js
+7. ui-renderer.js
+8. analysis-controller.js
+9. export-manager.js
+10. visualizer.js
+11. theme-toggle.js
 
 **CSS (1 file):**
 - style.css
