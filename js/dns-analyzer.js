@@ -1096,6 +1096,7 @@ class DNSAnalyzer {
     
     // Query crt.sh for subdomains
     async queryCrtSh(domain) {
+        domain = domain.trim().toLowerCase();
         console.log(`  📡 Querying crt.sh for subdomains...`);
         this.stats.apiCalls++;
         
@@ -1139,7 +1140,7 @@ class DNSAnalyzer {
                 const nameValue = entry.name_value;
                 if (nameValue) {
                     // Handle case where name_value contains multiple domains/subdomains separated by newlines or commas
-                    const domains = nameValue.split(/\n|,/).map(s => s.trim()).filter(s => s);
+                    const domains = nameValue.split(/\n|,/).map(s => s.trim().toLowerCase()).filter(s => s);
                     
                     for (const dnsName of domains) {
                         // Check if this is a wildcard certificate
@@ -1190,6 +1191,7 @@ class DNSAnalyzer {
 
     // Query SSLMate CT Search API (formerly Cert Spotter) for subdomains
     async queryCertSpotter(domain) {
+        domain = domain.trim().toLowerCase();
         console.log(`  📡 Querying SSLMate CT Search API for subdomains...`);
         this.stats.apiCalls++;
         
@@ -1218,7 +1220,8 @@ class DNSAnalyzer {
             let wildcardCount = 0;
             for (const issuance of data) {
                 if (issuance.dns_names) {
-                    for (const dnsName of issuance.dns_names) {
+                    for (const rawName of issuance.dns_names) {
+                        const dnsName = rawName.trim().toLowerCase();
                         // Check if this is a wildcard certificate
                         if (dnsName.includes('*') && (dnsName.endsWith(`.${domain}`) || dnsName === `*.${domain}` || dnsName === domain)) {
                             // Collect wildcard certificate
@@ -1270,6 +1273,7 @@ class DNSAnalyzer {
 
     // Query HackerTarget for subdomains
     async queryHackerTarget(domain) {
+        domain = domain.trim().toLowerCase();
         console.log(`  📡 Querying HackerTarget for subdomains...`);
         this.stats.apiCalls++;
         
@@ -1298,7 +1302,7 @@ class DNSAnalyzer {
                 if (line.trim()) {
                     const parts = line.split(',');
                     if (parts.length >= 1) {
-                        const subdomain = parts[0].trim();
+                        const subdomain = parts[0].trim().toLowerCase();
                         if (subdomain && subdomain.endsWith(`.${domain}`) && subdomain !== domain) {
                             processedCount++;
                             // Check if this subdomain was actually added (not a duplicate)
@@ -1325,6 +1329,7 @@ class DNSAnalyzer {
     // Query THC ip.thc.org API for subdomains (reverse DNS data)
     // Documentation: https://ip.thc.org/docs/API/subdomain-lookup
     async queryTHC(domain) {
+        domain = domain.trim().toLowerCase();
         console.log(`  📡 Querying THC ip.thc.org for subdomains...`);
         this.stats.apiCalls++;
         
@@ -1362,7 +1367,7 @@ class DNSAnalyzer {
             let processedCount = 0;
             let addedCount = 0;
             for (const entry of domains) {
-                const subdomain = entry.domain;
+                const subdomain = entry.domain?.trim().toLowerCase();
                 if (subdomain && subdomain.endsWith(`.${domain}`) && subdomain !== domain) {
                     processedCount++;
                     // Check if this subdomain was actually added (not a duplicate)
@@ -3362,4 +3367,4 @@ class RateLimiter {
         
         this.requests.push(now);
     }
-} 
+}

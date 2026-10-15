@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Case-insensitive subdomain discovery** - Mixed-case domains such as `Synottic.com` and uppercase names returned by discovery providers no longer cause valid subdomains or wildcard certificates to be missed.
+
 ## [1.1.3] - 2026-04-01
 
 ### Changed
@@ -233,4 +236,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DNS over HTTPS for encrypted DNS queries
 - No analytics or user tracking
 - Open source code for security review
-
